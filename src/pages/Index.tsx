@@ -32,6 +32,7 @@ import { ReceiptWallet } from '@/components/receipt-wallet';
 import { metaService } from '@/lib/recurring';
 import { BiometricLock } from '@/components/biometric-lock';
 import { SMSExpenseNudge } from '@/components/sms-expense-nudge';
+import { PermissionGuard } from '@/components/permission-guard';
 
 type Tab = 'dashboard' | 'expenses' | 'vehicle' | 'analytics' | 'settings';
 
@@ -131,8 +132,8 @@ const Index = () => {
   const avgEfficiency = useMemo(() => {
     const logs = fuelService.getLogs();
     if (logs.length < 2) return 0;
-    const efficiencies = logs.filter(l => l.efficiency).map(l => l.efficiency!);
-    return efficiencies.length > 0 ? efficiencies.reduce((a, b) => a + b, 0) / efficiencies.length : 0;
+    const economies = logs.filter(l => l.economy).map(l => l.economy!);
+    return economies.length > 0 ? economies.reduce((a, b) => a + b, 0) / economies.length : 0;
   }, []);
 
   const settings = settingsService.get();
@@ -152,8 +153,9 @@ const Index = () => {
 
   return (
     <BiometricLock enabled={!!settings.biometricLock}>
-      <SMSExpenseNudge onAdd={handleAddExpense} />
-      <div className="min-h-screen bg-background bg-aurora">
+      <PermissionGuard>
+        <SMSExpenseNudge onAdd={handleAddExpense} />
+        <div className="min-h-screen bg-background bg-aurora">
         {!onboarded && <Onboarding onComplete={() => setOnboarded(true)} />}
         {/* ── Sidebar (desktop) ── */}
         <aside className="hidden sm:flex fixed left-0 top-0 bottom-0 w-60 flex-col glass border-r border-border/40 z-30">
@@ -581,6 +583,7 @@ const Index = () => {
           </div>
         </nav>
       </div>
+      </PermissionGuard>
     </BiometricLock>
   );
 };
