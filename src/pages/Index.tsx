@@ -8,6 +8,7 @@ import { Expense } from '@/types/expense';
 import { storageService } from '@/lib/storage';
 import { ExpenseForm } from '@/components/expense-form';
 import { ExpenseList } from '@/components/expense-list';
+import { SettingsDialog } from '@/components/settings-dialog';
 
 const Index = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -44,13 +45,13 @@ const Index = () => {
     }
   };
 
-  const handleDeleteExpense = (id: string) => {
+  const handleDeleteAll = () => {
     try {
-      storageService.deleteExpense(id);
-      setExpenses(storageService.getExpenses());
-      toast.success('Expense deleted');
+      storageService.clearAll();
+      setExpenses([]);
+      toast.success('All expenses deleted');
     } catch {
-      toast.error('Failed to delete expense');
+      toast.error('Failed to delete expenses');
     }
   };
 
