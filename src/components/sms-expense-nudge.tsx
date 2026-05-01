@@ -20,7 +20,7 @@ export function SMSExpenseNudge({ onAdd }: SMSExpenseNudgeProps) {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const handleSimulate = (e: any) => {
+    const handleTransaction = (e: any) => {
       const parsed = smsParser.parse(e.detail.body);
       if (parsed) {
         setDetected(parsed);
@@ -28,8 +28,13 @@ export function SMSExpenseNudge({ onAdd }: SMSExpenseNudgeProps) {
       }
     };
 
-    window.addEventListener('simulate-sms', handleSimulate);
-    return () => window.removeEventListener('simulate-sms', handleSimulate);
+    window.addEventListener('simulate-sms', handleTransaction);
+    window.addEventListener('notification-transaction', handleTransaction);
+    
+    return () => {
+      window.removeEventListener('simulate-sms', handleTransaction);
+      window.removeEventListener('notification-transaction', handleTransaction);
+    };
   }, []);
 
   const handleSave = async () => {

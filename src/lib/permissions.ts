@@ -51,5 +51,27 @@ export const permissions = {
       console.error('Permission request failed', error);
       return await this.checkStatus();
     }
+  },
+
+  /**
+   * Opens Android settings for Notification Listener access
+   */
+  async requestNotificationListener(): Promise<void> {
+    if (Capacitor.isNativePlatform() && (window as any).NativeBridge) {
+      (window as any).NativeBridge.openNotificationSettings();
+    } else {
+      console.warn('NativeBridge not available or not on native platform');
+    }
+  },
+
+  /**
+   * Opens Android settings for "Display over other apps" permission
+   */
+  async requestOverlayPermission(): Promise<void> {
+    if (Capacitor.isNativePlatform() && (window as any).NativeBridge) {
+      (window as any).NativeBridge.openOverlaySettings();
+    } else {
+      console.warn('NativeBridge not available or not on native platform');
+    }
   }
 };

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { User, Building, Mail, Phone, MapPin, Plus, Trash2, Target, Moon, Sun, Palette, Lock, Settings, Bell } from 'lucide-react';
+import { User, Building,Zap, Mail, Phone, MapPin, Plus, Trash2, Target, Moon, Sun, Palette, Lock, Settings, Bell } from 'lucide-react';
 import { useEffect } from 'react';
 import { biometrics } from '@/lib/biometrics';
 
@@ -110,20 +110,46 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
     <div className="space-y-5 pb-24 sm:pb-8">
       {/* System Settings */}
       <Section icon={Settings} title="System">
-        <Button 
-          variant="outline" 
-          className="w-full justify-start gap-2 h-11 rounded-xl border-dashed border-primary/30 text-primary hover:bg-primary/5"
-          onClick={() => {
-            const event = new CustomEvent('simulate-sms', { 
-              detail: { body: "HDFC Bank: Rs. 1,250.00 spent at STARBUCKS on 01-MAY-26. Info: POS" } 
-            });
-            window.dispatchEvent(event);
-            toast.info('Simulated bank SMS received');
-          }}
-        >
-          <Bell className="h-4 w-4" />
-          Simulate Transaction SMS
-        </Button>
+        <div className="space-y-3">
+          <Button 
+            variant="outline" 
+            className="w-full justify-start gap-2 h-11 rounded-xl border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10"
+            onClick={() => {
+              import('@/lib/permissions').then(m => m.permissions.requestNotificationListener());
+              toast.info('Grant "Reimburse" access to read notifications to detect transactions automatically.');
+            }}
+          >
+            <Zap className="h-4 w-4" />
+            Enable Transaction Monitor
+          </Button>
+
+          <Button 
+            variant="outline" 
+            className="w-full justify-start gap-2 h-11 rounded-xl border border-warning/30 text-warning bg-warning/5 hover:bg-warning/10"
+            onClick={() => {
+              import('@/lib/permissions').then(m => m.permissions.requestOverlayPermission());
+              toast.info('Enable "Display over other apps" to see transaction popups anywhere.');
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            Enable Overlay Popup
+          </Button>
+
+          <Button 
+            variant="outline" 
+            className="w-full justify-start gap-2 h-11 rounded-xl border-dashed border-border/60 text-muted-foreground hover:bg-muted/50"
+            onClick={() => {
+              const event = new CustomEvent('simulate-sms', { 
+                detail: { body: "HDFC Bank: Rs. 1,250.00 spent at STARBUCKS on 01-MAY-26. Info: POS" } 
+              });
+              window.dispatchEvent(event);
+              toast.info('Simulated bank notification received');
+            }}
+          >
+            <Bell className="h-4 w-4" />
+            Test Simulation
+          </Button>
+        </div>
       </Section>
 
       {/* Appearance */}
