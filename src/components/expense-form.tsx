@@ -21,7 +21,7 @@ const expenseSchema = z.object({
   amount: z.number().min(0.01, 'Amount must be greater than 0'),
   date: z.string().min(1, 'Date is required'),
   category: z.string().min(1, 'Category is required'),
-  description: z.string().min(1, 'Description is required'),
+  description: z.string().optional(),
   status: z.string().min(1, 'Status is required'),
 });
 
@@ -75,7 +75,7 @@ export function ExpenseForm({ onSubmit, initialData, isEdit = false }: ExpenseFo
       amount: data.amount,
       date: data.date,
       category: data.category as ExpenseCategory,
-      description: data.description,
+      description: data.description || '',
       status: data.status as ExpenseStatus,
       currency: 'INR',
       receiptImage: receiptFile ? URL.createObjectURL(receiptFile) : initialData?.receiptImage,
@@ -244,7 +244,7 @@ export function ExpenseForm({ onSubmit, initialData, isEdit = false }: ExpenseFo
           {/* Description */}
           <div className="space-y-2">
             <Label htmlFor="description" className="text-sm font-medium text-foreground">
-              Description/Notes
+              Description/Notes <span className="text-muted-foreground font-normal">(Optional)</span>
             </Label>
             <Textarea
               id="description"
@@ -252,9 +252,6 @@ export function ExpenseForm({ onSubmit, initialData, isEdit = false }: ExpenseFo
               placeholder="Brief description of the expense..."
               className="bg-surface-elevated min-h-[80px]"
             />
-            {errors.description && (
-              <p className="text-sm text-destructive">{errors.description.message}</p>
-            )}
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
