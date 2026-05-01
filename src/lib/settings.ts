@@ -1,4 +1,5 @@
 import { AppSettings, BudgetGoal } from '@/types/expense';
+import { storageEngine } from '@/lib/storage-engine';
 
 const SETTINGS_KEY = 'reimburse_settings_v2';
 
@@ -31,7 +32,7 @@ export const settingsService = {
           billedTo: { ...defaultSettings.billedTo, ...old.billedTo },
           billedFrom: { ...defaultSettings.billedFrom, ...old.billedFrom },
         };
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify(migrated));
+        storageEngine.set(SETTINGS_KEY, JSON.stringify(migrated));
         return migrated;
       }
       const stored = localStorage.getItem(SETTINGS_KEY);
@@ -50,7 +51,7 @@ export const settingsService = {
   },
 
   save(settings: AppSettings): void {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    storageEngine.set(SETTINGS_KEY, JSON.stringify(settings));
   },
 
   updateBudget(budget: BudgetGoal): void {

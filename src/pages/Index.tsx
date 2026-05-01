@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, Receipt, BarChart3, Settings,
   Wallet, TrendingUp, Clock, CheckCircle2, Moon, Sun,
-  Zap, ArrowRight, ChevronRight
+  Zap, ArrowRight, ChevronRight, Plus, Car
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, startOfMonth, subMonths, isSameMonth } from 'date-fns';
@@ -10,6 +10,7 @@ import { format, startOfMonth, subMonths, isSameMonth } from 'date-fns';
 import { Expense, ExpenseStatus } from '@/types/expense';
 import { storageService } from '@/lib/storage';
 import { settingsService } from '@/lib/settings';
+import { haptics } from '@/lib/haptics';
 import { formatCurrency, formatCompactCurrency, cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -19,6 +20,13 @@ import { StatCard } from '@/components/stat-card';
 import { BudgetTracker } from '@/components/budget-tracker';
 import { SettingsPage } from '@/components/settings-page';
 import { SpendingTrendChart, CategoryBreakdownChart, MonthlyBarChart } from '@/components/analytics-charts';
+import { Onboarding } from '@/components/onboarding';
+import { MonthlySummary } from '@/components/monthly-summary';
+import { CategoryRings } from '@/components/category-rings';
+import { RecurringManager } from '@/components/recurring-manager';
+import { FuelTracker } from '@/components/fuel-tracker';
+import { ReceiptWallet } from '@/components/receipt-wallet';
+import { metaService } from '@/lib/recurring';
 
 type Tab = 'dashboard' | 'expenses' | 'analytics' | 'settings';
 
@@ -29,11 +37,45 @@ const NAV_ITEMS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
+// Split nav: 2 left of FAB, 2 right of FAB.
+const LEFT_NAV  = NAV_ITEMS.slice(0, 2);   // Dashboard, Expenses
+const RIGHT_NAV = NAV_ITEMS.slice(2, 4);   // Analytics, Settings
+
 const Index = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [expenseSubTab, setExpenseSubTab] = useState<'all' | 'wallet'>('all');
+  const [dashboardTab, setDashboardTab] = useState<'expenses' | 'mileage'>('expenses');
+  const [navExpanded, setNavExpanded] = useState(false);
+  const [onboarded, setOnboarded] = useState(true);
+  const navRef = useRef<HTMLDivElement>(null);
   const { theme, toggle: toggleTheme } = useTheme();
+
+  useEffect(() => {
+    setOnboarded(metaService.get().onboardingDone);
+  }, []);
+
+  // Swipe to expand nav logic
+  const navTouchStartX = useRef(0);
+  const handleNavTouchStart = (e: React.TouchEvent) => { navTouchStartX.current = e.touches[0].clientX; };
+  const handleNavTouchEnd = (e: React.TouchEvent) => {
+    const delta = navTouchStartX.current - e.changedTouches[0].clientX;
+    if (delta > 40 && !navExpanded) { haptics.selection(); setNavExpanded(true); } // swipe left
+    if (delta < -40 && navExpanded) { haptics.selection(); setNavExpanded(false); } // swipe right
+  };
+
+  // Close expanded nav when tapping outside
+  useEffect(() => {
+    if (!navExpanded) return;
+    const handler = (e: MouseEvent) => {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) {
+        setNavExpanded(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [navExpanded]);
 
   useEffect(() => {
     try {
@@ -58,22 +100,22 @@ const Index = () => {
   };
 
   const handleDeleteExpense = (id: string) => {
-    try { storageService.deleteExpense(id); reload(); toast.success('Expense deleted'); }
+    try { storageService.deleteExpense(id); reload(); haptics.heavy(); toast.success('Expense deleted'); }
     catch { toast.error('Failed to delete expense'); }
   };
 
   const handleDeleteAll = () => {
-    try { storageService.clearAll(); setExpenses([]); toast.success('All expenses cleared'); }
+    try { storageService.clearAll(); setExpenses([]); haptics.heavy(); toast.success('All expenses cleared'); }
     catch { toast.error('Failed to clear expenses'); }
   };
 
   const handleBatchDelete = (ids: string[]) => {
-    try { storageService.batchDelete(ids); reload(); toast.success(`${ids.length} expenses deleted`); }
+    try { storageService.batchDelete(ids); reload(); haptics.heavy(); toast.success(`${ids.length} expenses deleted`); }
     catch { toast.error('Failed to delete expenses'); }
   };
 
   const handleBatchStatus = (ids: string[], status: ExpenseStatus) => {
-    try { storageService.batchUpdateStatus(ids, status); reload(); toast.success(`Updated ${ids.length} expenses`); }
+    try { storageService.batchUpdateStatus(ids, status); reload(); haptics.medium(); toast.success(`Updated ${ids.length} expenses`); }
     catch { toast.error('Failed to update expenses'); }
   };
 
@@ -107,6 +149,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background bg-aurora">
+      {!onboarded && <Onboarding onComplete={() => setOnboarded(true)} />}
       {/* ── Sidebar (desktop) ── */}
       <aside className="hidden sm:flex fixed left-0 top-0 bottom-0 w-60 flex-col glass border-r border-border/40 z-30">
         {/* Logo */}
@@ -175,15 +218,12 @@ const Index = () => {
               </div>
               <span className="font-bold text-sm tracking-tight">Reimburse</span>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={toggleTheme}
-                className="h-8 w-8 rounded-xl border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground"
-              >
-                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </button>
-              <ExpenseForm onSubmit={handleAddExpense} />
-            </div>
+            <button
+              onClick={toggleTheme}
+              className="h-8 w-8 rounded-xl border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground"
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
           </div>
         </header>
 
@@ -206,36 +246,54 @@ const Index = () => {
         </header>
 
         {/* Scrollable content */}
-        <main className="px-4 sm:px-6 py-5 sm:py-6 pb-24 sm:pb-8 max-w-5xl mx-auto">
+        <main className="px-4 sm:px-6 py-5 sm:py-6 pb-32 sm:pb-8 max-w-5xl mx-auto">
 
           {/* ── DASHBOARD TAB ── */}
           {activeTab === 'dashboard' && (
             <div className="space-y-5 animate-fade-in">
-              {/* Welcome / hero */}
-              <div className="rounded-2xl border border-border/40 bg-card/60 p-5 overflow-hidden relative">
-                <div className="absolute inset-0 bg-aurora opacity-30 pointer-events-none" />
-                <div className="relative">
-                  <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold bg-primary/15 text-primary px-2.5 py-1 rounded-full mb-3">
-                    <Zap className="h-3 w-3" />
-                    Premium Expense Tracker
-                  </div>
-                  <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight mb-1">
-                    Track expenses,{' '}
-                    <span className="text-gradient">get paid faster.</span>
-                  </h2>
-                  <p className="text-sm text-muted-foreground max-w-md">
-                    Invoice-grade PDF exports, smart analytics, and budget tracking — all stored privately on your device.
-                  </p>
-                  {expenses.length === 0 && (
-                    <button
-                      onClick={() => setActiveTab('expenses')}
-                      className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:gap-2.5 transition-all"
-                    >
-                      Add your first expense <ArrowRight className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
+              <div className="flex bg-muted/40 p-1 rounded-xl w-full sm:w-fit mb-2">
+                <button onClick={() => setDashboardTab('expenses')} className={cn("flex-1 px-6 py-1.5 rounded-lg text-xs font-bold transition-all", dashboardTab === 'expenses' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>Expenses</button>
+                <button onClick={() => setDashboardTab('mileage')} className={cn("flex-1 px-6 py-1.5 rounded-lg text-xs font-bold transition-all", dashboardTab === 'mileage' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>Mileage</button>
               </div>
+
+              {dashboardTab === 'mileage' && (
+                <FuelTracker />
+              )}
+
+              {dashboardTab === 'expenses' && (
+                <>
+                  {/* Welcome / hero / summary */}
+                  {expenses.length === 0 ? (
+                    <div className="rounded-2xl border border-border/40 bg-card/60 p-5 overflow-hidden relative">
+                      <div className="absolute inset-0 bg-aurora opacity-30 pointer-events-none" />
+                      <div className="relative">
+                        <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold bg-primary/15 text-primary px-2.5 py-1 rounded-full mb-3">
+                          <Zap className="h-3 w-3" />
+                          Premium Expense Tracker
+                        </div>
+                        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight mb-1">
+                          Track expenses,{' '}
+                          <span className="text-gradient">get paid faster.</span>
+                        </h2>
+                        <p className="text-sm text-muted-foreground max-w-md">
+                          Invoice-grade PDF exports, smart analytics, and budget tracking — all stored privately on your device.
+                        </p>
+                        <button
+                          onClick={() => setActiveTab('expenses')}
+                          className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:gap-2.5 transition-all"
+                        >
+                          Add your first expense <ArrowRight className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <MonthlySummary expenses={expenses} onViewAll={() => setActiveTab('expenses')} />
+                      <div className="rounded-2xl border border-border/40 bg-card/60 p-4">
+                        <CategoryRings expenses={expenses} />
+                      </div>
+                    </div>
+                  )}
 
               {/* Stats grid — 2 cols on mobile, 4 on desktop */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -336,32 +394,55 @@ const Index = () => {
                   />
                 </div>
               )}
+                </>
+              )}
             </div>
           )}
 
-          {/* ── EXPENSES TAB ── */}
+              {/* ── EXPENSES TAB ── */}
           {activeTab === 'expenses' && (
-            <div className="animate-fade-in">
-              <div className="flex items-center justify-between mb-5">
+            <div className="animate-fade-in space-y-5">
+              <div className="flex items-center justify-between mb-2">
                 <div>
-                  <h2 className="font-bold text-lg">All Expenses</h2>
+                  <h2 className="font-bold text-lg">Expense Center</h2>
                   <p className="text-xs text-muted-foreground mt-0.5">{expenses.length} total · {formatCurrency(totalAmount)}</p>
                 </div>
                 <div className="sm:hidden">
                   <ExpenseForm onSubmit={handleAddExpense} />
                 </div>
               </div>
-              <ExpenseList
-                expenses={expenses}
-                onUpdateExpense={handleUpdateExpense}
-                onDeleteExpense={handleDeleteExpense}
-                onDeleteAll={handleDeleteAll}
-                onBatchDelete={handleBatchDelete}
-                onBatchStatus={handleBatchStatus}
-              />
+
+              {/* Navigation pills */}
+              <div className="flex bg-muted/40 p-1 rounded-xl w-full sm:w-fit">
+                <button onClick={() => setExpenseSubTab('all')} className={cn("flex-1 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all", expenseSubTab === 'all' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>Log</button>
+                <button onClick={() => setExpenseSubTab('wallet')} className={cn("flex-1 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all", expenseSubTab === 'wallet' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>Wallet</button>
+              </div>
+
+              {expenseSubTab === 'all' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="rounded-2xl border border-border/60 bg-card/40 p-4">
+                    <RecurringManager onAddExpense={handleAddExpense} />
+                  </div>
+                  <ExpenseList
+                    expenses={expenses}
+                    onUpdateExpense={handleUpdateExpense}
+                    onDeleteExpense={handleDeleteExpense}
+                    onDeleteAll={handleDeleteAll}
+                    onBatchDelete={handleBatchDelete}
+                    onBatchStatus={handleBatchStatus}
+                  />
+                </div>
+              )}
+
+              {expenseSubTab === 'wallet' && (
+                <div className="rounded-2xl border border-border/60 bg-card/40 p-4 animate-fade-in">
+                  <ReceiptWallet onAddExpense={handleAddExpense} />
+                </div>
+              )}
             </div>
           )}
 
+          {/* Vehicle tab moved to dashboard */}
           {/* ── ANALYTICS TAB ── */}
           {activeTab === 'analytics' && (
             <div className="space-y-5 animate-fade-in">
@@ -440,30 +521,113 @@ const Index = () => {
         </footer>
       </div>
 
-      {/* ── Bottom Nav (mobile) ── */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-30 glass border-t border-border/40">
-        <div className="flex items-stretch h-16 safe-area-bottom">
-          {NAV_ITEMS.map(item => {
-            const Icon = item.icon;
-            const active = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={cn(
-                  "flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-200 relative",
-                  active ? "text-primary" : "text-muted-foreground"
-                )}
-              >
-                {active && (
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 bg-gradient-primary rounded-full" />
-                )}
-                <Icon className={cn("h-5 w-5 transition-transform", active && "scale-110")} />
-                <span className="text-[10px] font-medium">{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
+      {/* ── Floating Bottom Nav (mobile) ── */}
+      <nav
+        ref={navRef}
+        onTouchStart={handleNavTouchStart}
+        onTouchEnd={handleNavTouchEnd}
+        className="sm:hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-40"
+        style={{ width: navExpanded ? 'calc(100vw - 24px)' : '320px', transition: 'width 0.38s cubic-bezier(0.34,1.56,0.64,1)' }}
+      >
+        {/* Collapsed pill */}
+        {!navExpanded && (
+          <div className="mobile-float-nav flex items-center justify-between px-3 py-2 gap-1">
+
+            {/* LEFT items */}
+            {LEFT_NAV.map(item => {
+              const Icon = item.icon;
+              const active = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={cn(
+                    "flex-1 flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-2xl transition-all duration-200",
+                    active
+                      ? "text-primary bg-primary/15"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Icon className={cn("h-[18px] w-[18px] transition-transform duration-200", active && "scale-110")} />
+                  <span className="text-[9px] font-semibold tracking-wide">{item.label}</span>
+                </button>
+              );
+            })}
+
+            {/* CENTER — Add Expense FAB */}
+            <div className="relative flex-shrink-0 mx-1">
+              <ExpenseForm
+                onSubmit={handleAddExpense}
+                trigger={
+                  <button
+                    className="h-14 w-14 rounded-full bg-gradient-primary shadow-glow flex items-center justify-center transition-all duration-300 active:scale-95 hover:scale-105"
+                    aria-label="Add expense"
+                  >
+                    <Plus className="h-6 w-6 text-white" strokeWidth={2.5} />
+                  </button>
+                }
+              />
+            </div>
+
+            {/* RIGHT items */}
+            {RIGHT_NAV.map(item => {
+              const Icon = item.icon;
+              const active = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={cn(
+                    "flex-1 flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-2xl transition-all duration-200",
+                    active
+                      ? "text-primary bg-primary/15"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Icon className={cn("h-[18px] w-[18px] transition-transform duration-200", active && "scale-110")} />
+                  <span className="text-[9px] font-semibold tracking-wide">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Expanded full-width rail (swipe state) */}
+        {navExpanded && (
+          <div className="mobile-float-nav flex items-center px-2 py-2 gap-1 animate-scale-in">
+            {NAV_ITEMS.map(item => {
+              const Icon = item.icon;
+              const active = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => { setActiveTab(item.id); setNavExpanded(false); }}
+                  className={cn(
+                    "flex-1 flex flex-col items-center gap-0.5 py-2 px-1 rounded-2xl transition-all duration-200",
+                    active
+                      ? "text-primary bg-primary/15"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Icon className={cn("h-5 w-5 transition-transform", active && "scale-110")} />
+                  <span className="text-[9px] font-semibold tracking-wide">{item.label}</span>
+                </button>
+              );
+            })}
+            {/* Collapsed Add button in expanded mode */}
+            <ExpenseForm
+              onSubmit={(e) => { handleAddExpense(e); setNavExpanded(false); }}
+              trigger={
+                <button
+                  className="h-10 w-10 rounded-full bg-gradient-primary shadow-glow flex items-center justify-center flex-shrink-0 transition-all active:scale-95"
+                  aria-label="Add expense"
+                >
+                  <Plus className="h-5 w-5 text-white" strokeWidth={2.5} />
+                </button>
+              }
+            />
+          </div>
+        )}
       </nav>
     </div>
   );

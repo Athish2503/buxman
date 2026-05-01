@@ -1,4 +1,5 @@
 import { Expense } from '@/types/expense';
+import { storageEngine } from '@/lib/storage-engine';
 
 const STORAGE_KEY = 'reimburse_expenses_v2';
 
@@ -8,7 +9,7 @@ export const storageService = {
       // Migrate from old key if needed
       const oldData = localStorage.getItem('reimbursement_expenses');
       if (oldData && !localStorage.getItem(STORAGE_KEY)) {
-        localStorage.setItem(STORAGE_KEY, oldData);
+        storageEngine.set(STORAGE_KEY, oldData);
       }
       const stored = localStorage.getItem(STORAGE_KEY);
       return stored ? JSON.parse(stored) : [];
@@ -19,7 +20,7 @@ export const storageService = {
 
   saveExpenses(expenses: Expense[]): void {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+      storageEngine.set(STORAGE_KEY, JSON.stringify(expenses));
     } catch (error) {
       console.error('Error saving expenses:', error);
     }
@@ -63,7 +64,7 @@ export const storageService = {
   },
 
   clearAll(): void {
-    localStorage.removeItem(STORAGE_KEY);
+    storageEngine.remove(STORAGE_KEY);
   },
 
   exportJSON(): string {

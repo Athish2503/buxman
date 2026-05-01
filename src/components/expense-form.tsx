@@ -1,411 +1,657 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format } from 'date-fns';
-import { 
-  CalendarDays, Upload, X, Plus, Tag, Briefcase,
-  Receipt, ChevronRight, Sparkles
+import {
+  X, Plus, Upload, Tag, Briefcase,
+  Receipt, Check, Camera,
+  CalendarDays, IndianRupee, ArrowRight,
+  Sparkles,
 } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 import { Expense, ExpenseCategory, ExpenseStatus } from '@/types/expense';
 import { categoryConfig } from '@/lib/categories';
+import { storageService } from '@/lib/storage';
+import { vendorService } from '@/lib/recurring';
+import { haptics } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 
+/* ─── schema ─────────────────────────────────────────────────────── */
 const expenseSchema = z.object({
-  vendor: z.string().min(1, 'Vendor name is required'),
-  amount: z.number().min(0.01, 'Amount must be greater than 0'),
-  date: z.string().min(1, 'Date is required'),
-  category: z.string().min(1, 'Category is required'),
+  vendor:      z.string().min(1, 'Vendor is required'),
+  amount:      z.number().min(0.01, 'Must be > 0'),
+  date:        z.string().min(1, 'Date is required'),
+  category:    z.string().min(1, 'Pick a category'),
   description: z.string().optional(),
-  status: z.string().min(1, 'Status is required'),
+  status:      z.string().min(1, 'Pick a status'),
   projectCode: z.string().optional(),
 });
+type FormData = z.infer<typeof expenseSchema>;
 
-type ExpenseFormData = z.infer<typeof expenseSchema>;
-
-interface ExpenseFormProps {
-  onSubmit: (expense: Expense) => void;
-  initialData?: Expense;
-  isEdit?: boolean;
-  onClose?: () => void;
-}
-
-const STATUS_OPTIONS: { value: ExpenseStatus; label: string; color: string }[] = [
-  { value: 'pending', label: 'Pending', color: 'text-warning' },
-  { value: 'approved', label: 'Approved', color: 'text-success' },
-  { value: 'reimbursed', label: 'Reimbursed', color: 'text-primary' },
-  { value: 'rejected', label: 'Rejected', color: 'text-destructive' },
+/* ─── status options ──────────────────────────────────────────────── */
+const STATUS_OPTIONS: {
+  value: ExpenseStatus;
+  label: string;
+  emoji: string;
+  active: string;
+}[] = [
+  { value: 'pending',    label: 'Pending',    emoji: '⏳', active: 'bg-amber-500/20 border-amber-500/50 text-amber-400' },
+  { value: 'approved',   label: 'Approved',   emoji: '✅', active: 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' },
+  { value: 'reimbursed', label: 'Reimbursed', emoji: '💸', active: 'bg-violet-500/20 border-violet-500/50 text-violet-400' },
+  { value: 'rejected',   label: 'Rejected',   emoji: '❌', active: 'bg-rose-500/20 border-rose-500/50 text-rose-400' },
 ];
 
-export function ExpenseForm({ onSubmit, initialData, isEdit = false, onClose }: ExpenseFormProps) {
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
-  const [receiptPreview, setReceiptPreview] = useState<string | null>(initialData?.receiptImage || null);
-  const [isOpen, setIsOpen] = useState(false);
-  const [tags, setTags] = useState<string[]>(initialData?.tags || []);
+/* ─── props ───────────────────────────────────────────────────────── */
+export interface ExpenseFormProps {
+  onSubmit:    (expense: Expense) => void;
+  initialData?: Expense;
+  isEdit?:     boolean;
+  onClose?:    () => void;
+  trigger?:    React.ReactNode;
+}
+
+/* ─── Swipe-to-add slider ─────────────────────────────────────────── */
+function SwipeToAdd({
+  onConfirm,
+  isSubmitting,
+  success,
+  label = 'Swipe to Add',
+}: {
+  onConfirm: () => void;
+  isSubmitting: boolean;
+  success: boolean;
+  label?: string;
+}) {
+  const trackRef  = useRef<HTMLDivElement>(null);
+  const thumbRef  = useRef<HTMLDivElement>(null);
+  const [pct, setPct]         = useState(0);      // 0-1 progress
+  const [dragging, setDragging] = useState(false);
+  const [done, setDone]       = useState(false);
+  const startX = useRef(0);
+  const trackW = useRef(0);
+  const THUMB  = 52; // thumb width in px
+  const THRESH = 0.82;
+  const lastTick = useRef(0);
+
+  const reset = () => { setPct(0); setDone(false); lastTick.current = 0; };
+
+  // keep in sync with parent success
+  useEffect(() => { if (!success) reset(); }, [success]);
+
+  const begin = (clientX: number) => {
+    if (done || isSubmitting) return;
+    startX.current = clientX;
+    trackW.current = (trackRef.current?.clientWidth ?? 200) - THUMB - 8;
+    setDragging(true);
+  };
+  const move = (clientX: number) => {
+    if (!dragging) return;
+    const delta = clientX - startX.current;
+    const raw   = Math.min(Math.max(delta / trackW.current, 0), 1);
+    setPct(raw);
+    
+    // Tactile ticks every 15%
+    const tick = Math.floor(raw / 0.15);
+    if (tick > lastTick.current && raw < THRESH) {
+      lastTick.current = tick;
+      haptics.selection();
+    }
+
+    if (raw >= THRESH) {
+      setDone(true);
+      setDragging(false);
+      setPct(1);
+      haptics.success();
+      onConfirm();
+    }
+  };
+  const end = () => {
+    if (!done) { setDragging(false); setPct(0); lastTick.current = 0; }
+  };
+
+  // Mouse
+  const onMouseDown = (e: React.MouseEvent) => begin(e.clientX);
+  useEffect(() => {
+    if (!dragging) return;
+    const mm = (e: MouseEvent) => move(e.clientX);
+    const mu = () => end();
+    window.addEventListener('mousemove', mm);
+    window.addEventListener('mouseup', mu);
+    return () => { window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu); };
+  }, [dragging, done]);
+
+  // Touch
+  const onTouchStart = (e: React.TouchEvent) => begin(e.touches[0].clientX);
+  const onTouchMove  = (e: React.TouchEvent) => move(e.touches[0].clientX);
+  const onTouchEnd   = () => end();
+
+  const fillOpacity = Math.max(0.15, pct);
+
+  return (
+    <div
+      ref={trackRef}
+      className="relative h-[52px] rounded-2xl overflow-hidden select-none cursor-grab active:cursor-grabbing"
+      style={{
+        background: success
+          ? 'linear-gradient(135deg, #10b981, #06b6d4)'
+          : `linear-gradient(135deg, hsl(262 85% 65% / ${fillOpacity}), hsl(186 95% 52% / ${fillOpacity * 0.6}))`,
+        boxShadow: success ? '0 0 24px hsl(152 68% 50% / 0.5)' : '0 0 24px hsl(262 85% 65% / 0.3)',
+        border: '1px solid hsl(262 85% 65% / 0.35)',
+        transition: success ? 'background 0.4s, box-shadow 0.4s' : undefined,
+      }}
+    >
+      {/* Label */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        {success ? (
+          <span className="flex items-center gap-2 text-white font-bold text-sm">
+            <Check className="h-4 w-4" strokeWidth={3} /> Added!
+          </span>
+        ) : isSubmitting ? (
+          <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+        ) : (
+          <span
+            className="text-sm font-bold tracking-wide"
+            style={{ color: `hsl(220 15% 94% / ${0.4 + pct * 0.6})` }}
+          >
+            {label}
+          </span>
+        )}
+      </div>
+
+      {/* Thumb */}
+      {!success && !isSubmitting && (
+        <div
+          ref={thumbRef}
+          onMouseDown={onMouseDown}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          className="absolute top-[4px] bottom-[4px] flex items-center justify-center rounded-xl bg-gradient-primary shadow-glow z-10"
+          style={{
+            width: THUMB,
+            left:  4 + pct * ((trackRef.current?.clientWidth ?? 200) - THUMB - 8),
+            transition: dragging ? 'none' : 'left 0.35s cubic-bezier(0.34,1.56,0.64,1)',
+          }}
+        >
+          <ArrowRight className="h-5 w-5 text-white" strokeWidth={2.5} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Inner form body — shared by both mobile sheet and desktop modal
+═══════════════════════════════════════════════════════════════════ */
+function FormBody({
+  onSubmit,
+  initialData,
+  isEdit = false,
+  onClose,
+  onDone,
+}: ExpenseFormProps & { onDone?: () => void }) {
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(
+    initialData?.receiptImage || null
+  );
+  const [tags,     setTags]     = useState<string[]>(initialData?.tags || []);
   const [tagInput, setTagInput] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const [success,  setSuccess]  = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors, isSubmitting },
-    reset
-  } = useForm<ExpenseFormData>({
-    resolver: zodResolver(expenseSchema),
-    defaultValues: initialData ? {
-      vendor: initialData.vendor,
-      amount: initialData.amount,
-      date: format(new Date(initialData.date), 'yyyy-MM-dd'),
-      category: initialData.category,
-      description: initialData.description,
-      status: initialData.status,
-      projectCode: initialData.projectCode || '',
-    } : {
-      date: format(new Date(), 'yyyy-MM-dd'),
-      status: 'pending',
-    }
-  });
+  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting }, reset } =
+    useForm<FormData>({
+      resolver: zodResolver(expenseSchema),
+      defaultValues: initialData
+        ? {
+            vendor:      initialData.vendor,
+            amount:      initialData.amount,
+            date:        format(new Date(initialData.date), 'yyyy-MM-dd'),
+            category:    initialData.category,
+            description: initialData.description,
+            status:      initialData.status,
+            projectCode: initialData.projectCode || '',
+          }
+        : { date: format(new Date(), 'yyyy-MM-dd'), status: 'pending' },
+    });
 
-  const watchedCategory = watch('category');
-  const watchedStatus = watch('status');
+  const cat    = watch('category');
+  const status = watch('status');
+  const amount = watch('amount');
+  const selCat = cat ? categoryConfig[cat as ExpenseCategory] : null;
+
+  const vendors = useMemo(() => {
+    try { return vendorService.getFromExpenses(storageService.getExpenses()); }
+    catch { return []; }
+  }, []);
 
   const processFile = (file: File) => {
     if (!file.type.startsWith('image/')) return;
-    setReceiptFile(file);
-    const reader = new FileReader();
-    reader.onload = (e) => setReceiptPreview(e.target?.result as string);
-    reader.readAsDataURL(file);
+    const r = new FileReader();
+    r.onload = (e) => setReceiptPreview(e.target?.result as string);
+    r.readAsDataURL(file);
   };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
-  };
-
   const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) processFile(file);
+    e.preventDefault(); setDragOver(false);
+    const f = e.dataTransfer.files?.[0]; if (f) processFile(f);
   }, []);
 
   const addTag = () => {
     const t = tagInput.trim().toLowerCase();
-    if (t && !tags.includes(t)) setTags(prev => [...prev, t]);
+    if (t && !tags.includes(t)) setTags(p => [...p, t]);
     setTagInput('');
   };
 
-  const removeTag = (tag: string) => setTags(prev => prev.filter(t => t !== tag));
-
-  const onFormSubmit = (data: ExpenseFormData) => {
+  const onFormSubmit = async (data: FormData) => {
     const expense: Expense = {
-      id: initialData?.id || crypto.randomUUID(),
-      vendor: data.vendor,
-      amount: data.amount,
-      date: data.date,
-      category: data.category as ExpenseCategory,
-      description: data.description || '',
-      status: data.status as ExpenseStatus,
-      currency: 'INR',
+      id:           initialData?.id || crypto.randomUUID(),
+      vendor:       data.vendor,
+      amount:       data.amount,
+      date:         data.date,
+      category:     data.category as ExpenseCategory,
+      description:  data.description || '',
+      status:       data.status as ExpenseStatus,
+      currency:     'INR',
       receiptImage: receiptPreview || initialData?.receiptImage,
       tags,
-      projectCode: data.projectCode || undefined,
-      createdAt: initialData?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      projectCode:  data.projectCode || undefined,
+      createdAt:    initialData?.createdAt || new Date().toISOString(),
+      updatedAt:    new Date().toISOString(),
     };
     onSubmit(expense);
     if (!isEdit) {
-      reset();
-      setReceiptFile(null);
-      setReceiptPreview(null);
-      setTags([]);
-      setIsOpen(false);
+      setSuccess(true);
+      await new Promise(r => setTimeout(r, 850));
+      reset(); setReceiptPreview(null); setTags([]); setSuccess(false);
+      onDone?.();
     }
     onClose?.();
   };
 
-  const selectedCatConfig = watchedCategory ? categoryConfig[watchedCategory as ExpenseCategory] : null;
+  return (
+    <form onSubmit={handleSubmit(onFormSubmit)} className="flex flex-col">
 
-  const FormContent = () => (
-    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-5">
-      {/* Receipt Upload */}
-      <div className="space-y-2">
-        <Label className="text-sm font-medium text-foreground/80 flex items-center gap-1.5">
-          <Receipt className="h-3.5 w-3.5" />
-          Receipt Image
-          <span className="text-muted-foreground font-normal">(optional)</span>
-        </Label>
+      {/* ── Hero: amount + merchant + date ── */}
+      <div
+        className="relative overflow-hidden rounded-2xl mb-5 p-4"
+        style={{
+          background: selCat
+            ? `linear-gradient(135deg, ${selCat.gradientFrom}20, ${selCat.gradientTo}0d)`
+            : 'linear-gradient(135deg, hsl(262 85% 65%/0.12), hsl(186 95% 52%/0.06))',
+        }}
+      >
+        {/* glow blob */}
         <div
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-          className={cn(
-            "relative border-2 border-dashed rounded-xl transition-all duration-200 cursor-pointer group",
-            dragOver 
-              ? "border-primary bg-primary/10 scale-[1.01]" 
-              : "border-border hover:border-primary/50 hover:bg-muted/30",
-            receiptPreview ? "p-2" : "p-6"
-          )}
-        >
+          className="absolute -top-8 -right-8 h-32 w-32 rounded-full blur-3xl opacity-30 pointer-events-none"
+          style={{ background: selCat?.gradientFrom ?? 'hsl(262 85% 65%)' }}
+        />
+
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
+          {isEdit ? 'Edit Expense' : 'New Expense'}
+        </p>
+
+        {/* Big rupee input */}
+        <div className="flex items-center gap-1 mb-4">
+          <IndianRupee className="h-7 w-7 text-muted-foreground/60 shrink-0" strokeWidth={1.5} />
           <input
-            id="receipt"
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="absolute inset-0 opacity-0 cursor-pointer"
+            type="number"
+            step="0.01"
+            inputMode="decimal"
+            {...register('amount', { valueAsNumber: true })}
+            placeholder="0.00"
+            className={cn(
+              'w-full bg-transparent border-none outline-none text-[44px] font-bold tracking-tight',
+              'placeholder:text-muted-foreground/25 number-lg',
+              amount && amount > 0 ? 'text-foreground' : 'text-muted-foreground/40'
+            )}
           />
-          {receiptPreview ? (
+        </div>
+        {errors.amount && <p className="text-xs text-destructive -mt-2 mb-2">{errors.amount.message}</p>}
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Merchant</p>
+            <Input
+              list="vendors-list"
+              {...register('vendor')}
+              placeholder="e.g. Swiggy"
+              className="h-10 bg-background/50 border-white/10 text-sm placeholder:text-muted-foreground/40 focus:border-white/25"
+            />
+            <datalist id="vendors-list">
+              {vendors.map(v => <option key={v} value={v} />)}
+            </datalist>
+            {errors.vendor && <p className="text-[10px] text-destructive mt-0.5">{errors.vendor.message}</p>}
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Date</p>
             <div className="relative">
-              <img src={receiptPreview} alt="Receipt" className="w-full max-h-40 object-contain rounded-lg" />
-              <Button
+              <Input
+                type="date"
+                {...register('date')}
+                className="h-10 bg-background/50 border-white/10 text-sm focus:border-white/25"
+              />
+              <CalendarDays className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Category grid ── */}
+      <div className="mb-5">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2.5">Category</p>
+        <div className="grid grid-cols-5 gap-1.5">
+          {Object.entries(categoryConfig).map(([key, cfg]) => {
+            const Icon = cfg.icon;
+            const active = cat === key;
+            return (
+              <button
+                key={key}
                 type="button"
-                variant="destructive"
-                size="icon"
-                className="absolute top-2 right-2 h-6 w-6"
-                onClick={(e) => { e.stopPropagation(); setReceiptFile(null); setReceiptPreview(null); }}
+                onClick={() => setValue('category', key, { shouldValidate: true })}
+                className={cn(
+                  'flex flex-col items-center gap-1 p-2 rounded-xl border transition-all duration-200 active:scale-95',
+                  active ? 'scale-105 border-transparent' : 'border-border/40 bg-muted/30 hover:bg-muted/50'
+                )}
+                style={active ? {
+                  background:  `linear-gradient(135deg, ${cfg.gradientFrom}22, ${cfg.gradientTo}11)`,
+                  borderColor: `${cfg.gradientFrom}55`,
+                  boxShadow:   `0 0 16px ${cfg.gradientFrom}40`,
+                } : {}}
               >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-          ) : (
-            <div className="text-center">
-              <div className="mx-auto w-10 h-10 rounded-xl bg-muted flex items-center justify-center mb-3 group-hover:bg-primary/10 transition-colors">
-                <Upload className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-              </div>
-              <p className="text-sm font-medium text-foreground/70">Drop receipt here or click to upload</p>
-              <p className="text-xs text-muted-foreground mt-0.5">PNG, JPG, WEBP up to 10MB</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Main Fields Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Vendor */}
-        <div className="space-y-1.5">
-          <Label htmlFor="vendor" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Vendor / Merchant
-          </Label>
-          <Input
-            id="vendor"
-            {...register('vendor')}
-            placeholder="e.g., Swiggy, Uber, Zomato"
-            className="bg-muted/50 border-border/60 focus:border-primary/50 h-10"
-          />
-          {errors.vendor && <p className="text-xs text-destructive">{errors.vendor.message}</p>}
-        </div>
-
-        {/* Amount */}
-        <div className="space-y-1.5">
-          <Label htmlFor="amount" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Amount (₹)
-          </Label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">₹</span>
-            <Input
-              id="amount"
-              type="number"
-              step="0.01"
-              {...register('amount', { valueAsNumber: true })}
-              placeholder="0.00"
-              className="pl-7 bg-muted/50 border-border/60 focus:border-primary/50 h-10 font-mono"
-            />
-          </div>
-          {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
-        </div>
-
-        {/* Date */}
-        <div className="space-y-1.5">
-          <Label htmlFor="date" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Date
-          </Label>
-          <div className="relative">
-            <Input
-              id="date"
-              type="date"
-              {...register('date')}
-              className="bg-muted/50 border-border/60 focus:border-primary/50 h-10"
-            />
-            <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-          </div>
-          {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
-        </div>
-
-        {/* Category */}
-        <div className="space-y-1.5">
-          <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Category</Label>
-          <Select onValueChange={(v) => setValue('category', v)} defaultValue={watchedCategory}>
-            <SelectTrigger className="bg-muted/50 border-border/60 h-10">
-              {selectedCatConfig ? (
-                <div className="flex items-center gap-2">
-                  <div className={cn("h-5 w-5 rounded flex items-center justify-center", selectedCatConfig.bgColor)}>
-                    <selectedCatConfig.icon className={cn("h-3 w-3", selectedCatConfig.color)} />
-                  </div>
-                  <span>{selectedCatConfig.label}</span>
+                <div className={cn('h-7 w-7 rounded-lg flex items-center justify-center', active ? cfg.bgColor : 'bg-muted/50')}>
+                  <Icon className={cn('h-3.5 w-3.5', active ? cfg.color : 'text-muted-foreground')} />
                 </div>
-              ) : (
-                <SelectValue placeholder="Select category" />
-              )}
-            </SelectTrigger>
-            <SelectContent className="max-h-64">
-              {Object.entries(categoryConfig).map(([key, cfg]) => {
-                const Icon = cfg.icon;
-                return (
-                  <SelectItem key={key} value={key}>
-                    <div className="flex items-center gap-2">
-                      <div className={cn("h-5 w-5 rounded flex items-center justify-center flex-shrink-0", cfg.bgColor)}>
-                        <Icon className={cn("h-3 w-3", cfg.color)} />
-                      </div>
-                      <span>{cfg.label}</span>
-                    </div>
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-          {errors.category && <p className="text-xs text-destructive">{errors.category.message}</p>}
+                <span className={cn('text-[9px] font-semibold leading-tight text-center line-clamp-1', active ? cfg.color : 'text-muted-foreground')}>
+                  {cfg.label.split(' ')[0]}
+                </span>
+              </button>
+            );
+          })}
         </div>
+        {errors.category && <p className="text-xs text-destructive mt-1">{errors.category.message}</p>}
       </div>
 
-      {/* Status */}
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</Label>
-        <div className="grid grid-cols-4 gap-2">
+      {/* ── Status ── */}
+      <div className="mb-5">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2.5">Status</p>
+        <div className="grid grid-cols-2 gap-2">
           {STATUS_OPTIONS.map(s => (
             <button
               key={s.value}
               type="button"
-              onClick={() => setValue('status', s.value)}
+              onClick={() => setValue('status', s.value, { shouldValidate: true })}
               className={cn(
-                "py-2 px-3 rounded-lg text-xs font-semibold border transition-all duration-150",
-                watchedStatus === s.value
-                  ? cn("border-current bg-current/10", s.color)
-                  : "border-border text-muted-foreground hover:border-border/80 hover:text-foreground"
+                'flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all duration-200 active:scale-95',
+                status === s.value
+                  ? s.active
+                  : 'border-border/40 bg-muted/30 text-muted-foreground hover:bg-muted/50'
               )}
             >
+              <span className="text-sm leading-none">{s.emoji}</span>
               {s.label}
+              {status === s.value && <Check className="h-3 w-3 ml-auto" />}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Description */}
-      <div className="space-y-1.5">
-        <Label htmlFor="description" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Notes
+      {/* ── Notes ── */}
+      <div className="mb-5">
+        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 block">
+          Notes <span className="normal-case font-normal">(optional)</span>
         </Label>
         <Textarea
-          id="description"
           {...register('description')}
-          placeholder="Add context, purpose, or any additional notes..."
-          className="bg-muted/50 border-border/60 focus:border-primary/50 min-h-[70px] resize-none"
+          placeholder="Add context or purpose..."
+          className="bg-muted/30 border-border/40 focus:border-primary/40 min-h-[60px] resize-none text-sm placeholder:text-muted-foreground/40"
         />
       </div>
 
-      {/* Tags + Project */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-            <Tag className="h-3 w-3" /> Tags
+      {/* ── Receipt ── */}
+      <div className="mb-5">
+        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 block">
+          Receipt <span className="normal-case font-normal">(optional)</span>
+        </Label>
+        {receiptPreview ? (
+          <div className="relative border-2 border-dashed border-border/30 rounded-xl p-1.5 transition-all">
+            <img src={receiptPreview} alt="Receipt" className="w-full max-h-28 object-contain rounded-lg" />
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); setReceiptPreview(null); }}
+              className="absolute top-2.5 right-2.5 h-7 w-7 rounded-full bg-destructive/90 flex items-center justify-center text-white z-20 shadow-md active:scale-95 transition-transform"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {/* Gallery Upload */}
+            <div
+              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              className={cn(
+                'relative flex flex-col items-center justify-center gap-1.5 border-2 border-dashed rounded-xl p-4 transition-all cursor-pointer hover:border-primary/40 active:bg-primary/5 group',
+                dragOver ? 'border-primary/70 bg-primary/10' : 'border-border/40'
+              )}
+            >
+              <input
+                type="file"
+                accept="image/*"
+                onChange={e => { const f = e.target.files?.[0]; if (f) processFile(f); }}
+                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+              />
+              <div className="h-8 w-8 rounded-full bg-muted/50 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                <Upload className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+              <p className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">Gallery</p>
+            </div>
+
+            {/* Camera Capture */}
+            <div className="relative flex flex-col items-center justify-center gap-1.5 border-2 border-dashed rounded-xl p-4 transition-all cursor-pointer hover:border-primary/40 active:bg-primary/5 group border-border/40">
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={e => { const f = e.target.files?.[0]; if (f) processFile(f); }}
+                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+              />
+              <div className="h-8 w-8 rounded-full bg-muted/50 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                <Camera className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+              <p className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">Camera</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Tags + Project ── */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        <div>
+          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1">
+            <Tag className="h-2.5 w-2.5" /> Tags
           </Label>
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <Input
               value={tagInput}
               onChange={e => setTagInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
-              placeholder="Add tag..."
-              className="bg-muted/50 border-border/60 h-9 text-sm"
+              placeholder="tag..."
+              className="h-9 bg-muted/30 border-border/40 text-xs flex-1 min-w-0"
             />
-            <Button type="button" size="sm" variant="outline" className="h-9 px-3 shrink-0" onClick={addTag}>
+            <button type="button" onClick={addTag}
+              className="h-9 w-9 rounded-lg border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 shrink-0">
               <Plus className="h-3.5 w-3.5" />
-            </Button>
+            </button>
           </div>
           {tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {tags.map(tag => (
-                <Badge key={tag} variant="secondary" className="text-xs gap-1 cursor-pointer hover:bg-destructive/20 hover:text-destructive transition-colors" onClick={() => removeTag(tag)}>
-                  {tag}
-                  <X className="h-2.5 w-2.5" />
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {tags.map(t => (
+                <Badge key={t} variant="secondary"
+                  className="text-[10px] gap-0.5 px-1.5 py-0.5 cursor-pointer hover:bg-destructive/20 hover:text-destructive"
+                  onClick={() => setTags(p => p.filter(x => x !== t))}>
+                  {t} <X className="h-2 w-2" />
                 </Badge>
               ))}
             </div>
           )}
         </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="projectCode" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-            <Briefcase className="h-3 w-3" /> Project Code
+        <div>
+          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1">
+            <Briefcase className="h-2.5 w-2.5" /> Project
           </Label>
-          <Input
-            id="projectCode"
-            {...register('projectCode')}
-            placeholder="e.g., PROJ-2024"
-            className="bg-muted/50 border-border/60 h-9 text-sm font-mono"
-          />
+          <Input {...register('projectCode')} placeholder="PROJ-2024"
+            className="h-9 bg-muted/30 border-border/40 text-xs font-mono" />
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex justify-end gap-3 pt-2 border-t border-border/50">
-        {!isEdit && (
-          <Button type="button" variant="ghost" onClick={() => { setIsOpen(false); onClose?.(); }}>
-            Cancel
-          </Button>
-        )}
-        <Button
-          type="submit"
-          disabled={isSubmitting}
-          className="bg-gradient-primary hover:opacity-90 transition-opacity text-white font-semibold shadow-glow min-w-[120px]"
-        >
-          {isSubmitting ? (
-            <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <>
-              {isEdit ? 'Update Expense' : 'Add Expense'}
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </>
-          )}
-        </Button>
-      </div>
+      {/* ── Swipe / click to submit ── */}
+      <SwipeToAdd
+        onConfirm={() => handleSubmit(onFormSubmit)()}
+        isSubmitting={isSubmitting}
+        success={success}
+        label={isEdit ? 'Swipe to Update' : 'Swipe to Add Expense'}
+      />
     </form>
   );
+}
 
-  if (isEdit) return <FormContent />;
+/* ═══════════════════════════════════════════════════════════════════
+   JS breakpoint hook — avoids inline-style vs Tailwind specificity
+   conflicts. Returns true when viewport < 640px (Tailwind sm).
+═══════════════════════════════════════════════════════════════════ */
+function useIsMobile() {
+  const [mobile, setMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 640 : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const handler = (e: MediaQueryListEvent) => setMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  return mobile;
+}
+
+export function ExpenseForm({ onSubmit, initialData, isEdit = false, onClose, trigger }: ExpenseFormProps) {
+  const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
+
+  // Lock body scroll while open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [open]);
+
+  // For inline edit mode (no dialog needed)
+  if (isEdit) {
+    return <FormBody onSubmit={onSubmit} initialData={initialData} isEdit onClose={onClose} />;
+  }
+
+  const overlay = open ? createPortal(
+    <>
+      {/* Shared backdrop */}
+      <div
+        className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm animate-fade-in"
+        onClick={() => setOpen(false)}
+      />
+
+      {isMobile ? (
+        /* ── Mobile: bottom sheet (only mounted on small viewports) ── */
+        <div
+          className="fixed bottom-0 left-0 right-0 z-[9999] rounded-t-3xl border-t border-border/40 animate-sheet-up"
+          style={{ background: 'hsl(var(--background))', maxHeight: '92dvh', display: 'flex', flexDirection: 'column' }}
+        >
+          {/* Drag handle */}
+          <div className="flex justify-center pt-3 pb-1 shrink-0">
+            <div className="h-1 w-10 rounded-full bg-muted-foreground/30" />
+          </div>
+          {/* Header — centered title, close on right */}
+          <div className="relative flex items-center justify-center px-5 py-3 shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
+                <Receipt className="h-3.5 w-3.5 text-white" />
+              </div>
+              <h2 className="text-sm font-bold leading-none">New Expense</h2>
+            </div>
+            <button
+              onClick={() => setOpen(false)}
+              className="absolute right-5 h-8 w-8 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          {/* Scrollable body */}
+          <div className="overflow-y-auto flex-1 px-5 pb-10" style={{ overscrollBehavior: 'contain' }}>
+            <FormBody onSubmit={onSubmit} onDone={() => setOpen(false)} />
+          </div>
+        </div>
+      ) : (
+        /* ── Desktop: centred modal (only mounted on large viewports) ── */
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}
+        >
+          <div
+            className="relative w-full max-w-xl rounded-2xl border border-border/50 shadow-2xl animate-scale-in overflow-hidden"
+            style={{ background: 'hsl(var(--background))', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border/30 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
+                  <Sparkles className="h-4 w-4 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold leading-none">New Expense</h2>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Fill in the details below</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setOpen(false)}
+                className="h-8 w-8 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 px-6 py-5">
+              <FormBody onSubmit={onSubmit} onDone={() => setOpen(false)} />
+            </div>
+          </div>
+        </div>
+      )}
+    </>,
+    document.body
+  ) : null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button
-          id="btn-add-expense"
-          className="bg-gradient-primary hover:opacity-90 transition-all text-white shadow-glow font-semibold gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">New Expense</span>
-          <span className="sm:hidden">Add</span>
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-xl max-h-[92vh] overflow-y-auto glass border-border/50">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg">
-            <div className="h-7 w-7 rounded-lg bg-gradient-primary flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-white" />
-            </div>
-            Add New Expense
-          </DialogTitle>
-        </DialogHeader>
-        <FormContent />
-      </DialogContent>
-    </Dialog>
+    <>
+      {/* Trigger */}
+      <div onClick={() => setOpen(true)} className="contents">
+        {trigger ?? (
+          <Button
+            id="btn-add-expense"
+            className="bg-gradient-primary hover:opacity-90 transition-all text-white shadow-glow font-semibold gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">New Expense</span>
+            <span className="sm:hidden">Add</span>
+          </Button>
+        )}
+      </div>
+
+      {overlay}
+    </>
   );
 }

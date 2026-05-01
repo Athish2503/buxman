@@ -1,73 +1,55 @@
-# Welcome to your Lovable project
+# Pixel Reimburse
 
-## Project info
+## Overview
+Pixel Reimburse is a premium, mobile-first expense reimbursement workspace. Designed with a luxury-minimalist aesthetic, it provides a seamless experience for tracking expenses, generating invoice-grade PDF reports, and monitoring your budget—all while keeping your data private and stored securely on your device.
 
-**URL**: https://lovable.dev/projects/7f058761-7230-44cb-945f-08783a4af0d3
+## Features
+- **Premium Interface:** Sleek, modern design with a deep charcoal theme and neon electric violet & cyan accents.
+- **Native Experience:** Built for Capacitor, delivering haptic feedback, responsive gestures, and safe-area adjustments for mobile devices.
+- **Invoice-grade PDFs:** Easily generate high-quality reimbursement reports.
+- **Privacy First:** All your data remains offline and is stored on your device.
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/7f058761-7230-44cb-945f-08783a4af0d3) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
+## Technologies Used
 - Vite
 - TypeScript
 - React
 - shadcn-ui
 - Tailwind CSS
+- Capacitor (Mobile integration)
 
-## How can I deploy this project?
+## Development Setup
 
-Simply open [Lovable](https://lovable.dev/projects/7f058761-7230-44cb-945f-08783a4af0d3) and click on Share -> Publish.
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-## Can I connect a custom domain to my Lovable project?
+2. **Start the development server:**
+   ```bash
+   npm run dev
+   ```
 
-Yes, you can!
+## Mobile Build
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+To build the native mobile applications:
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+1. **Build the web assets:**
+   ```bash
+   npm run build
+   ```
+
+2. **Add Android/iOS platforms (if not already added):**
+   ```bash
+   npx cap add android
+   npx cap add ios
+   ```
+
+3. **Generate App Icons & Splash Screens:**
+   ```bash
+   npx @capacitor/assets generate --iconBackgroundColor '#121215' --splashBackgroundColor '#121215'
+   ```
+
+4. **Sync with native projects:**
+   ```bash
+   npx cap sync
+   ```

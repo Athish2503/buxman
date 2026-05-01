@@ -26,6 +26,7 @@ import { getCategoryConfig, categoryConfig } from '@/lib/categories';
 import { generateExpensesPDF } from '@/lib/pdf-generator';
 import { exportCSV } from '@/lib/csv-exporter';
 import { settingsService } from '@/lib/settings';
+import { haptics } from '@/lib/haptics';
 import { ExpenseForm } from './expense-form';
 import { formatCurrency, cn } from '@/lib/utils';
 
@@ -98,9 +99,11 @@ export function ExpenseList({
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortKey(key); setSortDir('desc'); }
+    haptics.light();
   };
 
   const toggleSelect = (id: string) => {
+    haptics.selection();
     setSelected(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -109,6 +112,7 @@ export function ExpenseList({
   };
 
   const toggleSelectAll = () => {
+    haptics.selection();
     if (selected.size === filteredExpenses.length) setSelected(new Set());
     else setSelected(new Set(filteredExpenses.map(e => e.id)));
   };

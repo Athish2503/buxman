@@ -258,6 +258,24 @@
   }
 }
 
+/* ── Mobile Floating Nav ── */
+.mobile-float-nav {
+  background: var(--glass-bg);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 9999px;
+  box-shadow:
+    0 8px 32px hsl(0 0% 0% / 0.35),
+    0 2px 8px hsl(0 0% 0% / 0.2),
+    inset 0 1px 0 hsl(255 100% 100% / 0.06);
+}
+
+/* Safe area padding for devices with home indicators */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* ── Animations ── */
 @keyframes fade-in-up {
   from { opacity: 0; transform: translateY(12px); }
@@ -302,6 +320,21 @@
 .animate-slide-right  { animation: slide-in-right 0.35s cubic-bezier(0.4,0,0.2,1) both; }
 .animate-pulse-glow   { animation: pulse-glow 2s ease-in-out infinite; }
 .animate-spin-slow    { animation: spin-slow 3s linear infinite; }
+.animate-shine        { animation: shine 2.4s ease-in-out infinite; }
+
+@keyframes shine {
+  0%   { left: -100%; }
+  60%  { left: 140%; }
+  100% { left: 140%; }
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.animate-sheet-up {
+  animation: sheet-up 0.38s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
 
 /* Stagger children */
 .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
