@@ -1,18 +1,6 @@
 export type ExpenseStatus = 'pending' | 'approved' | 'reimbursed' | 'rejected';
 
-export type ExpenseCategory =
-  | 'travel'
-  | 'meals'
-  | 'supplies'
-  | 'accommodation'
-  | 'transportation'
-  | 'entertainment'
-  | 'communication'
-  | 'training'
-  | 'healthcare'
-  | 'home'
-  | 'clothing'
-  | 'other';
+export type ExpenseCategory = string;
 
 export interface Expense {
   id: string;

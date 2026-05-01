@@ -238,8 +238,8 @@ export function VehicleLogForm({ onSuccess, trigger }: VehicleLogFormProps) {
 
   return (
     <>
-      <div onClick={() => setOpen(true)}>{trigger}</div>
-      {overlay}
+      <div onClick={() => setOpen(true)} className="contents">{trigger}</div>
+      {createPortal(overlay, document.body)}
     </>
   );
 }

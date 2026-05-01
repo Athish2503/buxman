@@ -21,7 +21,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 import { Expense, ExpenseCategory, ExpenseStatus } from '@/types/expense';
-import { categoryConfig } from '@/lib/categories';
+import { categoryService, iconMap } from '@/lib/category-service';
+import { MoreHorizontal } from 'lucide-react';
 import { storageService } from '@/lib/storage';
 import { vendorService } from '@/lib/recurring';
 import { haptics } from '@/lib/haptics';
@@ -100,10 +101,27 @@ function FormBody({
         : { date: format(new Date(), 'yyyy-MM-dd'), status: 'pending' },
     });
 
+  const [categories, setCategories] = useState(categoryService.getVisible());
+
+  useEffect(() => {
+    const handleUpdate = () => setCategories(categoryService.getVisible());
+    window.addEventListener('categories-updated', handleUpdate);
+    return () => window.removeEventListener('categories-updated', handleUpdate);
+  }, []);
+
+  // Ensure initial category is visible even if hidden (for editing)
+  const displayCategories = useMemo(() => {
+    if (!initialData?.category) return categories;
+    const exists = categories.find(c => c.id === initialData.category);
+    if (exists) return categories;
+    const hidden = categoryService.getById(initialData.category);
+    return [...categories, hidden];
+  }, [categories, initialData]);
+
   const cat    = watch('category');
   const status = watch('status');
   const amount = watch('amount');
-  const selCat = cat ? categoryConfig[cat as ExpenseCategory] : null;
+  const selCat = cat ? categoryService.getById(cat) : null;
 
   const handleVoiceParse = (data: any) => {
     if (data.amount) setValue('amount', data.amount, { shouldValidate: true });
@@ -281,14 +299,18 @@ function FormBody({
       <div className="mb-5">
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2.5">Category</p>
         <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-          {Object.entries(categoryConfig).map(([key, cfg]) => {
-            const Icon = cfg.icon;
+          {displayCategories.map((cfg) => {
+            const Icon = iconMap[cfg.iconName] || MoreHorizontal;
+            const key = cfg.id;
             const active = cat === key;
             return (
               <button
                 key={key}
                 type="button"
-                onClick={() => setValue('category', key, { shouldValidate: true })}
+                onClick={() => {
+                  haptics.light();
+                  setValue('category', key, { shouldValidate: true });
+                }}
                 className={cn(
                   'flex flex-col items-center gap-1 p-2 rounded-xl border transition-all duration-200 active:scale-95 overflow-hidden',
                   active ? 'scale-105 border-transparent' : 'border-border/40 bg-muted/30 hover:bg-muted/50'
