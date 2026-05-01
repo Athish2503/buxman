@@ -93,7 +93,9 @@ export default {
 				'gradient-primary': 'var(--gradient-primary)',
 				'gradient-surface': 'var(--gradient-surface)',
 				'gradient-card': 'var(--gradient-card)',
+				'gradient-card-hover': 'var(--gradient-card-hover)',
 				'gradient-mesh': 'var(--gradient-mesh)',
+				'gradient-aurora': 'var(--gradient-aurora)',
 				'gradient-success': 'var(--gradient-success)',
 				'gradient-warning': 'var(--gradient-warning)'
 			},
