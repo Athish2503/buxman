@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Camera, Check, Plus, Trash2, Receipt, Image as ImageIcon, ArrowRight } from 'lucide-react';
+import { Camera as CameraIcon, Check, Plus, Trash2, Receipt, Image as ImageIcon, ArrowRight } from 'lucide-react';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { ReceiptDraft } from '@/types/modules';
 import { walletService } from '@/lib/modules-storage';
 import { ExpenseForm } from './expense-form';
@@ -19,19 +20,29 @@ export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
 
   const reload = () => setReceipts(walletService.getReceipts());
 
-  const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleCapture = async () => {
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Prompt, // Allows user to choose between camera or photo library
+      });
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const b64 = event.target?.result as string;
-      walletService.addReceipt(b64);
-      haptics.success();
-      reload();
-      toast.success('Saved to Wallet');
-    };
-    reader.readAsDataURL(file);
+      if (image.base64String) {
+        const b64 = `data:image/${image.format};base64,${image.base64String}`;
+        walletService.addReceipt(b64);
+        haptics.success();
+        reload();
+        toast.success('Saved to Wallet');
+      }
+    } catch (error) {
+      console.error('Camera error:', error);
+      // Don't toast on user cancel
+      if (error instanceof Error && error.message.includes('User cancelled')) {
+        return;
+      }
+    }
   };
 
   const handleDelete = (id: string, e: React.MouseEvent) => {
@@ -101,18 +112,12 @@ export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
           <h2 className="font-bold text-lg">Receipt Wallet</h2>
           <p className="text-xs text-muted-foreground mt-0.5">Snap now, log details later</p>
         </div>
-        <div className="relative">
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleCapture}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-          />
-          <button className="h-9 px-3 rounded-xl bg-gradient-primary text-white shadow-glow text-sm font-semibold flex items-center gap-1.5 active:scale-95 transition-transform pointer-events-none">
-            <Camera className="h-4 w-4" /> Snap
-          </button>
-        </div>
+        <button 
+          onClick={handleCapture}
+          className="h-9 px-3 rounded-xl bg-gradient-primary text-white shadow-glow text-sm font-semibold flex items-center gap-1.5 active:scale-95 transition-transform"
+        >
+          <CameraIcon className="h-4 w-4" /> Snap
+        </button>
       </div>
 
       {receipts.length === 0 ? (
