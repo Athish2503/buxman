@@ -5,7 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
-export const exportCSV = (expenses: Expense[], filename?: string): void => {
+export const exportCSV = async (expenses: Expense[], filename?: string): Promise<void> => {
   const headers = ['#', 'Date', 'Vendor', 'Category', 'Amount (INR)', 'Status', 'Description', 'Tags', 'Project Code', 'Created At'];
 
   const rows = expenses.map((e, i) => [
@@ -25,26 +25,24 @@ export const exportCSV = (expenses: Expense[], filename?: string): void => {
   const actualFilename = filename || `reimburse-export-${format(new Date(), 'yyyy-MM-dd')}.csv`;
 
   if (Capacitor.isNativePlatform()) {
-    const saveAndShare = async () => {
-      try {
-        const result = await Filesystem.writeFile({
-          path: `Documents/${actualFilename}`,
-          data: csvContent,
-          directory: Directory.Cache,
-          encoding: Encoding.UTF8,
-        });
+    try {
+      const result = await Filesystem.writeFile({
+        path: actualFilename,
+        data: csvContent,
+        directory: Directory.Cache,
+        encoding: Encoding.UTF8,
+      });
 
-        await Share.share({
-          title: 'Expense Export',
-          text: 'Here is your expense export in CSV format.',
-          url: result.uri,
-          dialogTitle: 'Share CSV',
-        });
-      } catch (e) {
-        console.error('Failed to export CSV on native:', e);
-      }
-    };
-    saveAndShare();
+      await Share.share({
+        title: 'Expense Export',
+        text: 'Here is your expense export in CSV format.',
+        files: [result.uri],
+        dialogTitle: 'Share CSV',
+      });
+    } catch (e) {
+      console.error('Failed to export CSV on native:', e);
+      throw e;
+    }
   } else {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

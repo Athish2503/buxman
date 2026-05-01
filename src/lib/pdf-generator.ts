@@ -341,25 +341,26 @@ export const generateExpensesPDF = async (
   const fileName = `reimbursement-invoice-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
 
   if (Capacitor.isNativePlatform()) {
-    const data = pdf.output('datauristring').split(',')[1];
-    const path = `Documents/${fileName}`;
-    
     try {
+      // Use a flat filename in the cache directory for maximum compatibility
+      const data = pdf.output('datauristring').split(',')[1];
+      
       const result = await Filesystem.writeFile({
-        path,
+        path: fileName,
         data,
         directory: Directory.Cache,
       });
 
+      // Using 'files' array is more robust in newer Capacitor Share versions
       await Share.share({
         title: 'Expense Reimbursement Invoice',
         text: 'Here is your expense reimbursement invoice.',
-        url: result.uri,
+        files: [result.uri],
         dialogTitle: 'Share Invoice',
       });
     } catch (e) {
       console.error('Failed to save or share PDF:', e);
-      pdf.save(fileName);
+      throw e; // Throw so the UI toast shows the error
     }
   } else {
     pdf.save(fileName);

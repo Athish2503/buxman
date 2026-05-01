@@ -4,8 +4,9 @@ import {
   Edit, Trash2, Eye, Filter, Download, Search,
   Receipt, ChevronDown, CheckSquare, Square, X,
   SlidersHorizontal, FileText, FileSpreadsheet,
-  MoreVertical, ArrowUpDown, Tag
+  MoreVertical, ArrowUpDown, Tag, Share2
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -123,33 +124,58 @@ export function ExpenseList({
 
   const clearSelection = () => setSelected(new Set());
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     const settings = settingsService.get();
     const dataToExport = selected.size > 0 
       ? filteredExpenses.filter(e => selected.has(e.id))
       : filteredExpenses;
     
-    const exportSummary = selected.size > 0 ? {
-      total: dataToExport.reduce((s, e) => s + e.amount, 0),
-      pending: dataToExport.filter(e => e.status === 'pending').reduce((s, e) => s + e.amount, 0),
-      approved: dataToExport.filter(e => e.status === 'approved').reduce((s, e) => s + e.amount, 0),
-      reimbursed: dataToExport.filter(e => e.status === 'reimbursed').reduce((s, e) => s + e.amount, 0),
-      rejected: dataToExport.filter(e => e.status === 'rejected').reduce((s, e) => s + e.amount, 0),
-      count: dataToExport.length,
-    } : summary;
+    if (dataToExport.length === 0) {
+      toast.error('No expenses to export');
+      return;
+    }
 
-    generateExpensesPDF(dataToExport, exportSummary, {
-      title: 'Expense Reimbursement Invoice',
-      billedTo: settings.billedTo,
-      billedFrom: settings.billedFrom,
-    });
+    const toastId = toast.loading('Generating PDF report...');
+    try {
+      const exportSummary = selected.size > 0 ? {
+        total: dataToExport.reduce((s, e) => s + e.amount, 0),
+        pending: dataToExport.filter(e => e.status === 'pending').reduce((s, e) => s + e.amount, 0),
+        approved: dataToExport.filter(e => e.status === 'approved').reduce((s, e) => s + e.amount, 0),
+        reimbursed: dataToExport.filter(e => e.status === 'reimbursed').reduce((s, e) => s + e.amount, 0),
+        rejected: dataToExport.filter(e => e.status === 'rejected').reduce((s, e) => s + e.amount, 0),
+        count: dataToExport.length,
+      } : summary;
+
+      await generateExpensesPDF(dataToExport, exportSummary, {
+        title: 'Expense Reimbursement Invoice',
+        billedTo: settings.billedTo,
+        billedFrom: settings.billedFrom,
+      });
+      toast.success('Report generated successfully', { id: toastId });
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to generate PDF', { id: toastId });
+    }
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     const dataToExport = selected.size > 0 
       ? filteredExpenses.filter(e => selected.has(e.id))
       : filteredExpenses;
-    exportCSV(dataToExport);
+    
+    if (dataToExport.length === 0) {
+      toast.error('No expenses to export');
+      return;
+    }
+
+    const toastId = toast.loading('Exporting CSV...');
+    try {
+      await exportCSV(dataToExport);
+      toast.success('CSV exported successfully', { id: toastId });
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to export CSV', { id: toastId });
+    }
   };
 
   const activeFilters = [filterCategory !== 'all', filterStatus !== 'all'].filter(Boolean).length;
@@ -243,52 +269,57 @@ export function ExpenseList({
     <div className="space-y-4">
       {/* Bulk action bar */}
       {selected.size > 0 && (
-        <div className="glass border border-primary/30 rounded-xl px-4 py-3 flex items-center gap-3 animate-slide-right">
-          <span className="text-sm font-semibold text-primary">{selected.size} selected</span>
-          <div className="flex-1 flex flex-wrap gap-2">
-            {(['approved', 'reimbursed', 'rejected'] as ExpenseStatus[]).map(s => (
-              <Button
-                key={s}
-                size="sm"
-                variant="outline"
-                className="h-7 text-xs capitalize"
-                onClick={() => { onBatchStatus?.(Array.from(selected), s); clearSelection(); }}
-              >
-                Mark {s}
-              </Button>
-            ))}
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button size="sm" variant="outline" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10">
-                  <Trash2 className="h-3 w-3 mr-1" /> Delete
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="glass border-border/50 max-w-sm mx-4">
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete {selected.size} expenses?</AlertDialogTitle>
-                  <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction className="bg-destructive" onClick={() => { onBatchDelete?.(Array.from(selected)); clearSelection(); }}>
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-
-            <div className="flex-1" />
-
-            <Button size="sm" variant="outline" className="h-7 text-xs border-primary/30 text-primary" onClick={handleExportPDF}>
-              <FileText className="h-3 w-3 mr-1" /> PDF
-            </Button>
-            <Button size="sm" variant="outline" className="h-7 text-xs border-success/30 text-success" onClick={handleExportCSV}>
-              <FileSpreadsheet className="h-3 w-3 mr-1" /> CSV
+        <div className="glass border border-primary/30 rounded-2xl p-3 flex flex-col gap-3 animate-slide-right shadow-2xl">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-bold text-primary uppercase tracking-wider">{selected.size} Expenses Selected</span>
+            <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={clearSelection}>
+              <X className="h-4 w-4" />
             </Button>
           </div>
-          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0" onClick={clearSelection}>
-            <X className="h-4 w-4" />
-          </Button>
+          
+          <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5 flex-1">
+              {(['approved', 'reimbursed', 'rejected'] as ExpenseStatus[]).map(s => (
+                <Button
+                  key={s}
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-[10px] px-2.5 capitalize font-bold"
+                  onClick={() => { onBatchStatus?.(Array.from(selected), s); clearSelection(); }}
+                >
+                  {s}
+                </Button>
+              ))}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="outline" className="h-8 text-[10px] px-2.5 text-destructive border-destructive/20 hover:bg-destructive/10 font-bold">
+                    Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="glass border-border/50 max-w-sm mx-4">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete {selected.size} expenses?</AlertDialogTitle>
+                    <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction className="bg-destructive" onClick={() => { onBatchDelete?.(Array.from(selected)); clearSelection(); }}>
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+
+            <div className="flex gap-2">
+              <Button size="sm" className="h-8 text-[10px] px-3 bg-primary text-white shadow-glow font-bold gap-1.5" onClick={handleExportPDF}>
+                <FileText className="h-3.5 w-3.5" /> Share PDF
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 text-[10px] px-3 border-success/30 text-success font-bold gap-1.5" onClick={handleExportCSV}>
+                <FileSpreadsheet className="h-3.5 w-3.5" /> CSV
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
