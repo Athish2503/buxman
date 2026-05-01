@@ -8,6 +8,7 @@ import { Expense } from '@/types/expense';
 import { storageService } from '@/lib/storage';
 import { ExpenseForm } from '@/components/expense-form';
 import { ExpenseList } from '@/components/expense-list';
+import { SettingsDialog } from '@/components/settings-dialog';
 
 const Index = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -54,6 +55,16 @@ const Index = () => {
     }
   };
 
+  const handleDeleteAll = () => {
+    try {
+      storageService.clearAll();
+      setExpenses([]);
+      toast.success('All expenses deleted');
+    } catch {
+      toast.error('Failed to delete expenses');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-surface bg-mesh flex items-center justify-center">
@@ -79,7 +90,10 @@ const Index = () => {
               <p className="text-[10px] sm:text-xs text-muted-foreground -mt-0.5">Premium expense tracker</p>
             </div>
           </div>
-          <ExpenseForm onSubmit={handleAddExpense} />
+          <div className="flex items-center gap-1.5">
+            <SettingsDialog />
+            <ExpenseForm onSubmit={handleAddExpense} />
+          </div>
         </div>
       </header>
 
@@ -133,6 +147,7 @@ const Index = () => {
           expenses={expenses}
           onUpdateExpense={handleUpdateExpense}
           onDeleteExpense={handleDeleteExpense}
+          onDeleteAll={handleDeleteAll}
         />
 
         <footer className="mt-16 pt-8 border-t border-border/50 text-center text-xs text-muted-foreground">

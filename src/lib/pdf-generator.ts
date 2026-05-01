@@ -3,29 +3,33 @@ import { Expense, ExpenseSummary } from '@/types/expense';
 import { getCategoryConfig } from '@/lib/categories';
 import { format } from 'date-fns';
 
-interface PDFOptions {
-  userInfo?: {
-    name?: string;
-    company?: string;
-    email?: string;
-  };
-  title?: string;
+interface PartyInfo {
+  name: string;
+  line2?: string;
+  email?: string;
 }
 
-// Brand palette (matches index.css design tokens)
-const COLORS = {
-  primary: [99, 78, 240] as [number, number, number],      // hsl(252 83% 60%)
-  primaryDark: [70, 50, 200] as [number, number, number],
-  accent: [161, 92, 230] as [number, number, number],      // violet
-  text: [25, 25, 38] as [number, number, number],
-  textMuted: [110, 110, 130] as [number, number, number],
-  border: [228, 228, 235] as [number, number, number],
-  surface: [248, 248, 252] as [number, number, number],
+interface PDFOptions {
+  title?: string;
+  billedTo?: PartyInfo;
+  billedFrom?: PartyInfo;
+}
+
+// Refined professional palette — neutral with a single accent
+const C = {
+  ink: [22, 24, 32] as [number, number, number],          // near-black headings
+  body: [55, 60, 72] as [number, number, number],         // body text
+  muted: [120, 125, 140] as [number, number, number],     // labels
+  faint: [180, 184, 196] as [number, number, number],     // dividers
+  border: [228, 230, 236] as [number, number, number],
+  surface: [249, 250, 252] as [number, number, number],   // zebra row
+  panel: [243, 244, 248] as [number, number, number],     // totals box
   white: [255, 255, 255] as [number, number, number],
-  success: [34, 178, 122] as [number, number, number],
-  warning: [240, 158, 40] as [number, number, number],
-  danger: [232, 70, 70] as [number, number, number],
-  info: [99, 78, 240] as [number, number, number],
+  accent: [79, 70, 229] as [number, number, number],      // indigo accent
+  success: [22, 163, 110] as [number, number, number],
+  warning: [202, 138, 4] as [number, number, number],
+  danger: [220, 38, 38] as [number, number, number],
+  info: [79, 70, 229] as [number, number, number],
 };
 
 const setFill = (pdf: jsPDF, c: [number, number, number]) => pdf.setFillColor(c[0], c[1], c[2]);
@@ -43,258 +47,292 @@ export const generateExpensesPDF = async (
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = pdf.internal.pageSize.getWidth();
   const H = pdf.internal.pageSize.getHeight();
-  const M = 15; // margin
+  const M = 18;
 
   const invoiceNo = `INV-${format(new Date(), 'yyyyMMdd-HHmm')}`;
   const issueDate = format(new Date(), 'dd MMM yyyy');
 
-  // ===== HEADER BAND =====
-  setFill(pdf, COLORS.primary);
-  pdf.rect(0, 0, W, 55, 'F');
+  const billedTo = options.billedTo || { name: 'Company Name', line2: 'Accounts Payable Dept.' };
+  const billedFrom = options.billedFrom || { name: 'Employee Name', line2: 'Reimbursement Claim' };
 
-  // Subtle accent bar
-  setFill(pdf, COLORS.accent);
-  pdf.rect(0, 52, W, 3, 'F');
+  // ===== HEADER =====
+  // Thin accent bar at top
+  setFill(pdf, C.accent);
+  pdf.rect(0, 0, W, 2, 'F');
 
-  // Logo mark
-  setFill(pdf, COLORS.white);
-  pdf.roundedRect(M, 14, 12, 12, 2.5, 2.5, 'F');
-  setText(pdf, COLORS.primary);
+  let y = 18;
+
+  // Brand mark (left)
+  setDraw(pdf, C.ink);
+  pdf.setLineWidth(0.4);
+  pdf.roundedRect(M, y - 4, 9, 9, 1.5, 1.5, 'S');
+  setText(pdf, C.ink);
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(14);
-  pdf.text('R', M + 6, 22, { align: 'center' });
+  pdf.setFontSize(10);
+  pdf.text('R', M + 4.5, y + 1.8, { align: 'center' });
 
-  // Brand name
-  setText(pdf, COLORS.white);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(20);
-  pdf.text('REIMBURSE', M + 16, 22);
-  pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(9);
-  pdf.text('Premium Expense Reimbursement', M + 16, 27);
-
-  // Right side: INVOICE label
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(28);
-  pdf.text('INVOICE', W - M, 24, { align: 'right' });
-  pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(9);
-  pdf.text(`#${invoiceNo}`, W - M, 31, { align: 'right' });
-  pdf.text(`Issued: ${issueDate}`, W - M, 36, { align: 'right' });
-
-  // ===== BILL TO / FROM =====
-  let y = 68;
-  setText(pdf, COLORS.textMuted);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(8);
-  pdf.text('BILLED TO', M, y);
-  pdf.text('FROM', W / 2 + 5, y);
-
-  y += 5;
-  setText(pdf, COLORS.text);
+  setText(pdf, C.ink);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
-  pdf.text(options.userInfo?.company || 'Company Name', M, y);
-  pdf.text(options.userInfo?.name || 'Employee Name', W / 2 + 5, y);
+  pdf.text('REIMBURSE', M + 13, y - 0.5);
+  setText(pdf, C.muted);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
+  pdf.text('Expense reimbursement statement', M + 13, y + 3.5);
+
+  // INVOICE block (right)
+  setText(pdf, C.ink);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(22);
+  pdf.text('INVOICE', W - M, y + 2, { align: 'right' });
+
+  y += 12;
+  setText(pdf, C.muted);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
+  pdf.text('INVOICE NO.', W - M - 38, y);
+  pdf.text('ISSUE DATE', W - M, y, { align: 'right' });
+  setText(pdf, C.ink);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(9);
+  pdf.text(invoiceNo, W - M - 38, y + 4.5);
+  pdf.text(issueDate, W - M, y + 4.5, { align: 'right' });
+
+  // Divider
+  y += 12;
+  setDraw(pdf, C.border);
+  pdf.setLineWidth(0.3);
+  pdf.line(M, y, W - M, y);
+
+  // ===== BILL TO / FROM =====
+  y += 8;
+  const colW = (W - 2 * M) / 2;
+
+  setText(pdf, C.muted);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(7.5);
+  pdf.text('BILLED TO', M, y);
+  pdf.text('FROM', M + colW, y);
 
   y += 5;
+  setText(pdf, C.ink);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(11);
+  pdf.text(billedTo.name || '—', M, y);
+  pdf.text(billedFrom.name || '—', M + colW, y);
+
+  y += 5;
+  setText(pdf, C.body);
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
-  setText(pdf, COLORS.textMuted);
-  pdf.text('Accounts Payable Dept.', M, y);
-  if (options.userInfo?.email) {
-    pdf.text(options.userInfo.email, W / 2 + 5, y);
-  } else {
-    pdf.text('Reimbursement Claim', W / 2 + 5, y);
+  if (billedTo.line2) pdf.text(billedTo.line2, M, y);
+  if (billedFrom.line2) pdf.text(billedFrom.line2, M + colW, y);
+
+  if (billedFrom.email) {
+    setText(pdf, C.muted);
+    pdf.setFontSize(8.5);
+    pdf.text(billedFrom.email, M + colW, y + 4.5);
   }
 
-  // ===== SUMMARY CARDS =====
-  y += 12;
-  const cardW = (W - 2 * M - 9) / 4;
-  const cardH = 22;
+  // ===== SUMMARY (Total + Pending + Reimbursed only — NO Approved) =====
+  y += 16;
   const cards = [
-    { label: 'TOTAL', value: summary.total, color: COLORS.primary },
-    { label: 'PENDING', value: summary.pending, color: COLORS.warning },
-    { label: 'APPROVED', value: summary.approved, color: COLORS.success },
-    { label: 'REIMBURSED', value: summary.reimbursed, color: COLORS.info },
+    { label: 'TOTAL', value: summary.total, color: C.ink },
+    { label: 'PENDING', value: summary.pending, color: C.warning },
+    { label: 'REIMBURSED', value: summary.reimbursed, color: C.info },
   ];
+  const cardW = (W - 2 * M - 6) / 3;
+  const cardH = 20;
   cards.forEach((c, i) => {
     const x = M + i * (cardW + 3);
-    setFill(pdf, COLORS.surface);
-    pdf.roundedRect(x, y, cardW, cardH, 2, 2, 'F');
+    setDraw(pdf, C.border);
+    setFill(pdf, C.white);
+    pdf.setLineWidth(0.3);
+    pdf.roundedRect(x, y, cardW, cardH, 1.5, 1.5, 'FD');
+    // tiny accent dot
     setFill(pdf, c.color);
-    pdf.rect(x, y, 1.5, cardH, 'F');
-    setText(pdf, COLORS.textMuted);
+    pdf.circle(x + 4, y + 6, 1, 'F');
+    setText(pdf, C.muted);
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(7);
-    pdf.text(c.label, x + 5, y + 7);
-    setText(pdf, COLORS.text);
+    pdf.text(c.label, x + 7.5, y + 7);
+    setText(pdf, C.ink);
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(11);
-    pdf.text(formatINR(c.value), x + 5, y + 15);
-    setText(pdf, COLORS.textMuted);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(7);
-    pdf.text(`${summary.count} entries`, x + 5, y + 19);
+    pdf.text(formatINR(c.value), x + 4, y + 15);
   });
 
   y += cardH + 12;
 
   // ===== TABLE =====
-  // Section title
-  setText(pdf, COLORS.text);
+  setText(pdf, C.ink);
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(12);
-  pdf.text('Expense Details', M, y);
-  y += 6;
+  pdf.setFontSize(10);
+  pdf.text('Itemized Expenses', M, y);
+  setText(pdf, C.muted);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
+  pdf.text(`${summary.count} ${summary.count === 1 ? 'entry' : 'entries'}`, W - M, y, { align: 'right' });
+  y += 4;
 
-  // Column layout (mm)
+  const tableW = W - 2 * M;
   const cols = [
-    { key: 'no', label: '#', x: M, w: 10, align: 'left' as const },
-    { key: 'date', label: 'DATE', x: M + 10, w: 22, align: 'left' as const },
-    { key: 'vendor', label: 'VENDOR', x: M + 32, w: 45, align: 'left' as const },
-    { key: 'category', label: 'CATEGORY', x: M + 77, w: 35, align: 'left' as const },
-    { key: 'status', label: 'STATUS', x: M + 112, w: 28, align: 'left' as const },
+    { key: 'no', label: '#', x: M, w: 8, align: 'left' as const },
+    { key: 'date', label: 'DATE', x: M + 8, w: 22, align: 'left' as const },
+    { key: 'vendor', label: 'VENDOR', x: M + 30, w: 48, align: 'left' as const },
+    { key: 'category', label: 'CATEGORY', x: M + 78, w: 32, align: 'left' as const },
+    { key: 'status', label: 'STATUS', x: M + 110, w: 28, align: 'left' as const },
     { key: 'amount', label: 'AMOUNT', x: W - M, w: 30, align: 'right' as const },
   ];
-  const tableW = W - 2 * M;
 
-  // Header row
-  setFill(pdf, COLORS.text);
-  pdf.roundedRect(M, y, tableW, 9, 1.5, 1.5, 'F');
-  setText(pdf, COLORS.white);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(8);
-  cols.forEach(c => {
-    pdf.text(c.label, c.x + (c.align === 'right' ? 0 : 2), y + 6, { align: c.align });
-  });
-  y += 9;
+  const drawHeader = () => {
+    // Top + bottom hairline (no fill — minimalist)
+    setDraw(pdf, C.ink);
+    pdf.setLineWidth(0.4);
+    pdf.line(M, y, W - M, y);
+    y += 4.5;
+    setText(pdf, C.muted);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7.5);
+    cols.forEach(c => {
+      pdf.text(c.label, c.x + (c.align === 'right' ? 0 : 1), y);
+    });
+    y += 3;
+    setDraw(pdf, C.border);
+    pdf.setLineWidth(0.2);
+    pdf.line(M, y, W - M, y);
+    y += 1;
+  };
+  drawHeader();
 
+  const rowH = 9;
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
-  const rowH = 10;
 
   expenses.forEach((expense, index) => {
-    if (y + rowH > H - 40) {
+    if (y + rowH > H - 50) {
       pdf.addPage();
       y = 20;
-      // Repeat header
-      setFill(pdf, COLORS.text);
-      pdf.roundedRect(M, y, tableW, 9, 1.5, 1.5, 'F');
-      setText(pdf, COLORS.white);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(8);
-      cols.forEach(c => {
-        pdf.text(c.label, c.x + (c.align === 'right' ? 0 : 2), y + 6, { align: c.align });
-      });
-      y += 9;
+      drawHeader();
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
     }
 
-    // Zebra
     if (index % 2 === 0) {
-      setFill(pdf, COLORS.surface);
+      setFill(pdf, C.surface);
       pdf.rect(M, y, tableW, rowH, 'F');
     }
 
-    setText(pdf, COLORS.textMuted);
-    pdf.text(String(index + 1).padStart(2, '0'), cols[0].x + 2, y + 6.5);
+    setText(pdf, C.muted);
+    pdf.setFontSize(8);
+    pdf.text(String(index + 1).padStart(2, '0'), cols[0].x + 1, y + 6);
 
-    setText(pdf, COLORS.text);
-    pdf.text(format(new Date(expense.date), 'dd MMM yy'), cols[1].x + 2, y + 6.5);
+    setText(pdf, C.body);
+    pdf.setFontSize(9);
+    pdf.text(format(new Date(expense.date), 'dd MMM yy'), cols[1].x + 1, y + 6);
 
+    setText(pdf, C.ink);
     pdf.setFont('helvetica', 'bold');
-    const vendor = expense.vendor.length > 24 ? expense.vendor.substring(0, 22) + '..' : expense.vendor;
-    pdf.text(vendor, cols[2].x + 2, y + 6.5);
+    const vendor = expense.vendor.length > 26 ? expense.vendor.substring(0, 24) + '..' : expense.vendor;
+    pdf.text(vendor, cols[2].x + 1, y + 6);
     pdf.setFont('helvetica', 'normal');
 
-    setText(pdf, COLORS.textMuted);
+    setText(pdf, C.body);
     const cat = getCategoryConfig(expense.category).label;
-    pdf.text(cat.length > 18 ? cat.substring(0, 16) + '..' : cat, cols[3].x + 2, y + 6.5);
+    pdf.text(cat.length > 17 ? cat.substring(0, 15) + '..' : cat, cols[3].x + 1, y + 6);
 
-    // Status pill
+    // Status — minimal outlined pill
     const statusColor =
-      expense.status === 'approved' ? COLORS.success :
-      expense.status === 'pending' ? COLORS.warning :
-      expense.status === 'reimbursed' ? COLORS.info :
-      COLORS.danger;
+      expense.status === 'approved' ? C.success :
+      expense.status === 'pending' ? C.warning :
+      expense.status === 'reimbursed' ? C.info :
+      C.danger;
     const statusLabel = expense.status.charAt(0).toUpperCase() + expense.status.slice(1);
-    const pillW = pdf.getTextWidth(statusLabel) + 5;
-    setFill(pdf, statusColor);
-    pdf.roundedRect(cols[4].x + 1, y + 2.5, pillW, 5, 1.2, 1.2, 'F');
-    setText(pdf, COLORS.white);
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(7);
-    pdf.text(statusLabel, cols[4].x + 1 + pillW / 2, y + 6, { align: 'center' });
+    const pillW = pdf.getTextWidth(statusLabel) + 5;
+    setDraw(pdf, statusColor);
+    pdf.setLineWidth(0.3);
+    pdf.roundedRect(cols[4].x + 1, y + 2.5, pillW, 4.5, 1, 1, 'S');
+    setText(pdf, statusColor);
+    pdf.text(statusLabel, cols[4].x + 1 + pillW / 2, y + 5.7, { align: 'center' });
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(9);
 
-    // Amount
-    setText(pdf, COLORS.text);
+    setText(pdf, C.ink);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(formatINR(expense.amount), cols[5].x, y + 6.5, { align: 'right' });
+    pdf.text(formatINR(expense.amount), cols[5].x, y + 6, { align: 'right' });
     pdf.setFont('helvetica', 'normal');
 
-    // Row separator
-    setDraw(pdf, COLORS.border);
-    pdf.setLineWidth(0.1);
+    setDraw(pdf, C.border);
+    pdf.setLineWidth(0.15);
     pdf.line(M, y + rowH, W - M, y + rowH);
 
     y += rowH;
   });
 
-  // ===== TOTALS BOX =====
-  if (y + 50 > H - 30) {
+  // Bold closing line under table
+  setDraw(pdf, C.ink);
+  pdf.setLineWidth(0.4);
+  pdf.line(M, y, W - M, y);
+
+  // ===== TOTALS =====
+  if (y + 40 > H - 30) {
     pdf.addPage();
     y = 20;
   }
+  y += 8;
+
+  const boxW = 78;
+  const boxX = W - M - boxW;
+
+  // Subtotal row
+  setText(pdf, C.muted);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
+  pdf.text('Subtotal', boxX, y);
+  setText(pdf, C.body);
+  pdf.text(formatINR(summary.total), boxX + boxW, y, { align: 'right' });
   y += 6;
 
-  const boxW = 80;
-  const boxX = W - M - boxW;
-  const lines = [
-    { label: 'Subtotal', value: summary.total, bold: false },
-    { label: 'Pending', value: summary.pending, bold: false },
-    { label: 'Approved', value: summary.approved, bold: false },
-  ];
+  // Pending row
+  setText(pdf, C.muted);
+  pdf.text('Pending', boxX, y);
+  setText(pdf, C.body);
+  pdf.text(formatINR(summary.pending), boxX + boxW, y, { align: 'right' });
+  y += 4;
 
-  lines.forEach((l) => {
-    setText(pdf, COLORS.textMuted);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(9);
-    pdf.text(l.label, boxX + 4, y + 5);
-    setText(pdf, COLORS.text);
-    pdf.text(formatINR(l.value), boxX + boxW - 4, y + 5, { align: 'right' });
-    y += 7;
-  });
+  setDraw(pdf, C.border);
+  pdf.setLineWidth(0.3);
+  pdf.line(boxX, y, boxX + boxW, y);
+  y += 6;
 
-  // Grand total
-  setFill(pdf, COLORS.primary);
-  pdf.roundedRect(boxX, y, boxW, 12, 2, 2, 'F');
-  setText(pdf, COLORS.white);
+  // Total Due
+  setFill(pdf, C.ink);
+  pdf.rect(boxX, y - 5, boxW, 11, 'F');
+  setText(pdf, C.white);
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(10);
-  pdf.text('TOTAL DUE', boxX + 4, y + 7.5);
-  pdf.setFontSize(12);
-  pdf.text(formatINR(summary.total), boxX + boxW - 4, y + 7.5, { align: 'right' });
+  pdf.setFontSize(9);
+  pdf.text('TOTAL DUE', boxX + 3, y + 1.5);
+  pdf.setFontSize(11);
+  pdf.text(formatINR(summary.total), boxX + boxW - 3, y + 1.5, { align: 'right' });
 
   // ===== FOOTER =====
   const totalPages = pdf.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     pdf.setPage(i);
-    setDraw(pdf, COLORS.border);
-    pdf.setLineWidth(0.2);
-    pdf.line(M, H - 18, W - M, H - 18);
+    setDraw(pdf, C.border);
+    pdf.setLineWidth(0.3);
+    pdf.line(M, H - 16, W - M, H - 16);
 
-    setText(pdf, COLORS.textMuted);
+    setText(pdf, C.muted);
     pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(8);
-    pdf.text('Thank you for your business.', M, H - 12);
-    pdf.text('Generated by Reimburse · Premium Expense Tracker', M, H - 7);
+    pdf.setFontSize(7.5);
+    pdf.text('Thank you for your prompt review and processing of this reimbursement.', M, H - 10);
+    pdf.text('Generated by Reimburse', M, H - 6);
 
-    pdf.text(`Page ${i} of ${totalPages}`, W - M, H - 12, { align: 'right' });
-    pdf.text(format(new Date(), "dd MMM yyyy 'at' HH:mm"), W - M, H - 7, { align: 'right' });
+    pdf.text(`Page ${i} of ${totalPages}`, W - M, H - 10, { align: 'right' });
+    pdf.text(format(new Date(), "dd MMM yyyy 'at' HH:mm"), W - M, H - 6, { align: 'right' });
   }
 
   pdf.save(`reimbursement-invoice-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
