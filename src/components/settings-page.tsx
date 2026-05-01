@@ -18,6 +18,34 @@ interface SettingsPageProps {
   onThemeToggle: () => void;
 }
 
+const Section = ({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) => (
+  <div className="rounded-2xl border border-border/60 bg-card/60 overflow-hidden">
+    <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border/40 bg-muted/20">
+      <div className="h-7 w-7 rounded-lg bg-gradient-primary flex items-center justify-center">
+        <Icon className="h-3.5 w-3.5 text-white" />
+      </div>
+      <h3 className="font-semibold text-sm">{title}</h3>
+    </div>
+    <div className="p-4 space-y-3">{children}</div>
+  </div>
+);
+
+const Field = ({ id, label, value, onChange, placeholder, type = 'text' }: {
+  id: string; label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string;
+}) => (
+  <div className="space-y-1.5">
+    <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">{label}</Label>
+    <Input
+      id={id}
+      type={type}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="bg-muted/50 border-border/60 h-9 text-sm"
+    />
+  </div>
+);
+
 export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
   const [settings, setSettings] = useState<AppSettings>(settingsService.get());
   const [newBudget, setNewBudget] = useState<Partial<BudgetGoal>>({ period: 'monthly' });
@@ -53,34 +81,6 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
     setSettings(updated);
     settingsService.save(updated);
   };
-
-  const Section = ({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) => (
-    <div className="rounded-2xl border border-border/60 bg-card/60 overflow-hidden">
-      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border/40 bg-muted/20">
-        <div className="h-7 w-7 rounded-lg bg-gradient-primary flex items-center justify-center">
-          <Icon className="h-3.5 w-3.5 text-white" />
-        </div>
-        <h3 className="font-semibold text-sm">{title}</h3>
-      </div>
-      <div className="p-4 space-y-3">{children}</div>
-    </div>
-  );
-
-  const Field = ({ id, label, value, onChange, placeholder, type = 'text' }: {
-    id: string; label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string;
-  }) => (
-    <div className="space-y-1.5">
-      <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">{label}</Label>
-      <Input
-        id={id}
-        type={type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="bg-muted/50 border-border/60 h-9 text-sm"
-      />
-    </div>
-  );
 
   return (
     <div className="space-y-5 pb-24 sm:pb-8">

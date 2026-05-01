@@ -31,6 +31,7 @@ import { settingsService } from '@/lib/settings';
 import { haptics } from '@/lib/haptics';
 import { ExpenseForm } from './expense-form';
 import { formatCurrency, cn } from '@/lib/utils';
+import { ExportDialog } from './export-dialog';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -67,6 +68,7 @@ export function ExpenseList({
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => 
     typeof window !== 'undefined' && window.innerWidth < 640 ? 'cards' : 'table'
   );
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   const filteredExpenses = useMemo(() => {
     let list = expenses.filter(e => {
@@ -124,7 +126,7 @@ export function ExpenseList({
 
   const clearSelection = () => setSelected(new Set());
 
-  const handleExportPDF = async () => {
+  const handleExportPDF = async (shareMessage?: string) => {
     const settings = settingsService.get();
     const dataToExport = selected.size > 0 
       ? filteredExpenses.filter(e => selected.has(e.id))
@@ -150,6 +152,7 @@ export function ExpenseList({
         title: 'Expense Reimbursement Invoice',
         billedTo: settings.billedTo,
         billedFrom: settings.billedFrom,
+        shareMessage,
       });
       toast.success('Report generated successfully', { id: toastId });
     } catch (error) {
@@ -312,7 +315,7 @@ export function ExpenseList({
             </div>
 
             <div className="flex gap-2">
-              <Button size="sm" className="h-8 text-[10px] px-3 bg-primary text-white shadow-glow font-bold gap-1.5" onClick={handleExportPDF}>
+              <Button size="sm" className="h-8 text-[10px] px-3 bg-primary text-white shadow-glow font-bold gap-1.5" onClick={() => setExportDialogOpen(true)}>
                 <FileText className="h-3.5 w-3.5" /> Share PDF
               </Button>
               <Button size="sm" variant="outline" className="h-8 text-[10px] px-3 border-success/30 text-success font-bold gap-1.5" onClick={handleExportCSV}>
@@ -388,7 +391,7 @@ export function ExpenseList({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="glass border-border/50">
-            <DropdownMenuItem onClick={handleExportPDF} className="gap-2">
+            <DropdownMenuItem onClick={() => setExportDialogOpen(true)} className="gap-2">
               <FileText className="h-4 w-4 text-primary" />
               Export as PDF
             </DropdownMenuItem>
@@ -703,6 +706,14 @@ export function ExpenseList({
           )}
         </DialogContent>
       </Dialog>
+
+      <ExportDialog
+        isOpen={exportDialogOpen}
+        onClose={() => setExportDialogOpen(false)}
+        onConfirm={handleExportPDF}
+        title="Export PDF Report"
+        count={selected.size > 0 ? selected.size : filteredExpenses.length}
+      />
     </div>
   );
 }
