@@ -7,7 +7,7 @@ import { format, startOfMonth, eachMonthOfInterval, subMonths, isSameMonth } fro
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 import { Expense } from '@/types/expense';
-import { categoryConfig } from '@/lib/categories';
+import { categoryService } from '@/lib/category-service';
 import { formatCurrency, formatCompactCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
@@ -102,12 +102,15 @@ export function CategoryBreakdownChart({ expenses }: ChartsProps) {
       categoryTotals[e.category] = (categoryTotals[e.category] || 0) + e.amount;
     });
     return Object.entries(categoryTotals)
-      .map(([cat, amount]) => ({
-        name: categoryConfig[cat as keyof typeof categoryConfig]?.label || cat,
-        value: amount,
-        color: categoryConfig[cat as keyof typeof categoryConfig]?.gradientFrom || '#888',
-        category: cat,
-      }))
+      .map(([catId, amount]) => {
+        const cat = categoryService.getById(catId);
+        return {
+          name: cat.label || catId,
+          value: amount,
+          color: cat.gradientFrom || '#888',
+          category: catId,
+        };
+      })
       .sort((a, b) => b.value - a.value)
       .slice(0, 6);
   }, [expenses]);
@@ -191,6 +194,82 @@ export function MonthlyBarChart({ expenses }: ChartsProps) {
         <Bar dataKey="pending" name="Pending" fill="hsl(38 95% 58%)" radius={[4, 4, 0, 0]} />
         <Bar dataKey="approved" name="Approved" fill="hsl(152 68% 50%)" radius={[4, 4, 0, 0]} />
         <Bar dataKey="reimbursed" name="Reimbursed" fill="hsl(262 85% 65%)" radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function VehicleEfficiencyChart({ logs }: { logs: any[] }) {
+  const data = useMemo(() => {
+    return [...logs]
+      .filter(l => l.economy)
+      .slice(0, 12)
+      .reverse()
+      .map(l => ({
+        date: format(new Date(l.date), 'dd MMM'),
+        economy: Number(l.economy?.toFixed(1))
+      }));
+  }, [logs]);
+
+  if (data.length < 2) return (
+    <div className="h-48 flex items-center justify-center text-xs text-muted-foreground border border-dashed border-border/40 rounded-2xl">
+      Need 2+ full tank logs to show trend
+    </div>
+  );
+
+  return (
+    <ResponsiveContainer width="100%" height={200}>
+      <AreaChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+        <defs>
+          <linearGradient id="ecoGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="hsl(142 71% 45%)" stopOpacity={0.3} />
+            <stop offset="95%" stopColor="hsl(142 71% 45%)" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border) / 0.4)" />
+        <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+        <YAxis hide domain={['dataMin - 2', 'dataMax + 2']} />
+        <Tooltip 
+          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: 'none', borderRadius: '12px', fontSize: '10px' }}
+          itemStyle={{ color: 'hsl(142 71% 45%)', fontWeight: 'bold' }}
+        />
+        <Area 
+          type="monotone" 
+          dataKey="economy" 
+          name="Economy" 
+          stroke="hsl(142 71% 45%)" 
+          strokeWidth={3} 
+          fill="url(#ecoGrad)" 
+          dot={{ r: 3, fill: 'hsl(142 71% 45%)', strokeWidth: 0 }}
+          activeDot={{ r: 5, fill: 'hsl(142 71% 45%)' }} 
+        />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function FuelCostChart({ logs }: { logs: any[] }) {
+  const data = useMemo(() => {
+    return [...logs]
+      .slice(0, 10)
+      .reverse()
+      .map(l => ({
+        date: format(new Date(l.date), 'dd MMM'),
+        cost: l.totalCost
+      }));
+  }, [logs]);
+
+  return (
+    <ResponsiveContainer width="100%" height={120}>
+      <BarChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border) / 0.4)" />
+        <XAxis dataKey="date" hide />
+        <YAxis hide />
+        <Tooltip 
+          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: 'none', borderRadius: '12px', fontSize: '10px' }}
+          formatter={(v: number) => `₹${v}`}
+        />
+        <Bar dataKey="cost" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

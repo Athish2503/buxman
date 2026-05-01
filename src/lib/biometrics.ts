@@ -3,7 +3,9 @@ import { Capacitor } from '@capacitor/core';
 
 export const biometrics = {
   async isAvailable(): Promise<boolean> {
-    if (!Capacitor.isNativePlatform()) return false;
+    // If on web, we return true to allow the toggle in settings for simulation/UI testing
+    if (!Capacitor.isNativePlatform()) return true; 
+    
     try {
       const result = await NativeBiometric.isAvailable();
       return result.isAvailable;
@@ -13,7 +15,11 @@ export const biometrics = {
   },
 
   async authenticate(): Promise<boolean> {
-    if (!Capacitor.isNativePlatform()) return true;
+    if (!Capacitor.isNativePlatform()) {
+      console.log('[Biometrics] Simulating successful authentication on web');
+      return true;
+    }
+    
     try {
       await NativeBiometric.verifyIdentity({
         reason: 'Unlock Pixel Reimburse',
@@ -23,7 +29,7 @@ export const biometrics = {
       });
       return true;
     } catch (e: any) {
-      console.error('Biometric auth failed', e);
+      console.error('[Biometrics] Native auth failed', e);
       return false;
     }
   }

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
+import { Briefcase } from 'lucide-react';
 import { Expense } from '@/types/expense';
-import { categoryConfig } from '@/lib/categories';
+import { categoryService, iconMap } from '@/lib/category-service';
 import { formatCompactCurrency, cn } from '@/lib/utils';
 
 interface CategoryRingsProps {
@@ -21,7 +22,7 @@ export function CategoryRings({ expenses }: CategoryRingsProps) {
         cat,
         amount,
         pct: total > 0 ? (amount / total) * 100 : 0,
-        cfg: categoryConfig[cat as keyof typeof categoryConfig],
+        cfg: categoryService.getById(cat),
       }));
   }, [expenses]);
 
@@ -35,7 +36,7 @@ export function CategoryRings({ expenses }: CategoryRingsProps) {
       <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">By Category</p>
       <div className="grid grid-cols-3 gap-2">
         {cats.map(({ cat, amount, pct, cfg }) => {
-          const Icon = cfg.icon;
+          const Icon = iconMap[cfg.iconName] || Briefcase;
           const dashOffset = CIRC * (1 - pct / 100);
           return (
             <div key={cat} className="flex flex-col items-center gap-2 p-3 rounded-2xl border border-border/40 bg-card/60">

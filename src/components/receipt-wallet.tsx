@@ -15,10 +15,11 @@ import { notificationService } from '@/lib/notifications';
 import { ImageViewer } from './image-viewer';
 
 interface ReceiptWalletProps {
+  expenses: Expense[];
   onAddExpense: (e: Expense) => void;
 }
 
-export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
+export function ReceiptWallet({ expenses, onAddExpense }: ReceiptWalletProps) {
   const [receipts, setReceipts] = useState<ReceiptDraft[]>(() => walletService.getReceipts());
   const [processingReceipt, setProcessingReceipt] = useState<ReceiptDraft | null>(null);
   const [longPressedId, setLongPressedId] = useState<string | null>(null);
@@ -39,7 +40,6 @@ export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
         ];
         const randomMsg = messages[Math.floor(Math.random() * messages.length)];
         
-        // Show In-App Toast
         toast(randomMsg, {
           duration: 6000,
           icon: '💰',
@@ -50,11 +50,7 @@ export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
           }
         });
 
-        // Trigger Native Mobile Notification
-        notificationService.scheduleFunnyReminder(
-          "Pixel Reimburse", 
-          randomMsg
-        );
+        notificationService.scheduleFunnyReminder("Pixel Reimburse", randomMsg);
       }
     }
   }, []);
@@ -63,8 +59,6 @@ export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
 
   const handleCapture = (source: CameraSource) => {
     setShowSourcePicker(false);
-    
-    // Small delay to allow picker animation to finish
     setTimeout(async () => {
       try {
         const image = await Camera.getPhoto({
@@ -83,18 +77,8 @@ export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
         }
       } catch (error) {
         console.error('Camera error:', error);
-        if (error instanceof Error && error.message.includes('User cancelled')) {
-          return;
-        }
       }
     }, 100);
-  };
-
-  const handleDelete = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    walletService.removeReceipt(id);
-    haptics.heavy();
-    reload();
   };
 
   const handleFormSubmit = (expense: Expense) => {
@@ -107,7 +91,6 @@ export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
   };
 
   if (processingReceipt) {
-    // Generate an initial expense stub populated with the image
     const initialData: Expense = {
       id: crypto.randomUUID(),
       vendor: '',
@@ -118,6 +101,7 @@ export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
       description: '',
       status: 'pending',
       receiptImage: processingReceipt.imageUri,
+      isReimbursement: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -144,11 +128,10 @@ export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
           />
         </div>
 
-        {/* Reusing FormBody inline */}
         <ExpenseForm 
           onSubmit={handleFormSubmit} 
           initialData={initialData}
-          isEdit // we use isEdit mode to mount FormBody inline instead of a modal
+          isEdit 
           onClose={() => setProcessingReceipt(null)}
         />
       </motion.div>
@@ -170,7 +153,6 @@ export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
         </button>
       </div>
 
-      {/* Custom Source Picker Bottom Sheet */}
       <AnimatePresence>
         {showSourcePicker && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center px-4 pb-8">
@@ -195,32 +177,26 @@ export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <button
                     onClick={() => handleCapture(CameraSource.Camera)}
-                    className="flex flex-col items-center gap-3 p-6 rounded-3xl bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-all group active:scale-95"
+                    className="flex flex-col items-center gap-3 p-6 rounded-3xl bg-primary/10 border border-primary/20 active:scale-95 transition-transform"
                   >
-                    <div className="h-12 w-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
+                    <div className="h-12 w-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
                       <CameraIcon className="h-6 w-6 text-white" />
                     </div>
                     <span className="text-sm font-bold">Take Photo</span>
                   </button>
-
                   <button
                     onClick={() => handleCapture(CameraSource.Photos)}
-                    className="flex flex-col items-center gap-3 p-6 rounded-3xl bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 transition-all group active:scale-95"
+                    className="flex flex-col items-center gap-3 p-6 rounded-3xl bg-indigo-500/10 border border-indigo-500/20 active:scale-95 transition-transform"
                   >
-                    <div className="h-12 w-12 rounded-2xl bg-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/30 group-hover:scale-110 transition-transform">
+                    <div className="h-12 w-12 rounded-2xl bg-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
                       <ImageIcon className="h-6 w-6 text-white" />
                     </div>
                     <span className="text-sm font-bold">From Gallery</span>
                   </button>
                 </div>
-
-                <p className="text-[10px] text-center text-muted-foreground mt-2 font-medium uppercase tracking-widest">
-                  Quick Snap for Later
-                </p>
               </div>
             </motion.div>
           </div>
@@ -231,7 +207,6 @@ export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
         <div className="text-center py-12 border border-dashed border-border/40 rounded-2xl">
           <Receipt className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
           <p className="text-sm font-semibold text-muted-foreground">Wallet is empty</p>
-          <p className="text-xs text-muted-foreground mt-1 max-w-[200px] mx-auto">Take photos of physical receipts to process them when you have time.</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -247,7 +222,6 @@ export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
                 onSelect={() => setProcessingReceipt(r)}
                 onDelete={(id) => {
                   walletService.removeReceipt(id);
-                  haptics.heavy();
                   reload();
                 }}
                 onView={(r) => setViewingReceipt(r)}
@@ -294,17 +268,34 @@ function ReceiptItem({ receipt, onSelect, onDelete, onView, isLongPressed, setLo
   );
 
   return (
-    <div 
+    <motion.div 
       {...(!isLongPressed ? longPressProps : {})}
+      drag="y"
+      dragConstraints={{ top: -100, bottom: 0 }}
+      dragElastic={0.1}
+      onDragEnd={(_, info) => {
+        if (info.offset.y < -80) {
+          haptics.success();
+          onSelect();
+        }
+      }}
       className={cn(
-        "group relative aspect-[3/4] rounded-xl overflow-hidden border border-border/40 cursor-pointer active:scale-95 transition-transform",
+        "group relative aspect-[3/4] rounded-xl overflow-hidden border border-border/40 cursor-pointer active:scale-95 transition-transform bg-muted/20",
         isLongPressed && "scale-105 ring-2 ring-primary ring-offset-2 z-10"
       )}
     >
       <img src={receipt.imageUri} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="Draft" />
+      
+      {/* Swipe Indicator */}
+      <div className="absolute top-2 left-0 right-0 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="bg-white/20 backdrop-blur-md px-2 py-1 rounded-full flex items-center gap-1">
+          <ArrowRight className="h-3 w-3 -rotate-90 text-white" />
+          <span className="text-[8px] text-white font-bold uppercase">Swipe Up to Process</span>
+        </div>
+      </div>
+
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
       
-      {/* Options Overlay on Long Press */}
       <AnimatePresence>
         {isLongPressed && (
           <motion.div 
@@ -341,7 +332,6 @@ function ReceiptItem({ receipt, onSelect, onDelete, onView, isLongPressed, setLo
         )}
       </AnimatePresence>
 
-      {/* Normal View Bottom Text */}
       {!isLongPressed && (
         <div className="absolute bottom-2 left-2 right-2">
           <p className="text-[10px] text-white/80 font-medium">{format(new Date(receipt.createdAt), 'dd MMM, HH:mm')}</p>
@@ -350,6 +340,6 @@ function ReceiptItem({ receipt, onSelect, onDelete, onView, isLongPressed, setLo
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

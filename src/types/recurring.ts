@@ -13,6 +13,7 @@ export interface RecurringExpense {
   nextDue: string;         // ISO date
   lastAdded?: string;      // ISO date
   isActive: boolean;
+  isReimbursement?: boolean;
   createdAt: string;
 }
 
@@ -25,6 +26,7 @@ export interface QuickTemplate {
   description?: string;
   projectCode?: string;
   tags?: string[];
+  isReimbursement?: boolean;
   usageCount: number;
   createdAt: string;
 }

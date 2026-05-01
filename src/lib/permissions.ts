@@ -35,7 +35,7 @@ export const permissions = {
       status.allGranted = status.camera && status.microphone && status.notifications;
       return status;
     } catch {
-      return { camera: false, notifications: false, allGranted: false };
+      return { camera: false, microphone: false, notifications: false, allGranted: false };
     }
   },
 
@@ -52,9 +52,7 @@ export const permissions = {
       await LocalNotifications.requestPermissions();
       
       // Request Record Audio (Microphone)
-      if ((window as any).Capacitor?.Plugins?.Permissions) {
-        await (window as any).Capacitor.Plugins.Permissions.requestPermission({ name: 'microphone' });
-      }
+      await this.requestMicrophonePermission();
 
       return await this.checkStatus();
     } catch (error) {
@@ -64,11 +62,20 @@ export const permissions = {
   },
 
   async checkMicrophonePermission(): Promise<boolean> {
+    if (Capacitor.isNativePlatform() && (window as any).NativeBridge) {
+      return (window as any).NativeBridge.checkMicrophonePermission();
+    }
+
     try {
-      // Use standard browser API as a fallback or Capacitor native check
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(track => track.stop());
-      return true;
+      // On web, use the Permissions API which doesn't open the microphone
+      if (navigator.permissions && navigator.permissions.query) {
+        const status = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+        return status.state === 'granted';
+      }
+      
+      // Fallback for older browsers (not ideal as it opens the mic, but better than nothing)
+      // Actually, if we don't want to "mess with audio", we should just return false if we can't query
+      return false;
     } catch {
       return false;
     }
@@ -94,5 +101,54 @@ export const permissions = {
     } else {
       console.warn('NativeBridge not available or not on native platform');
     }
+  },
+
+  /**
+   * Requests SMS permissions via native bridge
+   */
+  async requestSMSPermission(): Promise<void> {
+    if (Capacitor.isNativePlatform() && (window as any).NativeBridge) {
+      (window as any).NativeBridge.requestSMSPermission();
+    } else {
+      console.warn('NativeBridge not available or not on native platform');
+    }
+  },
+
+  /**
+   * Requests Microphone permission via native bridge
+   */
+  async requestMicrophonePermission(): Promise<void> {
+    if (Capacitor.isNativePlatform() && (window as any).NativeBridge) {
+      (window as any).NativeBridge.requestMicrophonePermission();
+    } else {
+      // On web, we have to use getUserMedia to trigger the prompt
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop());
+      } catch (e) {
+        console.error('Web microphone request failed', e);
+      }
+    }
+  },
+
+  async checkSMSStatus(): Promise<boolean> {
+    if (Capacitor.isNativePlatform() && (window as any).NativeBridge) {
+      return (window as any).NativeBridge.checkSMSPermission();
+    }
+    return false;
+  },
+
+  async checkNotificationStatus(): Promise<boolean> {
+    if (Capacitor.isNativePlatform() && (window as any).NativeBridge) {
+      return (window as any).NativeBridge.checkNotificationPermission();
+    }
+    return false;
+  },
+
+  async checkOverlayStatus(): Promise<boolean> {
+    if (Capacitor.isNativePlatform() && (window as any).NativeBridge) {
+      return (window as any).NativeBridge.checkOverlayPermission();
+    }
+    return false;
   }
 };

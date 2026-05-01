@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { haptics } from '@/lib/haptics';
 import { formatCurrency, cn } from '@/lib/utils';
 import { ExpenseCategory } from '@/types/expense';
-import { categoryConfig } from '@/lib/categories';
+import { categoryService } from '@/lib/category-service';
 import { smsParser } from '@/lib/sms-parser';
 
 interface SMSExpenseNudgeProps {
@@ -21,12 +21,23 @@ export function SMSExpenseNudge({ onAdd }: SMSExpenseNudgeProps) {
 
   useEffect(() => {
     const handleTransaction = (e: any) => {
-      const parsed = smsParser.parse(e.detail.body);
+      const body = e.detail?.body || e;
+      if (typeof body !== 'string') return;
+      
+      const parsed = smsParser.parse(body);
       if (parsed) {
         setDetected(parsed);
         haptics.heavy();
       }
     };
+
+    // Check for pending transaction on mount (Cold start)
+    if ((window as any).NativeBridge?.getPendingTransaction) {
+      const pending = (window as any).NativeBridge.getPendingTransaction();
+      if (pending) {
+        handleTransaction({ detail: { body: pending } });
+      }
+    }
 
     window.addEventListener('simulate-sms', handleTransaction);
     window.addEventListener('notification-transaction', handleTransaction);
@@ -47,6 +58,7 @@ export function SMSExpenseNudge({ onAdd }: SMSExpenseNudgeProps) {
       category,
       description: notes,
       status: 'pending',
+      isReimbursement: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -97,18 +109,18 @@ export function SMSExpenseNudge({ onAdd }: SMSExpenseNudgeProps) {
                     <Tag className="h-3 w-3" /> Category
                   </label>
                   <div className="flex overflow-x-auto no-scrollbar gap-2 pb-1">
-                    {Object.entries(categoryConfig).map(([id, cfg]) => (
+                    {categoryService.getAll().map((cat) => (
                       <button
-                        key={id}
-                        onClick={() => { setCategory(id as ExpenseCategory); haptics.selection(); }}
+                        key={cat.id}
+                        onClick={() => { setCategory(cat.id as ExpenseCategory); haptics.selection(); }}
                         className={cn(
                           "flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border",
-                          category === id 
+                          category === cat.id 
                             ? "bg-primary text-white border-primary shadow-glow" 
                             : "bg-muted/50 border-border/40 text-muted-foreground hover:border-primary/30"
                         )}
                       >
-                        {cfg.label}
+                        {cat.label}
                       </button>
                     ))}
                   </div>

@@ -11,6 +11,7 @@ export interface Expense {
   currency: string;
   description: string;
   status: ExpenseStatus;
+  isReimbursement: boolean;
   receiptImage?: string;
   tags?: string[];
   projectCode?: string;

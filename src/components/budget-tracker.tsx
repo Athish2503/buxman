@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Expense, BudgetGoal } from '@/types/expense';
-import { categoryConfig } from '@/lib/categories';
+import { categoryService, iconMap } from '@/lib/category-service';
 import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { startOfMonth } from 'date-fns';
@@ -52,8 +52,8 @@ export function BudgetTracker({ expenses, budgets, onManage }: BudgetTrackerProp
   return (
     <div className="space-y-3">
       {budgetProgress.map(b => {
-        const cfg = categoryConfig[b.category];
-        const Icon = cfg.icon;
+        const cat = categoryService.getById(b.category);
+        const Icon = iconMap[cat.iconName] || Target;
         const isOver = b.pct >= 100;
         const isNear = b.pct >= 80 && !isOver;
 
@@ -61,10 +61,10 @@ export function BudgetTracker({ expenses, budgets, onManage }: BudgetTrackerProp
           <div key={b.category} className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className={cn("h-6 w-6 rounded flex items-center justify-center shrink-0", cfg.bgColor)}>
-                  <Icon className={cn("h-3.5 w-3.5", cfg.color)} />
+                <div className={cn("h-6 w-6 rounded flex items-center justify-center shrink-0", cat.bgColor)}>
+                  <Icon className={cn("h-3.5 w-3.5", cat.color)} />
                 </div>
-                <span className="text-sm font-medium">{cfg.label}</span>
+                <span className="text-sm font-medium">{cat.label}</span>
                 {isOver && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
                 {!isOver && b.pct === 0 && <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground/40" />}
               </div>

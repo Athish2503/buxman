@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ShieldCheck, Fingerprint, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Capacitor } from '@capacitor/core';
 import { biometrics } from '@/lib/biometrics';
 import { Button } from '@/components/ui/button';
 import { haptics } from '@/lib/haptics';
@@ -16,16 +17,38 @@ export function BiometricLock({ children, enabled }: BiometricLockProps) {
   useEffect(() => {
     if (enabled) {
       handleAuth();
+      
+      // Re-lock on app resume (Banking style security)
+      const handleResume = () => {
+        setIsLocked(true);
+        handleAuth();
+      };
+      
+      document.addEventListener('resume', handleResume);
+      window.addEventListener('focus', () => {
+        // Optional: lock on focus if not native but enabled
+        if (!Capacitor.isNativePlatform() && enabled) {
+          // setIsLocked(true); // Can be annoying on web, but good for testing
+        }
+      });
+
+      return () => document.removeEventListener('resume', handleResume);
     }
   }, [enabled]);
 
   const handleAuth = async () => {
-    const success = await biometrics.authenticate();
-    if (success) {
-      setIsLocked(false);
-      haptics.success();
-    } else {
-      haptics.error();
+    try {
+      const success = await biometrics.authenticate();
+      if (success) {
+        setIsLocked(false);
+        haptics.success();
+      } else {
+        haptics.error();
+      }
+    } catch (error) {
+      console.error('Auth error:', error);
+      // Fallback if native auth fails/errors
+      if (!Capacitor.isNativePlatform()) setIsLocked(false);
     }
   };
 

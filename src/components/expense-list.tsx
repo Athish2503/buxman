@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import {
   Edit, Trash2, Eye, Filter, Download, Search,
   Receipt, ChevronDown, CheckSquare, Square, X,
-  SlidersHorizontal, FileText, FileSpreadsheet,
-  MoreVertical, ArrowUpDown, Tag, Share2, ZoomIn
+  SlidersHorizontal, FileText, FileSpreadsheet, Briefcase,
+  MoreVertical, ArrowUpDown, Tag, Share2, ZoomIn, RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -24,7 +24,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Checkbox } from '@/components/ui/checkbox';
 
 import { Expense, ExpenseStatus, ExpenseSummary } from '@/types/expense';
-import { getCategoryConfig, categoryConfig } from '@/lib/categories';
+import { getCategoryConfig } from '@/lib/categories';
+import { categoryService } from '@/lib/category-service';
 import { generateExpensesPDF } from '@/lib/pdf-generator';
 import { exportCSV } from '@/lib/csv-exporter';
 import { settingsService } from '@/lib/settings';
@@ -38,6 +39,9 @@ import { PullToRefresh } from './pull-to-refresh';
 
 interface ExpenseListProps {
   expenses: Expense[];
+  initialFilterType?: 'all' | 'personal' | 'reimbursable';
+  showTypeTabs?: boolean;
+  title?: string;
   onUpdateExpense: (expense: Expense) => void;
   onDeleteExpense: (id: string) => void;
   onDeleteAll: () => void;
@@ -56,13 +60,14 @@ const STATUS_COLORS: Record<ExpenseStatus, string> = {
 };
 
 export function ExpenseList({
-  expenses, onUpdateExpense, onDeleteExpense, onDeleteAll,
-  onBatchDelete, onBatchStatus
+  expenses, initialFilterType = 'all', showTypeTabs = true, title, onUpdateExpense, 
+  onDeleteExpense, onDeleteAll, onBatchDelete, onBatchStatus
 }: ExpenseListProps) {
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterType, setFilterType] = useState<'all' | 'personal' | 'reimbursable'>(initialFilterType);
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -74,6 +79,11 @@ export function ExpenseList({
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
 
+  // Sync filter when changed from parent (dashboard buttons)
+  useEffect(() => {
+    setFilterType(initialFilterType);
+  }, [initialFilterType]);
+
   const filteredExpenses = useMemo(() => {
     let list = expenses.filter(e => {
       const catOk = filterCategory === 'all' || e.category === filterCategory;
@@ -83,7 +93,10 @@ export function ExpenseList({
         e.description.toLowerCase().includes(q) ||
         (e.tags || []).some(t => t.includes(q)) ||
         (e.projectCode || '').toLowerCase().includes(q);
-      return catOk && statusOk && searchOk;
+      const typeOk = filterType === 'all' || 
+        (filterType === 'personal' && !e.isReimbursement) || 
+        (filterType === 'reimbursable' && e.isReimbursement);
+      return catOk && statusOk && searchOk && typeOk;
     });
 
     list.sort((a, b) => {
@@ -207,8 +220,8 @@ export function ExpenseList({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            {Object.entries(categoryConfig).map(([k, c]) => (
-              <SelectItem key={k} value={k}>{c.label}</SelectItem>
+            {categoryService.getAll().map((cat) => (
+              <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -228,6 +241,28 @@ export function ExpenseList({
               )}
             >
               {s === 'all' ? 'All' : s}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Type</p>
+        <div className="grid grid-cols-3 gap-2">
+          {(['all', 'personal', 'reimbursable'] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => {
+                haptics.selection();
+                setFilterType(t);
+              }}
+              className={cn(
+                "py-1.5 px-3 rounded-lg text-xs font-medium border capitalize transition-all",
+                filterType === t
+                  ? "border-primary bg-primary/15 text-primary"
+                  : "border-border text-muted-foreground hover:border-border/80"
+              )}
+            >
+              {t}
             </button>
           ))}
         </div>
@@ -285,6 +320,54 @@ export function ExpenseList({
         </div>
       )}
 
+      {/* Module Title */}
+      {title && (
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xl font-bold tracking-tight">{title}</h2>
+          <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
+            {filteredExpenses.length} items
+          </Badge>
+        </div>
+      )}
+
+      {/* Top Level Type Tabs */}
+      {showTypeTabs && (
+        <div className="flex bg-muted/40 p-1 rounded-2xl w-full">
+        {(['all', 'personal', 'reimbursable'] as const).map(t => {
+          const active = filterType === t;
+          const count = expenses.filter(e => {
+            if (t === 'all') return true;
+            if (t === 'personal') return !e.isReimbursement;
+            return e.isReimbursement;
+          }).length;
+          
+          return (
+            <button
+              key={t}
+              onClick={() => {
+                haptics.selection();
+                setFilterType(t);
+              }}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all duration-300",
+                active 
+                  ? "bg-background text-foreground shadow-lg scale-[1.02] border border-border/50" 
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <span className="capitalize">{t}</span>
+              <span className={cn(
+                "px-1.5 py-0.5 rounded-md text-[9px]",
+                active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground/60"
+              )}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      )}
+
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -336,7 +419,13 @@ export function ExpenseList({
                 {filteredExpenses.map(expense => (
                   <tr key={expense.id} className={cn("hover:bg-muted/20", selected.has(expense.id) ? "bg-primary/5" : "")} onClick={() => toggleSelect(expense.id)}>
                     <td className="p-3" onClick={e => e.stopPropagation()}><Checkbox checked={selected.has(expense.id)} onCheckedChange={() => toggleSelect(expense.id)} /></td>
-                    <td className="p-3"><p className="text-xs font-bold">{expense.vendor}</p><p className="text-[10px] text-muted-foreground">{format(new Date(expense.date), 'dd/MM/yy')}</p></td>
+                    <td className="p-3">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs font-bold">{expense.vendor}</p>
+                        {expense.isReimbursement && <Briefcase className="h-2.5 w-2.5 text-primary" />}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">{format(new Date(expense.date), 'dd/MM/yy')}</p>
+                    </td>
                     <td className="p-3 text-right text-xs font-mono font-bold">{formatCurrency(expense.amount)}</td>
                     <td className="p-3"><Badge className={cn("text-[9px] uppercase", STATUS_COLORS[expense.status])}>{expense.status}</Badge></td>
                     <td className="p-3" onClick={e => e.stopPropagation()}>

@@ -2,7 +2,16 @@ import {
   Plane, Utensils, Package, Bed, Car, PartyPopper, Phone, 
   GraduationCap, Home, Heart, Shirt, MoreHorizontal,
   LucideIcon, ShoppingBag, Coffee, CarTaxiFront, 
-  Briefcase, Gift, Wrench, Zap, Shield, HelpCircle
+  Briefcase, Gift, Wrench, Zap, Shield, HelpCircle,
+  Smartphone, Laptop, Tv, Headset, Gamepad2,
+  Dumbbell, Bike, Dog, Cat, Baby,
+  Flame, Droplets, Lightbulb, Wifi,
+  Ticket, Camera, Music, Book, Newspaper,
+  CreditCard, Banknote, Landmark, Wallet,
+  Trophy, Star, Crown, Ghost,
+  Apple, Pizza, Beer, Wine, IceCream,
+  Activity, Pill, Stethoscope,
+  Scissors, Brush, Palette
 } from 'lucide-react';
 import { ExpenseCategory } from '@/types/expense';
 
@@ -23,7 +32,16 @@ export const iconMap: Record<string, LucideIcon> = {
   Plane, Utensils, Package, Bed, Car, PartyPopper, Phone, 
   GraduationCap, Home, Heart, Shirt, MoreHorizontal,
   ShoppingBag, Coffee, CarTaxiFront, Briefcase, Gift, 
-  Wrench, Zap, Shield, HelpCircle
+  Wrench, Zap, Shield, HelpCircle,
+  Smartphone, Laptop, Tv, Headset, Gamepad2,
+  Dumbbell, Bike, Dog, Cat, Baby,
+  Flame, Droplets, Lightbulb, Wifi,
+  Ticket, Camera, Music, Book, Newspaper,
+  CreditCard, Banknote, Landmark, Wallet,
+  Trophy, Star, Crown, Ghost,
+  Apple, Pizza, Beer, Wine, IceCream,
+  Activity, Pill, Stethoscope,
+  Scissors, Brush, Palette
 };
 
 const DEFAULT_CATEGORIES: CategoryDefinition[] = [

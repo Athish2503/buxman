@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { haptics } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { permissions } from '@/lib/permissions';
 
 interface VoiceInputProps {
   onParse: (data: { amount?: number; vendor?: string; category?: string; date?: string; description?: string }) => void;
@@ -29,75 +30,95 @@ export function VoiceInput({ onParse }: VoiceInputProps) {
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognitionRef.current = recognition;
-    recognition.lang = 'en-IN';
-    recognition.interimResults = true;
-    recognition.continuous = true;
-    recognition.maxAlternatives = 1;
-
-    let silenceTimer: any;
-    const resetSilenceTimer = () => {
-      clearTimeout(silenceTimer);
-      silenceTimer = setTimeout(() => {
-        if (isListening) stopListening();
-      }, 4000); // 4 seconds of silence to stop
-    };
-
-    recognition.onstart = () => {
-      setIsListening(true);
-      setError(null);
-      setTranscript('');
-      setInterimTranscript('');
-      haptics.medium();
-      resetSilenceTimer();
-    };
-
-    recognition.onresult = (event: any) => {
-      resetSilenceTimer();
-      setError(null);
-      let interim = '';
-      let final = '';
-
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          final += event.results[i][0].transcript;
-        } else {
-          interim += event.results[i][0].transcript;
+    // Check permission first to avoid "unable to access" errors
+    const checkPermission = async () => {
+      const hasPermission = await permissions.checkMicrophonePermission();
+      if (!hasPermission) {
+        toast.info('Requesting microphone access...');
+        await permissions.requestMicrophonePermission();
+        // Check again after request
+        const nowHasPermission = await permissions.checkMicrophonePermission();
+        if (!nowHasPermission) {
+          toast.error('Microphone access is required for voice input');
+          return false;
         }
       }
-
-      if (final) {
-        setTranscript(prev => prev + ' ' + final);
-        parseTranscript(final);
-      }
-      setInterimTranscript(interim);
+      return true;
     };
 
-    recognition.onerror = (event: any) => {
-      console.error('Speech recognition error', event.error);
-      if (event.error === 'no-speech') {
-        setError('no-speech');
-        haptics.warning();
-      } else if (event.error === 'not-allowed') {
+    checkPermission().then(granted => {
+      if (!granted) return;
+
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      recognition.lang = 'en-IN';
+      recognition.interimResults = true;
+      recognition.continuous = true;
+      recognition.maxAlternatives = 1;
+
+      let silenceTimer: any;
+      const resetSilenceTimer = () => {
+        clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(() => {
+          if (isListening) stopListening();
+        }, 4000); // 4 seconds of silence to stop
+      };
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setError(null);
+        setTranscript('');
+        setInterimTranscript('');
+        haptics.medium();
+        resetSilenceTimer();
+      };
+
+      recognition.onresult = (event: any) => {
+        resetSilenceTimer();
+        setError(null);
+        let interim = '';
+        let final = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            final += event.results[i][0].transcript;
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+
+        if (final) {
+          setTranscript(prev => prev + ' ' + final);
+          parseTranscript(final);
+        }
+        setInterimTranscript(interim);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error', event.error);
+        if (event.error === 'no-speech') {
+          setError('no-speech');
+          haptics.warning();
+        } else if (event.error === 'not-allowed') {
+          setIsListening(false);
+          toast.error('Microphone access denied');
+        } else {
+          setIsListening(false);
+          toast.error(`Recognition error: ${event.error}`);
+        }
+      };
+
+      recognition.onend = () => {
         setIsListening(false);
-        toast.error('Microphone access denied');
-      } else {
-        setIsListening(false);
-        toast.error(`Recognition error: ${event.error}`);
+        clearTimeout(silenceTimer);
+      };
+
+      try {
+        recognition.start();
+      } catch (e) {
+        console.error('Failed to start recognition', e);
       }
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-      clearTimeout(silenceTimer);
-    };
-
-    try {
-      recognition.start();
-    } catch (e) {
-      console.error('Failed to start recognition', e);
-    }
+    });
   };
 
   const stopListening = () => {

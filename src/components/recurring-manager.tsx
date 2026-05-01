@@ -4,10 +4,12 @@ import { RepeatIcon, Plus, Trash2, Play, Pause, ChevronRight, Clock } from 'luci
 import { RecurringExpense } from '@/types/recurring';
 import { Expense, ExpenseCategory } from '@/types/expense';
 import { recurringService } from '@/lib/recurring';
-import { categoryConfig } from '@/lib/categories';
+import { categoryService, iconMap } from '@/lib/category-service';
 import { haptics } from '@/lib/haptics';
 import { formatCurrency, cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { Switch } from '@/components/ui/switch';
+import { RefreshCw } from 'lucide-react';
 
 interface RecurringManagerProps {
   onAddExpense: (e: Expense) => void;
@@ -42,6 +44,7 @@ export function RecurringManager({ onAddExpense }: RecurringManagerProps) {
       frequency: draft.frequency as RecurringExpense['frequency'],
       nextDue: draft.nextDue || format(new Date(), 'yyyy-MM-dd'),
       isActive: true,
+      isReimbursement: draft.isReimbursement || false,
       createdAt: new Date().toISOString(),
     };
     recurringService.add(rec);
@@ -64,6 +67,7 @@ export function RecurringManager({ onAddExpense }: RecurringManagerProps) {
       currency: 'INR',
       tags: r.tags,
       projectCode: r.projectCode,
+      isReimbursement: r.isReimbursement || false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -142,7 +146,7 @@ export function RecurringManager({ onAddExpense }: RecurringManagerProps) {
             className="w-full h-10 px-3 rounded-xl bg-muted/40 border border-border/40 text-sm outline-none focus:border-primary/50"
           >
             <option value="">Category *</option>
-            {Object.entries(categoryConfig).map(([k, c]) => <option key={k} value={k}>{c.label}</option>)}
+            {categoryService.getAll().map((cat) => <option key={cat.id} value={cat.id}>{cat.label}</option>)}
           </select>
 
           <div className="grid grid-cols-2 gap-2">
@@ -157,6 +161,17 @@ export function RecurringManager({ onAddExpense }: RecurringManagerProps) {
               value={draft.nextDue || ''}
               onChange={e => setDraft(p => ({ ...p, nextDue: e.target.value }))}
               className="h-10 px-3 rounded-xl bg-muted/40 border border-border/40 text-sm outline-none focus:border-primary/50"
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-3 rounded-xl bg-primary/5 border border-primary/10">
+            <div className="flex items-center gap-2">
+              <RefreshCw className={cn("h-3.5 w-3.5", draft.isReimbursement ? "text-primary animate-spin-slow" : "text-muted-foreground")} />
+              <span className="text-xs font-bold">Reimbursable</span>
+            </div>
+            <Switch 
+              checked={!!draft.isReimbursement} 
+              onCheckedChange={checked => setDraft(p => ({ ...p, isReimbursement: checked }))} 
             />
           </div>
 
@@ -182,16 +197,16 @@ export function RecurringManager({ onAddExpense }: RecurringManagerProps) {
 
       <div className="space-y-2">
         {items.map(r => {
-          const cfg = categoryConfig[r.category];
-          const Icon = cfg.icon;
+          const cat = categoryService.getById(r.category);
+          const Icon = iconMap[cat.iconName] || RepeatIcon;
           const isDue = new Date(r.nextDue) <= new Date();
           return (
             <div key={r.id} className={cn(
               'rounded-xl border p-3.5 flex items-center gap-3 transition-all',
               r.isActive ? 'border-border/60 bg-card/80' : 'border-border/30 bg-muted/20 opacity-60'
             )}>
-              <div className={cn('h-10 w-10 rounded-xl flex items-center justify-center shrink-0', cfg.bgColor)}>
-                <Icon className={cn('h-5 w-5', cfg.color)} />
+              <div className={cn('h-10 w-10 rounded-xl flex items-center justify-center shrink-0', cat.bgColor)}>
+                <Icon className={cn('h-5 w-5', cat.color)} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">

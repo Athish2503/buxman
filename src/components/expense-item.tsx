@@ -1,6 +1,6 @@
 import { motion, useMotionValue, useTransform, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
-import { Check, X, Eye, Edit, Trash2 } from 'lucide-react';
+import { Check, X, Eye, Edit, Trash2, Briefcase } from 'lucide-react';
 import { Expense, ExpenseStatus } from '@/types/expense';
 import { getCategoryConfig } from '@/lib/categories';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -113,8 +113,14 @@ export function ExpenseItem({
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <h3 className="font-semibold text-sm leading-tight truncate">{expense.vendor}</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
                 {cfg.label} · {format(new Date(expense.date), 'dd MMM yyyy')}
+                {expense.isReimbursement && (
+                  <span className="flex items-center gap-0.5 px-1 rounded-sm bg-primary/10 text-primary text-[9px] font-bold uppercase tracking-wider">
+                    <Briefcase className="h-2.5 w-2.5" />
+                    Work
+                  </span>
+                )}
               </p>
             </div>
             <div className="text-right shrink-0">

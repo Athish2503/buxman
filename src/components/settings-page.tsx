@@ -19,6 +19,8 @@ import { settingsService } from '@/lib/settings';
 import { categoryService, CategoryDefinition, iconMap } from '@/lib/category-service';
 import { formatCurrency, cn } from '@/lib/utils';
 
+import { createPortal } from 'react-dom';
+
 type SettingsTab = 'overview' | 'organization' | 'smart' | 'security' | 'categories' | 'budgets' | 'data';
 
 interface SettingsPageProps {
@@ -88,13 +90,37 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
   const [editingCategory, setEditingCategory] = useState<CategoryDefinition | null>(null);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
 
+  const [permissionsStatus, setPermissionsStatus] = useState({
+    sms: false,
+    notifications: false,
+    overlay: false
+  });
+
   useEffect(() => {
     biometrics.isAvailable().then(setBioAvailable);
     
     const handleUpdate = () => setCategories(categoryService.getAll());
     window.addEventListener('categories-updated', handleUpdate);
-    return () => window.removeEventListener('categories-updated', handleUpdate);
-  }, []);
+
+    // Poll for permission status when on Smart tab
+    let interval: any;
+    if (activeTab === 'smart') {
+      const check = async () => {
+        const { permissions } = await import('@/lib/permissions');
+        const sms = await permissions.checkSMSStatus();
+        const notifications = await permissions.checkNotificationStatus();
+        const overlay = await permissions.checkOverlayStatus();
+        setPermissionsStatus({ sms, notifications, overlay });
+      };
+      check();
+      interval = setInterval(check, 2000);
+    }
+
+    return () => {
+      window.removeEventListener('categories-updated', handleUpdate);
+      if (interval) clearInterval(interval);
+    };
+  }, [activeTab]);
 
   const updateSettings = (updates: Partial<AppSettings>) => {
     const updated = { ...settings, ...updates };
@@ -207,46 +233,88 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
       <SubModuleHeader title="Smart Features" onBack={() => setActiveTab('overview')} />
       
       <div className="space-y-4">
-        <div className="p-5 rounded-3xl bg-primary/5 border border-primary/20 space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-primary/20 flex items-center justify-center">
-              <Bell className="h-5 w-5 text-primary" />
+        <div className={cn("p-5 rounded-3xl border transition-all space-y-4", permissionsStatus.notifications ? "bg-emerald-500/5 border-emerald-500/20" : "bg-primary/5 border-primary/20")}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={cn("h-10 w-10 rounded-2xl flex items-center justify-center", permissionsStatus.notifications ? "bg-emerald-500/20" : "bg-primary/20")}>
+                <Bell className={cn("h-5 w-5", permissionsStatus.notifications ? "text-emerald-500" : "text-primary")} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold">App Monitoring</h4>
+                <p className="text-xs text-muted-foreground">Detect expenses from bank notifications</p>
+              </div>
             </div>
-            <div>
-              <h4 className="text-sm font-bold">Transaction Monitor</h4>
-              <p className="text-xs text-muted-foreground">Automatically detect expenses from bank SMS</p>
-            </div>
+            {permissionsStatus.notifications && (
+              <div className="h-6 w-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                <Check className="h-3.5 w-3.5 text-white" />
+              </div>
+            )}
           </div>
           <Button 
-            className="w-full rounded-2xl h-11 bg-primary text-white shadow-lg shadow-primary/20"
+            className={cn("w-full rounded-2xl h-11 text-white shadow-lg", permissionsStatus.notifications ? "bg-emerald-500 shadow-emerald-500/20" : "bg-primary shadow-primary/20")}
             onClick={() => {
               import('@/lib/permissions').then(m => m.permissions.requestNotificationListener());
               toast.info('Requesting notification access...');
             }}
           >
-            Enable Monitoring
+            {permissionsStatus.notifications ? 'Monitoring Active' : 'Enable App Monitoring'}
           </Button>
         </div>
 
-        <div className="p-5 rounded-3xl bg-warning/5 border border-warning/20 space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-warning/20 flex items-center justify-center">
-              <Zap className="h-5 w-5 text-warning" />
+        <div className={cn("p-5 rounded-3xl border transition-all space-y-4", permissionsStatus.sms ? "bg-emerald-500/5 border-emerald-500/20" : "bg-indigo-500/5 border-indigo-500/20")}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={cn("h-10 w-10 rounded-2xl flex items-center justify-center", permissionsStatus.sms ? "bg-emerald-500/20" : "bg-indigo-500/20")}>
+                <Phone className={cn("h-5 w-5", permissionsStatus.sms ? "text-emerald-500" : "text-indigo-500")} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold">SMS Monitoring</h4>
+                <p className="text-xs text-muted-foreground">Detect expenses from bank SMS messages</p>
+              </div>
             </div>
-            <div>
-              <h4 className="text-sm font-bold">Overlay Detection</h4>
-              <p className="text-xs text-muted-foreground">Show transaction popups over other apps</p>
-            </div>
+            {permissionsStatus.sms && (
+              <div className="h-6 w-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                <Check className="h-3.5 w-3.5 text-white" />
+              </div>
+            )}
           </div>
           <Button 
-            variant="outline"
-            className="w-full rounded-2xl h-11 border-warning/30 hover:bg-warning/10"
+            className={cn("w-full rounded-2xl h-11 text-white shadow-lg", permissionsStatus.sms ? "bg-emerald-500 shadow-emerald-500/20" : "bg-indigo-500 shadow-indigo-500/20")}
+            onClick={() => {
+              import('@/lib/permissions').then(m => m.permissions.requestSMSPermission());
+              toast.info('Requesting SMS permission...');
+            }}
+          >
+            {permissionsStatus.sms ? 'SMS Detection Active' : 'Enable SMS Detection'}
+          </Button>
+        </div>
+
+        <div className={cn("p-5 rounded-3xl border transition-all space-y-4", permissionsStatus.overlay ? "bg-emerald-500/5 border-emerald-500/20" : "bg-warning/5 border-warning/20")}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={cn("h-10 w-10 rounded-2xl flex items-center justify-center", permissionsStatus.overlay ? "bg-emerald-500/20" : "bg-warning/20")}>
+                <Zap className={cn("h-5 w-5", permissionsStatus.overlay ? "text-emerald-500" : "text-warning")} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold">Overlay Detection</h4>
+                <p className="text-xs text-muted-foreground">Show transaction popups over other apps</p>
+              </div>
+            </div>
+            {permissionsStatus.overlay && (
+              <div className="h-6 w-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                <Check className="h-3.5 w-3.5 text-white" />
+              </div>
+            )}
+          </div>
+          <Button 
+            variant={permissionsStatus.overlay ? "default" : "outline"}
+            className={cn("w-full rounded-2xl h-11 shadow-lg", permissionsStatus.overlay ? "bg-emerald-500 text-white shadow-emerald-500/20 border-transparent" : "border-warning/30 hover:bg-warning/10")}
             onClick={() => {
               import('@/lib/permissions').then(m => m.permissions.requestOverlayPermission());
               toast.info('Opening system overlay settings...');
             }}
           >
-            Grant Overlay Permission
+            {permissionsStatus.overlay ? 'Overlay Permission Granted' : 'Grant Overlay Permission'}
           </Button>
         </div>
 
@@ -354,105 +422,9 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
         </div>
       </div>
 
-      {/* Category Editor Modal Overlay */}
-      <AnimatePresence>
-        {editingCategory && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
-          >
-            <motion.div 
-              initial={{ y: 100, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 100, opacity: 0 }}
-              className="w-full max-w-md bg-card border border-border shadow-2xl rounded-3xl overflow-hidden"
-            >
-              <div className="p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-lg font-bold">{isAddingCategory ? 'New Category' : 'Edit Category'}</h4>
-                  <Button variant="ghost" size="icon" onClick={() => setEditingCategory(null)} className="rounded-full">
-                    <X className="h-5 w-5" />
-                  </Button>
-                </div>
-
-                <div className="space-y-4">
-                  <Field 
-                    id="cat-label" label="Label" value={editingCategory.label} 
-                    onChange={v => setEditingCategory({ ...editingCategory, label: v })} 
-                    placeholder="e.g. Subscriptions"
-                  />
-                  <Field 
-                    id="cat-desc" label="Description" value={editingCategory.description} 
-                    onChange={v => setEditingCategory({ ...editingCategory, description: v })} 
-                    placeholder="Short summary"
-                  />
-
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 ml-1">Icon</Label>
-                    <div className="grid grid-cols-6 gap-2 p-3 bg-muted/20 rounded-2xl border border-border/40">
-                      {Object.keys(iconMap).map(name => {
-                        const Icon = iconMap[name];
-                        return (
-                          <button
-                            key={name}
-                            onClick={() => setEditingCategory({ ...editingCategory, iconName: name })}
-                            className={cn(
-                              "h-10 w-10 rounded-xl flex items-center justify-center transition-all",
-                              editingCategory.iconName === name ? "bg-primary text-white shadow-lg" : "hover:bg-muted text-muted-foreground"
-                            )}
-                          >
-                            <Icon className="h-5 w-5" />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 ml-1">Aesthetic (Color)</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        { from: '#3b82f6', to: '#6366f1', text: 'text-blue-400', bg: 'bg-blue-500/15' },
-                        { from: '#f97316', to: '#f59e0b', text: 'text-orange-400', bg: 'bg-orange-500/15' },
-                        { from: '#a855f7', to: '#8b5cf6', text: 'text-purple-400', bg: 'bg-purple-500/15' },
-                        { from: '#10b981', to: '#06b6d4', text: 'text-emerald-400', bg: 'bg-emerald-500/15' },
-                        { from: '#f43f5e', to: '#fb7185', text: 'text-rose-400', bg: 'bg-rose-500/15' },
-                        { from: '#8b5cf6', to: '#d946ef', text: 'text-violet-400', bg: 'bg-violet-500/15' },
-                        { from: '#94a3b8', to: '#64748b', text: 'text-slate-400', bg: 'bg-slate-500/15' },
-                      ].map((style, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => setEditingCategory({ 
-                            ...editingCategory, 
-                            gradientFrom: style.from, 
-                            gradientTo: style.to, 
-                            color: style.text, 
-                            bgColor: style.bg 
-                          })}
-                          className={cn(
-                            "h-8 w-8 rounded-full border-2 transition-all",
-                            editingCategory.gradientFrom === style.from ? "border-primary scale-110" : "border-transparent"
-                          )}
-                          style={{ background: `linear-gradient(135deg, ${style.from}, ${style.to})` }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <Button variant="outline" onClick={() => setEditingCategory(null)} className="flex-1 h-12 rounded-2xl">Cancel</Button>
-                  <Button onClick={() => handleSaveCategory(editingCategory)} className="flex-1 h-12 rounded-2xl bg-gradient-primary text-white">Save Category</Button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
+
 
   const renderSecurity = () => (
     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -745,6 +717,158 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
           </Button>
         </div>
       )}
+
+      {createPortal(
+        <AnimatePresence>
+          {editingCategory && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
+            >
+              <motion.div 
+                initial={{ y: 100, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 100, opacity: 0 }}
+                className="w-full max-w-md bg-card border border-border shadow-2xl rounded-3xl overflow-y-auto max-h-[90vh] custom-scrollbar"
+              >
+                <div className="p-6 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-lg font-bold">{isAddingCategory ? 'New Category' : 'Edit Category'}</h4>
+                    <Button variant="ghost" size="icon" onClick={() => setEditingCategory(null)} className="rounded-full">
+                      <X className="h-5 w-5" />
+                    </Button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <Field 
+                      id="cat-label" label="Label" value={editingCategory.label} 
+                      onChange={v => setEditingCategory({ ...editingCategory, label: v })} 
+                      placeholder="e.g. Subscriptions"
+                    />
+                    <Field 
+                      id="cat-desc" label="Description" value={editingCategory.description} 
+                      onChange={v => setEditingCategory({ ...editingCategory, description: v })} 
+                      placeholder="Short summary"
+                    />
+
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 ml-1">Icon Selection</Label>
+                      <div className="grid grid-cols-5 gap-2 p-3 bg-muted/20 rounded-2xl border border-border/40 max-h-60 overflow-y-auto custom-scrollbar">
+                        {Object.keys(iconMap).map(name => {
+                          const Icon = iconMap[name];
+                          return (
+                            <button
+                              key={name}
+                              type="button"
+                              onClick={() => setEditingCategory({ ...editingCategory, iconName: name })}
+                              className={cn(
+                                "h-12 w-full rounded-xl flex items-center justify-center transition-all",
+                                editingCategory.iconName === name ? "bg-primary text-white shadow-lg scale-110" : "hover:bg-muted text-muted-foreground"
+                              )}
+                            >
+                              <Icon className="h-6 w-6" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between ml-1">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">Aesthetic Palette</Label>
+                      </div>
+
+                      <div 
+                        className="relative p-4 rounded-3xl border border-white/10 overflow-hidden group transition-all"
+                        style={{ background: `linear-gradient(135deg, ${editingCategory.gradientFrom}20, ${editingCategory.gradientTo}10)` }}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div 
+                            className={cn("h-14 w-14 rounded-2xl flex items-center justify-center shadow-xl shrink-0 transition-transform group-hover:scale-105", editingCategory.bgColor)}
+                            style={editingCategory.bgColor === 'bg-muted/20' ? { backgroundColor: `${editingCategory.gradientFrom}30` } : {}}
+                          >
+                            {(() => {
+                              const PreviewIcon = iconMap[editingCategory.iconName] || MoreHorizontal;
+                              return <PreviewIcon 
+                                className={cn("h-7 w-7", editingCategory.color)} 
+                                style={editingCategory.color === 'text-white' ? { color: editingCategory.gradientFrom } : {}}
+                              />;
+                            })()}
+                          </div>
+                          <div className="flex-1">
+                             <p className="text-xs font-bold mb-1">Aesthetic Preview</p>
+                             <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors cursor-pointer border border-white/5">
+                               <Palette className="h-3.5 w-3.5" />
+                               <span className="text-[10px] font-black uppercase tracking-wider">Custom Color</span>
+                               <input 
+                                  type="color" 
+                                  value={editingCategory.gradientFrom}
+                                  onChange={(e) => setEditingCategory({ 
+                                    ...editingCategory, 
+                                    gradientFrom: e.target.value,
+                                    gradientTo: e.target.value,
+                                    color: 'text-white',
+                                    bgColor: 'bg-muted/20'
+                                  })}
+                                  className="sr-only"
+                                />
+                             </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-7 gap-2 p-1">
+                        {[
+                          { from: '#3b82f6', to: '#6366f1', text: 'text-blue-400', bg: 'bg-blue-500/15' },
+                          { from: '#f97316', to: '#f59e0b', text: 'text-orange-400', bg: 'bg-orange-500/15' },
+                          { from: '#a855f7', to: '#8b5cf6', text: 'text-purple-400', bg: 'bg-purple-500/15' },
+                          { from: '#10b981', to: '#06b6d4', text: 'text-emerald-400', bg: 'bg-emerald-500/15' },
+                          { from: '#f43f5e', to: '#fb7185', text: 'text-rose-400', bg: 'bg-rose-500/15' },
+                          { from: '#8b5cf6', to: '#d946ef', text: 'text-violet-400', bg: 'bg-violet-500/15' },
+                          { from: '#0ea5e9', to: '#38bdf8', text: 'text-sky-400', bg: 'bg-sky-500/15' },
+                          { from: '#14b8a6', to: '#0d9488', text: 'text-teal-400', bg: 'bg-teal-500/15' },
+                          { from: '#facc15', to: '#ca8a04', text: 'text-yellow-400', bg: 'bg-yellow-500/15' },
+                          { from: '#4ade80', to: '#16a34a', text: 'text-green-400', bg: 'bg-green-500/15' },
+                          { from: '#2dd4bf', to: '#0f766e', text: 'text-teal-400', bg: 'bg-teal-500/15' },
+                          { from: '#94a3b8', to: '#475569', text: 'text-slate-400', bg: 'bg-slate-500/15' },
+                          { from: '#e879f9', to: '#d946ef', text: 'text-fuchsia-400', bg: 'bg-fuchsia-500/15' },
+                          { from: '#fbbf24', to: '#d97706', text: 'text-amber-400', bg: 'bg-amber-500/15' },
+                        ].map((style, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setEditingCategory({ 
+                              ...editingCategory, 
+                              gradientFrom: style.from, 
+                              gradientTo: style.to, 
+                              color: style.text, 
+                              bgColor: style.bg 
+                            })}
+                            className={cn(
+                              "h-9 w-full rounded-xl border-2 transition-all",
+                              editingCategory.gradientFrom === style.from ? "border-white scale-110 shadow-lg" : "border-transparent"
+                            )}
+                            style={{ background: `linear-gradient(135deg, ${style.from}, ${style.to})` }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button variant="outline" onClick={() => setEditingCategory(null)} className="flex-1 h-12 rounded-2xl">Cancel</Button>
+                      <Button onClick={() => handleSaveCategory(editingCategory)} className="flex-1 h-12 rounded-2xl bg-gradient-primary text-white">Save Category</Button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
     </div>
   );
 }

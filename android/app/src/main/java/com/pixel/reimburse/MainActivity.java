@@ -12,19 +12,38 @@ import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    private String pendingTransaction = null;
     private BroadcastReceiver transactionReceiver;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Standard Capacitor bridge already handles some permissions, 
-        // but for Voice/Mic in WebView, we sometimes need a manual boost:
+        // Improved WebChromeClient for handling permissions specifically
         bridge.getWebView().setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
                 MainActivity.this.runOnUiThread(() -> {
-                    request.grant(request.getResources());
+                    String[] resources = request.getResources();
+                    for (String resource : resources) {
+                        if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
+                            // Check if app has system permission before granting to WebView
+                            if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+                            } else {
+                                // Request system permission if not granted
+                                requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, 102);
+                                // The WebView request will likely timeout/fail, but the user will get the system prompt
+                                request.deny();
+                            }
+                        } else if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) {
+                            if (checkSelfPermission(android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                request.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                            } else {
+                                request.deny();
+                            }
+                        }
+                    }
                 });
             }
         });
@@ -34,11 +53,7 @@ public class MainActivity extends BridgeActivity {
             public void onReceive(Context context, Intent intent) {
                 if ("com.pixel.reimburse.TRANSACTION_DETECTED".equals(intent.getAction())) {
                     String body = intent.getStringExtra("body");
-                    bridge.getWebView().post(() -> bridge.getWebView().evaluateJavascript(
-                        "window.dispatchEvent(new CustomEvent('notification-transaction', { detail: { body: '" + 
-                        body.replace("'", "\\'") + "' } }));",
-                        null
-                    ));
+                    dispatchTransaction(body);
                 }
             }
         };
@@ -63,6 +78,56 @@ public class MainActivity extends BridgeActivity {
                         android.net.Uri.parse("package:" + getPackageName()));
                 startActivity(intent);
             }
+
+            @JavascriptInterface
+            public void requestSMSPermission() {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    requestPermissions(new String[]{
+                        android.Manifest.permission.RECEIVE_SMS, 
+                        android.Manifest.permission.READ_SMS
+                    }, 101);
+                }
+            }
+
+            @JavascriptInterface
+            public boolean checkSMSPermission() {
+                return android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M ||
+                    (checkSelfPermission(android.Manifest.permission.RECEIVE_SMS) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                     checkSelfPermission(android.Manifest.permission.READ_SMS) == android.content.pm.PackageManager.PERMISSION_GRANTED);
+            }
+
+            @JavascriptInterface
+            public void requestMicrophonePermission() {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, 102);
+                }
+            }
+
+            @JavascriptInterface
+            public boolean checkMicrophonePermission() {
+                return android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M ||
+                    checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+            }
+
+            @JavascriptInterface
+            public boolean checkNotificationPermission() {
+                String packageName = getPackageName();
+                String enabledListeners = android.provider.Settings.Secure.getString(getContentResolver(), "enabled_notification_listeners");
+                return enabledListeners != null && enabledListeners.contains(packageName);
+            }
+
+            @JavascriptInterface
+            public boolean checkOverlayPermission() {
+                return android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M || 
+                    android.provider.Settings.canDrawOverlays(MainActivity.this);
+            }
+
+            @JavascriptInterface
+            public String getPendingTransaction() {
+                String temp = pendingTransaction;
+                pendingTransaction = null; // Clear after read
+                return temp;
+            }
         }, "NativeBridge");
 
         // Check if we were started with transaction data
@@ -78,12 +143,18 @@ public class MainActivity extends BridgeActivity {
     private void handleIntent(Intent intent) {
         if (intent != null && intent.hasExtra("body")) {
             String body = intent.getStringExtra("body");
-            bridge.getWebView().post(() -> bridge.getWebView().evaluateJavascript(
-                "window.dispatchEvent(new CustomEvent('notification-transaction', { detail: { body: '" + 
-                body.replace("'", "\\'") + "' } }));",
-                null
-            ));
+            pendingTransaction = body;
+            dispatchTransaction(body);
         }
+    }
+
+    private void dispatchTransaction(String body) {
+        if (body == null) return;
+        bridge.getWebView().post(() -> bridge.getWebView().evaluateJavascript(
+            "window.dispatchEvent(new CustomEvent('notification-transaction', { detail: { body: '" + 
+            body.replace("'", "\\'").replace("\n", " ") + "' } }));",
+            null
+        ));
     }
 
     @Override

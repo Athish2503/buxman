@@ -9,6 +9,7 @@ import {
   Receipt, Check, Camera,
   CalendarDays, IndianRupee, ArrowRight,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -19,6 +20,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 
 import { Expense, ExpenseCategory, ExpenseStatus } from '@/types/expense';
 import { categoryService, iconMap } from '@/lib/category-service';
@@ -38,6 +40,7 @@ const expenseSchema = z.object({
   description: z.string().optional(),
   status:      z.string().min(1, 'Pick a status'),
   projectCode: z.string().optional(),
+  isReimbursement: z.boolean().default(false),
 });
 type FormData = z.infer<typeof expenseSchema>;
 
@@ -61,6 +64,8 @@ export interface ExpenseFormProps {
   isEdit?:     boolean;
   onClose?:    () => void;
   trigger?:    React.ReactNode;
+  open?:       boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 
@@ -97,8 +102,9 @@ function FormBody({
             description: initialData.description,
             status:      initialData.status,
             projectCode: initialData.projectCode || '',
+            isReimbursement: initialData.isReimbursement || false,
           }
-        : { date: format(new Date(), 'yyyy-MM-dd'), status: 'pending' },
+        : { date: format(new Date(), 'yyyy-MM-dd'), status: 'pending', isReimbursement: false },
     });
 
   const [categories, setCategories] = useState(categoryService.getVisible());
@@ -180,6 +186,7 @@ function FormBody({
         status:       data.status as ExpenseStatus,
         currency:     'INR',
         receiptImage: receiptPreview || initialData?.receiptImage,
+        isReimbursement: data.isReimbursement,
         tags,
         projectCode:  data.projectCode || undefined,
         createdAt:    initialData?.createdAt || new Date().toISOString(),
@@ -370,6 +377,23 @@ function FormBody({
         />
       </div>
 
+      {/* ── Reimbursement Toggle ── */}
+      <div className="mb-5 p-4 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+            <RefreshCw className={cn("h-4.5 w-4.5 transition-all", watch('isReimbursement') ? "text-primary animate-spin-slow" : "text-muted-foreground")} />
+          </div>
+          <div>
+            <p className="text-sm font-bold">Reimbursable</p>
+            <p className="text-[11px] text-muted-foreground">Mark this for office/business refund</p>
+          </div>
+        </div>
+        <Switch
+          checked={watch('isReimbursement')}
+          onCheckedChange={(checked) => setValue('isReimbursement', checked)}
+        />
+      </div>
+
       {/* ── Receipt ── */}
       <div className="mb-5">
         <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 block">
@@ -489,8 +513,19 @@ function FormBody({
 ═══════════════════════════════════════════════════════════════════ */
 
 
-export function ExpenseForm({ onSubmit, initialData, isEdit = false, onClose, trigger }: ExpenseFormProps) {
-  const [open, setOpen] = useState(false);
+export function ExpenseForm({ 
+  onSubmit, 
+  initialData, 
+  isEdit = false, 
+  onClose, 
+  trigger,
+  open: externalOpen,
+  onOpenChange
+}: ExpenseFormProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
+  
   const isMobile = useIsMobile();
 
   // Lock body scroll while open
@@ -552,7 +587,12 @@ export function ExpenseForm({ onSubmit, initialData, isEdit = false, onClose, tr
               </div>
               {/* Scrollable body */}
               <div className="overflow-y-auto flex-1 px-5 pb-10" style={{ overscrollBehavior: 'contain' }}>
-                <FormBody onSubmit={onSubmit} onDone={() => setOpen(false)} />
+                <FormBody 
+                  onSubmit={onSubmit} 
+                  onDone={() => setOpen(false)} 
+                  initialData={initialData}
+                  isEdit={isEdit}
+                />
               </div>
             </motion.div>
           ) : (
@@ -583,7 +623,12 @@ export function ExpenseForm({ onSubmit, initialData, isEdit = false, onClose, tr
                 </button>
               </div>
               <div className="overflow-y-auto flex-1 px-6 py-5">
-                <FormBody onSubmit={onSubmit} onDone={() => setOpen(false)} />
+                <FormBody 
+                  onSubmit={onSubmit} 
+                  onDone={() => setOpen(false)} 
+                  initialData={initialData}
+                  isEdit={isEdit}
+                />
               </div>
             </motion.div>
           )}

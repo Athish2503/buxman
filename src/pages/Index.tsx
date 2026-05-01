@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Receipt, BarChart3, Settings,
   Wallet, TrendingUp, Clock, CheckCircle2, Moon, Sun,
-  Zap, ArrowRight, ChevronRight, Plus, Car, Fuel
+  Zap, ArrowRight, ChevronRight, Plus, Car, Fuel, RefreshCw, Briefcase,
+  GaugeCircle, IndianRupee
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, startOfMonth, subMonths, isSameMonth } from 'date-fns';
@@ -23,7 +24,13 @@ import { ExpenseList } from '@/components/expense-list';
 import { StatCard } from '@/components/stat-card';
 import { BudgetTracker } from '@/components/budget-tracker';
 import { SettingsPage } from '@/components/settings-page';
-import { SpendingTrendChart, CategoryBreakdownChart, MonthlyBarChart } from '@/components/analytics-charts';
+import { 
+  SpendingTrendChart, 
+  CategoryBreakdownChart, 
+  MonthlyBarChart,
+  VehicleEfficiencyChart,
+  FuelCostChart
+} from '@/components/analytics-charts';
 import { Onboarding } from '@/components/onboarding';
 import { MonthlySummary } from '@/components/monthly-summary';
 import { CategoryRings } from '@/components/category-rings';
@@ -35,18 +42,20 @@ import { BiometricLock } from '@/components/biometric-lock';
 import { SMSExpenseNudge } from '@/components/sms-expense-nudge';
 import { PermissionGuard } from '@/components/permission-guard';
 
-type Tab = 'dashboard' | 'expenses' | 'vehicle' | 'analytics' | 'settings';
+type Tab = 'dashboard' | 'expenses' | 'reimbursements' | 'vehicle' | 'analytics' | 'settings';
 
 const NAV_ITEMS: { id: Tab; label: string; icon: any }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
   { id: 'expenses', label: 'Expenses', icon: Receipt },
+  { id: 'reimbursements', label: 'Reimburse', icon: Briefcase },
   { id: 'vehicle', label: 'Vehicle', icon: Car },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+  { id: 'analytics', label: 'Charts', icon: BarChart3 },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
-const LEFT_NAV  = NAV_ITEMS.slice(0, 2);   // Dashboard, Expenses
-const RIGHT_NAV = NAV_ITEMS.slice(2);      // Vehicle, Analytics, Settings
+const LEFT_NAV  = NAV_ITEMS.slice(0, 2);   // Home, Expenses
+const RIGHT_NAV = NAV_ITEMS.slice(2, 4);   // Reimburse, Vehicle
+const MORE_NAV  = NAV_ITEMS.slice(4);      // Charts, Settings
 
 const Index = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -54,6 +63,7 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [expenseSubTab, setExpenseSubTab] = useState<'all' | 'wallet'>('all');
   const [dashboardTab, setDashboardTab] = useState<'expenses' | 'vehicle'>('expenses');
+  const [initialFilter, setInitialFilter] = useState<'all' | 'personal' | 'reimbursable'>('all');
   const [onboarded, setOnboarded] = useState(true);
   const navRef = useRef<HTMLDivElement>(null);
   const { theme, toggle: toggleTheme } = useTheme();
@@ -114,8 +124,10 @@ const Index = () => {
 
   // Stats calculation
   const totalAmount = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
-  const pendingAmount = useMemo(() => expenses.filter(e => e.status === 'pending').reduce((s, e) => s + e.amount, 0), [expenses]);
-  const reimbursedAmount = useMemo(() => expenses.filter(e => e.status === 'reimbursed').reduce((s, e) => s + e.amount, 0), [expenses]);
+  const pendingAmount = useMemo(() => expenses.filter(e => e.isReimbursement && e.status === 'pending').reduce((s, e) => s + e.amount, 0), [expenses]);
+  const reimbursedAmount = useMemo(() => expenses.filter(e => e.isReimbursement && e.status === 'reimbursed').reduce((s, e) => s + e.amount, 0), [expenses]);
+  const personalAmount = useMemo(() => expenses.filter(e => !e.isReimbursement).reduce((s, e) => s + e.amount, 0), [expenses]);
+  const reimbursableAmount = useMemo(() => expenses.filter(e => e.isReimbursement).reduce((s, e) => s + e.amount, 0), [expenses]);
   
   const now = new Date();
   const thisMonthExp = useMemo(() => expenses.filter(e => isSameMonth(new Date(e.date), now)), [expenses]);
@@ -130,12 +142,30 @@ const Index = () => {
     return ((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100;
   }, [thisMonthTotal, lastMonthTotal]);
 
-  const avgEfficiency = useMemo(() => {
-    const logs = fuelService.getLogs();
-    if (logs.length < 2) return 0;
-    const economies = logs.filter(l => l.economy).map(l => l.economy!);
-    return economies.length > 0 ? economies.reduce((a, b) => a + b, 0) / economies.length : 0;
-  }, []);
+  const vehicleStats = useMemo(() => {
+    const mLogs = mileageService.getLogs();
+    const fLogs = fuelService.getLogs();
+    const totalDist = mLogs.reduce((s, l) => s + l.distance, 0);
+    const totalCost = fLogs.reduce((s, l) => s + l.totalCost, 0);
+    const totalLiters = fLogs.reduce((s, l) => s + l.liters, 0);
+    
+    const avgEff = totalLiters > 0 ? (totalLiters / (totalDist / 100)) : 0;
+    const cpKm = totalDist > 0 ? (totalCost / totalDist) : 0;
+    
+    const economies = fLogs.filter(l => l.economy).map(l => l.economy!);
+    const recentEco = economies.slice(0, 3).reduce((s, e) => s + e, 0) / Math.max(1, economies.slice(0, 3).length);
+    const overallEco = economies.reduce((s, e) => s + e, 0) / Math.max(1, economies.length);
+    
+    return {
+      avgEfficiency: avgEff,
+      costPerKm: cpKm,
+      trend: recentEco > overallEco ? 'Positive' : economies.length > 0 ? 'Neutral' : 'N/A',
+      efficiencyPercent: Math.min(100, Math.max(20, (recentEco / Math.max(1, overallEco)) * 50)) || 0,
+      totalDistance: totalDist,
+      totalCost: totalCost,
+      overallEco: overallEco
+    };
+  }, [expenses]); 
 
   const settings = settingsService.get();
 
@@ -189,12 +219,23 @@ const Index = () => {
                       : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                   )}
                 >
-                  {active && <div className="nav-active-indicator" />}
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {item.label}
-                  {item.id === 'expenses' && expenses.length > 0 && (
+                  {active && (
+                    <motion.div 
+                      layoutId="sidebar-pill"
+                      className="absolute inset-0 bg-primary/10 border-l-4 border-primary z-0" 
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                  <Icon className="h-4 w-4 shrink-0 relative z-10" />
+                  <span className="relative z-10">{item.label}</span>
+                  {item.id === 'expenses' && (
                     <span className="ml-auto text-[10px] font-bold bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">
-                      {expenses.length}
+                      {expenses.filter(e => !e.isReimbursement).length}
+                    </span>
+                  )}
+                  {item.id === 'reimbursements' && (
+                    <span className="ml-auto text-[10px] font-bold bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">
+                      {expenses.filter(e => e.isReimbursement).length}
                     </span>
                   )}
                 </button>
@@ -215,143 +256,162 @@ const Index = () => {
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
+                initial={{ opacity: 0, scale: 0.98, filter: 'blur(10px)' }}
+                animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, scale: 1.02, filter: 'blur(10px)' }}
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
               >
             
-            {/* Section Header (Integrated into content) */}
-            <div className="mb-8 animate-fade-in">
-              <h1 className="text-3xl sm:text-4xl font-black tracking-tight mb-1 capitalize">
-                {NAV_ITEMS.find(n => n.id === activeTab)?.label}
-              </h1>
-              <div className="flex items-center gap-3">
-                <p className="text-xs sm:text-sm text-muted-foreground font-medium">{format(now, 'EEEE, dd MMMM yyyy')}</p>
-                {activeTab === 'dashboard' && expenses.length > 0 && (
-                  <>
-                    <div className="h-1 w-1 rounded-full bg-muted-foreground/30" />
-                    <p className="text-xs sm:text-sm text-warning font-bold">{formatCompactCurrency(pendingAmount)} Pending</p>
-                  </>
-                )}
-              </div>
-            </div>
-
             {/* ── DASHBOARD TAB ── */}
             {activeTab === 'dashboard' && (
               <div className="space-y-5 animate-fade-in">
+                {/* KPIs Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-8">
+                  <div className="rounded-2xl border border-border/40 bg-card/60 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Personal</p>
+                    <p className="text-xl font-bold number-lg">{formatCompactCurrency(personalAmount)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-border/40 bg-card/60 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Claims</p>
+                    <p className="text-xl font-bold number-lg">{formatCompactCurrency(reimbursableAmount)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-border/40 bg-card/60 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-warning mb-1">Pending</p>
+                    <p className="text-xl font-bold number-lg">{formatCompactCurrency(pendingAmount)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-border/40 bg-card/60 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-success mb-1">Settled</p>
+                    <p className="text-xl font-bold number-lg">{formatCompactCurrency(reimbursedAmount)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-border/40 bg-card/60 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-1">Distance</p>
+                    <p className="text-xl font-bold number-lg">{mileageService.getLogs().reduce((sum, log) => sum + log.distance, 0).toFixed(0)} km</p>
+                  </div>
+                  <div className="rounded-2xl border border-border/40 bg-card/60 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-violet-500 mb-1">Fuel</p>
+                    <p className="text-xl font-bold number-lg">{fuelService.getLogs().reduce((s,l) => s + l.liters, 0).toFixed(0)} L</p>
+                  </div>
+                </div>
+
                 <div className="flex bg-muted/40 p-1 rounded-xl w-full sm:w-fit mb-2">
-                  <button onClick={() => setDashboardTab('expenses')} className={cn("flex-1 px-6 py-1.5 rounded-lg text-xs font-bold transition-all", dashboardTab === 'expenses' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>Expenses</button>
+                  <button onClick={() => setDashboardTab('expenses')} className={cn("flex-1 px-6 py-1.5 rounded-lg text-xs font-bold transition-all", dashboardTab === 'expenses' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>Overview</button>
                   <button onClick={() => setDashboardTab('vehicle')} className={cn("flex-1 px-6 py-1.5 rounded-lg text-xs font-bold transition-all", dashboardTab === 'vehicle' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>Vehicle</button>
                 </div>
 
                 {dashboardTab === 'vehicle' && (
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-2xl border border-border/40 bg-card/60">
-                      <VehicleTracker />
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="rounded-2xl border border-border/40 bg-card/60 p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5">
+                          <GaugeCircle className="h-3 w-3" /> Distance
+                        </p>
+                        <p className="text-xl font-bold number-lg">{vehicleStats.totalDistance.toLocaleString()} <span className="text-[10px] font-medium opacity-60">km</span></p>
+                      </div>
+                      <div className="rounded-2xl border border-border/40 bg-card/60 p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5">
+                          <Fuel className="h-3 w-3" /> Spend
+                        </p>
+                        <p className="text-xl font-bold number-lg">₹ {vehicleStats.totalCost.toLocaleString()}</p>
+                      </div>
+                      <div className="rounded-2xl border border-border/40 bg-card/60 p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5">
+                          <TrendingUp className="h-3 w-3 text-success" /> Avg. Eco
+                        </p>
+                        <p className="text-xl font-bold number-lg text-success">{vehicleStats.overallEco.toFixed(1)} <span className="text-[10px] font-medium opacity-60">km/l</span></p>
+                      </div>
+                      <div className="rounded-2xl border border-border/40 bg-card/60 p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5">
+                          <IndianRupee className="h-3 w-3 text-primary" /> Cost / KM
+                        </p>
+                        <p className="text-xl font-bold number-lg text-primary">₹ {vehicleStats.costPerKm.toFixed(2)}</p>
+                      </div>
                     </div>
-                    <button 
-                      onClick={() => setActiveTab('vehicle')}
-                      className="w-full p-4 rounded-2xl border border-dashed border-primary/30 text-primary bg-primary/5 flex items-center justify-between hover:bg-primary/10 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center">
-                          <Car className="h-5 w-5" />
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                      <div className="lg:col-span-2 rounded-2xl border border-border/60 bg-card/80 p-5">
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h3 className="text-sm font-bold tracking-tight">Economy Trend</h3>
+                            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-0.5">Kilometers per Liter</p>
+                          </div>
+                          <div className="h-8 w-8 rounded-lg bg-success/10 flex items-center justify-center text-success">
+                            <TrendingUp className="h-4 w-4" />
+                          </div>
                         </div>
-                        <div className="text-left">
-                          <p className="font-bold text-sm">Full Car Manager</p>
-                          <p className="text-[11px] opacity-70">Efficiency charts, service logs and more</p>
+                        <VehicleEfficiencyChart logs={fuelService.getLogs()} />
+                      </div>
+
+                      <div className="rounded-2xl border border-border/60 bg-card/80 p-5">
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h3 className="text-sm font-bold tracking-tight">Fuel Expenditure</h3>
+                            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-0.5">Last 10 Records</p>
+                          </div>
+                          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                            <IndianRupee className="h-4 w-4" />
+                          </div>
+                        </div>
+                        <FuelCostChart logs={fuelService.getLogs()} />
+                        <div className="mt-6 pt-6 border-t border-border/30 space-y-3">
+                           <div className="flex items-center justify-between">
+                             <span className="text-xs text-muted-foreground">Most Efficient</span>
+                             <span className="text-xs font-bold text-success">{Math.max(...fuelService.getLogs().map(l => l.economy || 0), 0).toFixed(1)} km/l</span>
+                           </div>
+                           <div className="flex items-center justify-between">
+                             <span className="text-xs text-muted-foreground">Last Recorded</span>
+                             <span className="text-xs font-bold">₹ {fuelService.getLogs()[0]?.totalCost.toLocaleString() || '0'}</span>
+                           </div>
                         </div>
                       </div>
-                      <ChevronRight className="h-5 w-5" />
+                    </div>
+
+                    <button 
+                      onClick={() => setActiveTab('vehicle')}
+                      className="w-full py-4 rounded-2xl border border-border/40 bg-muted/20 hover:bg-muted/30 transition-all flex items-center justify-center gap-2 group"
+                    >
+                      <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground group-hover:text-foreground">Open Full Garage Manager</span>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" />
                     </button>
                   </div>
                 )}
 
                 {dashboardTab === 'expenses' && (
                   <>
-                    {/* Welcome / hero / summary */}
-                    {expenses.length === 0 ? (
-                      <div className="rounded-2xl border border-border/40 bg-card/60 p-5 overflow-hidden relative">
-                        <div className="absolute inset-0 bg-aurora opacity-30 pointer-events-none" />
-                        <div className="relative">
-                          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold bg-primary/15 text-primary px-2.5 py-1 rounded-full mb-3">
-                            <Zap className="h-3 w-3" />
-                            Premium Expense Tracker
-                          </div>
-                          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight mb-1">
-                            Track expenses,{' '}
-                            <span className="text-gradient">get paid faster.</span>
-                          </h2>
-                          <p className="text-sm text-muted-foreground max-w-md">
-                            Invoice-grade PDF exports, smart analytics, and budget tracking — all stored privately on your device.
-                          </p>
-                          <button
-                            onClick={() => setActiveTab('expenses')}
-                            className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:gap-2.5 transition-all"
-                          >
-                            Add your first expense <ArrowRight className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <MonthlySummary expenses={expenses} onViewAll={() => setActiveTab('expenses')} />
                         <div className="rounded-2xl border border-border/40 bg-card/60 p-4">
                           <CategoryRings expenses={expenses} />
                         </div>
+                        <div className="rounded-2xl border border-border/40 bg-card/60 p-4 lg:col-span-1">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-bold tracking-tight">Vehicle Efficiency</h3>
+                            <Car className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-muted-foreground">Mileage Trend</span>
+                              <span className={cn("text-xs font-bold", vehicleStats.trend === 'Positive' ? 'text-success' : 'text-warning')}>{vehicleStats.trend}</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                              <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${vehicleStats.efficiencyPercent}%` }}
+                                className={cn("h-full", vehicleStats.trend === 'Positive' ? 'bg-success' : 'bg-warning')} 
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mt-4">
+                              <div className="p-2 rounded-xl bg-muted/30">
+                                <p className="text-[9px] text-muted-foreground uppercase font-bold">Avg. Fuel</p>
+                                <p className="text-sm font-bold">{vehicleStats.avgEfficiency > 0 ? `${vehicleStats.avgEfficiency.toFixed(1)}L / 100k` : 'N/A'}</p>
+                              </div>
+                              <div className="p-2 rounded-xl bg-muted/30">
+                                <p className="text-[9px] text-muted-foreground uppercase font-bold">Cost / km</p>
+                                <p className="text-sm font-bold">{vehicleStats.costPerKm > 0 ? `₹ ${vehicleStats.costPerKm.toFixed(1)}` : 'N/A'}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    )}
-
-                {/* Stats grid — 2 cols on mobile, 5 on desktop */}
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                  <StatCard
-                    label="Total Expenses"
-                    value={formatCompactCurrency(totalAmount)}
-                    subLabel={`${expenses.length} entries`}
-                    icon={Wallet}
-                    gradient="bg-primary/15"
-                    iconColor="text-primary"
-                    delay={0}
-                  />
-                  <StatCard
-                    label="Pending"
-                    value={formatCompactCurrency(pendingAmount)}
-                    subLabel={`${expenses.filter(e => e.status === 'pending').length} items`}
-                    icon={Clock}
-                    gradient="bg-warning/15"
-                    iconColor="text-warning"
-                    delay={60}
-                  />
-                  <StatCard
-                    label="Reimbursed"
-                    value={formatCompactCurrency(reimbursedAmount)}
-                    subLabel={`${expenses.filter(e => e.status === 'reimbursed').length} settled`}
-                    icon={CheckCircle2}
-                    gradient="bg-success/15"
-                    iconColor="text-success"
-                    delay={120}
-                  />
-                  <StatCard
-                    label="This Month"
-                    value={formatCompactCurrency(thisMonthTotal)}
-                    subLabel={`${thisMonthExp.length} this month`}
-                    icon={TrendingUp}
-                    gradient="bg-secondary/15"
-                    iconColor="text-secondary"
-                    trend={lastMonthTotal > 0 ? { value: monthTrend, label: 'vs last month' } : undefined}
-                    delay={180}
-                  />
-                  <StatCard
-                    label="Avg Efficiency"
-                    value={`${avgEfficiency.toFixed(1)}`}
-                    subLabel="km per liter"
-                    icon={Fuel}
-                    gradient="bg-indigo-500/15"
-                    iconColor="text-indigo-500"
-                    delay={240}
-                  />
-                </div>
 
                   {/* Chart + Budget row */}
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
@@ -396,13 +456,14 @@ const Index = () => {
                       <h3 className="text-sm font-semibold">Recent Expenses</h3>
                       <button
                         onClick={() => setActiveTab('expenses')}
-                        className="text-[11px] text-primary hover:underline flex items-center gap-0.5"
+                        className="text-[11px] font-bold text-primary hover:bg-primary/10 px-2 py-1 rounded-lg transition-all flex items-center gap-1"
                       >
-                        View all <ChevronRight className="h-3 w-3" />
+                        All Expenses <ChevronRight className="h-3 w-3" />
                       </button>
                     </div>
                     <ExpenseList
                       expenses={expenses.slice(0, 5)}
+                      showTypeTabs={false}
                       onUpdateExpense={handleUpdateExpense}
                       onDeleteExpense={handleDeleteExpense}
                       onDeleteAll={handleDeleteAll}
@@ -417,10 +478,15 @@ const Index = () => {
             )}
 
                 {/* ── EXPENSES TAB ── */}
+            {/* ── PERSONAL EXPENSES TAB ── */}
             {activeTab === 'expenses' && (
               <div className="animate-fade-in space-y-5">
-
-                {/* Navigation pills */}
+                <div className="mb-6">
+                  <h1 className="text-3xl font-black tracking-tight capitalize">
+                    {NAV_ITEMS.find(n => n.id === activeTab)?.label}
+                  </h1>
+                  <p className="text-xs text-muted-foreground mt-1">Manage your personal daily spending</p>
+                </div>
                 <div className="flex bg-muted/40 p-1 rounded-xl w-full sm:w-fit">
                   <button onClick={() => setExpenseSubTab('all')} className={cn("flex-1 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all", expenseSubTab === 'all' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>Log</button>
                   <button onClick={() => setExpenseSubTab('wallet')} className={cn("flex-1 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all", expenseSubTab === 'wallet' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>Wallet</button>
@@ -433,6 +499,9 @@ const Index = () => {
                     </div>
                     <ExpenseList
                       expenses={expenses}
+                      initialFilterType="personal"
+                      showTypeTabs={false}
+                      title="Personal Expenses"
                       onUpdateExpense={handleUpdateExpense}
                       onDeleteExpense={handleDeleteExpense}
                       onDeleteAll={handleDeleteAll}
@@ -444,7 +513,45 @@ const Index = () => {
 
                 {expenseSubTab === 'wallet' && (
                   <div className="rounded-2xl border border-border/60 bg-card/40 p-4 animate-fade-in">
-                    <ReceiptWallet onAddExpense={handleAddExpense} />
+                    <ReceiptWallet expenses={expenses} onAddExpense={handleAddExpense} />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── REIMBURSEMENTS TAB ── */}
+            {activeTab === 'reimbursements' && (
+              <div className="animate-fade-in space-y-5">
+                <div className="mb-6">
+                  <h1 className="text-3xl font-black tracking-tight capitalize">
+                    {NAV_ITEMS.find(n => n.id === activeTab)?.label}
+                  </h1>
+                  <p className="text-xs text-muted-foreground mt-1">Track work expenses and pending claims</p>
+                </div>
+                <div className="flex bg-muted/40 p-1 rounded-xl w-full sm:w-fit">
+                  <button onClick={() => setExpenseSubTab('all')} className={cn("flex-1 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all", expenseSubTab === 'all' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>Log</button>
+                  <button onClick={() => setExpenseSubTab('wallet')} className={cn("flex-1 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all", expenseSubTab === 'wallet' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>Wallet</button>
+                </div>
+
+                {expenseSubTab === 'all' && (
+                  <div className="space-y-6 animate-fade-in">
+                    <ExpenseList
+                      expenses={expenses}
+                      initialFilterType="reimbursable"
+                      showTypeTabs={false}
+                      title="Reimbursements"
+                      onUpdateExpense={handleUpdateExpense}
+                      onDeleteExpense={handleDeleteExpense}
+                      onDeleteAll={handleDeleteAll}
+                      onBatchDelete={handleBatchDelete}
+                      onBatchStatus={handleBatchStatus}
+                    />
+                  </div>
+                )}
+
+                {expenseSubTab === 'wallet' && (
+                  <div className="rounded-2xl border border-border/60 bg-card/40 p-4 animate-fade-in">
+                    <ReceiptWallet expenses={expenses} onAddExpense={handleAddExpense} />
                   </div>
                 )}
               </div>
@@ -453,6 +560,12 @@ const Index = () => {
             {/* ── VEHICLE TAB ── */}
             {activeTab === 'vehicle' && (
               <div className="animate-fade-in space-y-5">
+                <div className="mb-6">
+                  <h1 className="text-3xl font-black tracking-tight capitalize">
+                    {NAV_ITEMS.find(n => n.id === activeTab)?.label}
+                  </h1>
+                  <p className="text-xs text-muted-foreground mt-1">Mileage logs and fuel efficiency analysis</p>
+                </div>
                 <VehicleTracker />
               </div>
             )}
@@ -482,10 +595,10 @@ const Index = () => {
                     {/* Summary row */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       {[
-                        { label: 'Total', value: totalAmount, color: 'text-foreground' },
+                        { label: 'Personal', value: personalAmount, color: 'text-indigo-500' },
+                        { label: 'Reimbursable', value: reimbursableAmount, color: 'text-primary' },
                         { label: 'Pending', value: pendingAmount, color: 'text-warning' },
-                        { label: 'Approved', value: expenses.filter(e=>e.status==='approved').reduce((s,e)=>s+e.amount,0), color: 'text-success' },
-                        { label: 'Reimbursed', value: reimbursedAmount, color: 'text-primary' },
+                        { label: 'Settled', value: reimbursedAmount, color: 'text-success' },
                       ].map(s => (
                         <div key={s.label} className="rounded-xl border border-border/60 bg-card/80 p-3">
                           <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">{s.label}</p>
@@ -531,64 +644,65 @@ const Index = () => {
           </footer>
         </div>
 
-        {/* ── Scrollable Bottom Nav (mobile) ── */}
-        <nav
-          ref={navRef}
-          className="sm:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92vw] max-w-md"
-        >
-          <div className="mobile-float-nav flex items-center overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-smooth p-1">
-            {/* Dashboard & Expenses */}
-            {LEFT_NAV.map(item => {
-              const Icon = item.icon;
-              const active = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => { setActiveTab(item.id); haptics.selection(); }}
-                  className={cn(
-                    "flex-shrink-0 w-[19%] flex flex-col items-center gap-1 py-2 px-1 rounded-2xl transition-all duration-200 snap-center",
-                    active ? "text-primary bg-primary/15" : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Icon className={cn("h-5 w-5 transition-transform", active && "scale-110")} />
-                  <span className="text-[9px] font-bold tracking-tight">{item.label}</span>
-                </button>
-              );
-            })}
-
-            {/* Fixed Center FAB */}
-            <div className="flex-shrink-0 w-[24%] flex justify-center snap-center px-1">
-              <ExpenseForm
-                onSubmit={handleAddExpense}
-                trigger={
-                  <button
-                    className="h-14 w-14 rounded-full bg-gradient-primary shadow-glow flex items-center justify-center transition-all duration-300 active:scale-90 hover:scale-105"
-                    aria-label="Add expense"
-                  >
-                    <Plus className="h-7 w-7 text-white" strokeWidth={3} />
-                  </button>
+        {/* ── High-Density Pro Navigation (mobile) ── */}
+        <nav className="sm:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-40 w-[94vw] max-w-md h-20">
+          <div className="relative h-full w-full bg-card/80 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-2xl overflow-hidden flex items-center">
+            
+            <div 
+              ref={navRef}
+              className="w-full flex items-center justify-between px-4 overflow-x-auto no-scrollbar snap-x snap-mandatory"
+            >
+              {[
+                ...LEFT_NAV,
+                { id: 'add', label: 'Add', icon: Plus, isFab: true },
+                ...RIGHT_NAV,
+                ...MORE_NAV
+              ].map((item, idx) => {
+                const Icon = item.icon;
+                const active = activeTab === item.id;
+                
+                if ('isFab' in item) {
+                  return (
+                    <div key="fab-item" className="flex-shrink-0 w-16 flex justify-center snap-center mx-1">
+                      <ExpenseForm
+                        onSubmit={handleAddExpense}
+                        trigger={
+                          <motion.button
+                            whileTap={{ scale: 0.9 }}
+                            className="h-14 w-14 rounded-full bg-gradient-primary shadow-glow flex items-center justify-center border-4 border-background"
+                          >
+                            <Plus className="h-7 w-7 text-white" strokeWidth={3} />
+                          </motion.button>
+                        }
+                      />
+                    </div>
+                  );
                 }
-              />
-            </div>
 
-            {/* Remaining items (Vehicle, Analytics, Settings) */}
-            {RIGHT_NAV.map(item => {
-              const Icon = item.icon;
-              const active = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => { setActiveTab(item.id); haptics.selection(); }}
-                  className={cn(
-                    "flex-shrink-0 w-[19%] flex flex-col items-center gap-1 py-2 px-1 rounded-2xl transition-all duration-200 snap-center",
-                    active ? "text-primary bg-primary/15" : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Icon className={cn("h-5 w-5 transition-transform", active && "scale-110")} />
-                  <span className="text-[9px] font-bold tracking-tight">{item.label}</span>
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id as Tab)}
+                    className={cn(
+                      "flex-shrink-0 w-14 flex flex-col items-center justify-center gap-1 transition-all duration-300 snap-center mx-0.5",
+                      active ? "text-primary" : "text-muted-foreground/50"
+                    )}
+                  >
+                    <div className={cn(
+                      "p-2.5 rounded-xl transition-all duration-300",
+                      active ? "bg-primary/10 scale-110" : "bg-transparent"
+                    )}>
+                      <Icon className="h-5.5 w-5.5" />
+                    </div>
+                    {active && (
+                      <span className="text-[8px] font-black tracking-tighter uppercase leading-none">
+                        {item.label}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </nav>
       </div>

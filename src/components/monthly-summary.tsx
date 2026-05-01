@@ -12,15 +12,15 @@ interface MonthlySummaryProps {
 export function MonthlySummary({ expenses, onViewAll }: MonthlySummaryProps) {
   const now = new Date();
 
-  const { thisMonth, lastMonth, pending, reimbursed, approved } = useMemo(() => {
+  const { thisMonth, lastMonth, personal, reimbursable, pending } = useMemo(() => {
     const tm = expenses.filter(e => isSameMonth(new Date(e.date), now));
     const lm = expenses.filter(e => isSameMonth(new Date(e.date), subMonths(now, 1)));
     return {
-      thisMonth: tm.reduce((s, e) => s + e.amount, 0),
-      lastMonth:  lm.reduce((s, e) => s + e.amount, 0),
-      pending:    tm.filter(e => e.status === 'pending').reduce((s, e) => s + e.amount, 0),
-      approved:   tm.filter(e => e.status === 'approved').reduce((s, e) => s + e.amount, 0),
-      reimbursed: tm.filter(e => e.status === 'reimbursed').reduce((s, e) => s + e.amount, 0),
+      thisMonth:    tm.reduce((s, e) => s + e.amount, 0),
+      lastMonth:     lm.reduce((s, e) => s + e.amount, 0),
+      personal:      tm.filter(e => !e.isReimbursement).reduce((s, e) => s + e.amount, 0),
+      reimbursable:  tm.filter(e => e.isReimbursement).reduce((s, e) => s + e.amount, 0),
+      pending:       tm.filter(e => e.isReimbursement && e.status === 'pending').reduce((s, e) => s + e.amount, 0),
     };
   }, [expenses, now]);
 
@@ -30,9 +30,9 @@ export function MonthlySummary({ expenses, onViewAll }: MonthlySummaryProps) {
   // Progress bars
   const max = Math.max(thisMonth, 1);
   const bars = [
-    { label: 'Pending',    value: pending,    color: 'bg-amber-500' },
-    { label: 'Approved',   value: approved,   color: 'bg-emerald-500' },
-    { label: 'Reimbursed', value: reimbursed, color: 'bg-violet-500' },
+    { label: 'Personal',     value: personal,     color: 'bg-indigo-500' },
+    { label: 'Reimbursable', value: reimbursable, color: 'bg-primary' },
+    { label: 'Pending',      value: pending,      color: 'bg-warning' },
   ];
 
   return (
