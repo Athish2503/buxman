@@ -1,16 +1,12 @@
 import { Expense } from '@/types/expense';
 import { storageEngine } from '@/lib/storage-engine';
+import { syncService } from '@/lib/sync';
 
 const STORAGE_KEY = 'reimburse_expenses_v2';
 
 export const storageService = {
   getExpenses(): Expense[] {
     try {
-      // Migrate from old key if needed
-      const oldData = localStorage.getItem('reimbursement_expenses');
-      if (oldData && !localStorage.getItem(STORAGE_KEY)) {
-        storageEngine.set(STORAGE_KEY, oldData);
-      }
       const stored = localStorage.getItem(STORAGE_KEY);
       return stored ? JSON.parse(stored) : [];
     } catch {
@@ -18,49 +14,58 @@ export const storageService = {
     }
   },
 
-  saveExpenses(expenses: Expense[]): void {
+  saveExpenses(expenses: Expense[]): Expense[] {
     try {
       storageEngine.set(STORAGE_KEY, JSON.stringify(expenses));
     } catch (error) {
       console.error('Error saving expenses:', error);
     }
+    return expenses;
   },
 
-  addExpense(expense: Expense): void {
+  addExpense(expense: Expense): Expense[] {
     const expenses = this.getExpenses();
     expenses.unshift(expense);
-    this.saveExpenses(expenses);
+    syncService.enqueue('add', expense.id, expense);
+    return this.saveExpenses(expenses);
   },
 
-  updateExpense(id: string, updates: Partial<Expense>): void {
+  updateExpense(expense: Expense): Expense[] {
     const expenses = this.getExpenses();
-    const index = expenses.findIndex(e => e.id === id);
+    const index = expenses.findIndex(e => e.id === expense.id);
     if (index !== -1) {
-      expenses[index] = { ...expenses[index], ...updates, updatedAt: new Date().toISOString() };
-      this.saveExpenses(expenses);
+      expenses[index] = { ...expense, updatedAt: new Date().toISOString() };
+      syncService.enqueue('update', expense.id, expenses[index]);
+      return this.saveExpenses(expenses);
     }
+    return expenses;
   },
 
-  batchUpdateStatus(ids: string[], status: Expense['status']): void {
+  batchUpdateStatus(ids: string[], status: Expense['status']): Expense[] {
     const expenses = this.getExpenses();
     const updatedAt = new Date().toISOString();
     ids.forEach(id => {
       const index = expenses.findIndex(e => e.id === id);
       if (index !== -1) {
         expenses[index] = { ...expenses[index], status, updatedAt };
+        syncService.enqueue('update', id, expenses[index]);
       }
     });
-    this.saveExpenses(expenses);
+    return this.saveExpenses(expenses);
   },
 
-  deleteExpense(id: string): void {
+  deleteExpense(id: string): Expense[] {
     const expenses = this.getExpenses();
-    this.saveExpenses(expenses.filter(e => e.id !== id));
+    const updated = expenses.filter(e => e.id !== id);
+    syncService.enqueue('delete', id, null);
+    return this.saveExpenses(updated);
   },
 
-  batchDelete(ids: string[]): void {
+  batchDeleteExpenses(ids: string[]): Expense[] {
     const expenses = this.getExpenses();
-    this.saveExpenses(expenses.filter(e => !ids.includes(e.id)));
+    const updated = expenses.filter(e => !ids.includes(e.id));
+    ids.forEach(id => syncService.enqueue('delete', id, null));
+    return this.saveExpenses(updated);
   },
 
   clearAll(): void {

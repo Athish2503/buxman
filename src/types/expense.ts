@@ -59,4 +59,5 @@ export interface AppSettings {
   currency: string;
   theme: 'dark' | 'light' | 'system';
   budgets: BudgetGoal[];
+  biometricLock?: boolean;
 }

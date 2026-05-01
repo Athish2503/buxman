@@ -25,6 +25,7 @@ import { storageService } from '@/lib/storage';
 import { vendorService } from '@/lib/recurring';
 import { haptics } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
+import { VoiceInput } from './voice-input';
 
 /* ─── schema ─────────────────────────────────────────────────────── */
 const expenseSchema = z.object({
@@ -102,6 +103,17 @@ function FormBody({
   const status = watch('status');
   const amount = watch('amount');
   const selCat = cat ? categoryConfig[cat as ExpenseCategory] : null;
+
+  const handleVoiceParse = (data: any) => {
+    if (data.amount) setValue('amount', data.amount, { shouldValidate: true });
+    if (data.vendor) setValue('vendor', data.vendor, { shouldValidate: true });
+    if (data.category) setValue('category', data.category, { shouldValidate: true });
+    if (data.date) setValue('date', data.date, { shouldValidate: true });
+    if (data.description) {
+      const current = watch('description') || '';
+      setValue('description', current ? `${current} ${data.description}` : data.description);
+    }
+  };
 
   const vendors = useMemo(() => {
     try { 
@@ -219,7 +231,10 @@ function FormBody({
 
         <div className="grid grid-cols-2 gap-3">
           <div className="relative">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Merchant</p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Merchant</p>
+              <VoiceInput onParse={handleVoiceParse} />
+            </div>
             <Input
               {...register('vendor')}
               onFocus={() => setShowVendors(true)}

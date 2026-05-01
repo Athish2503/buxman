@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { User, Building, Mail, Phone, MapPin, Plus, Trash2, Target, Moon, Sun, Palette } from 'lucide-react';
+import { User, Building, Mail, Phone, MapPin, Plus, Trash2, Target, Moon, Sun, Palette, Lock, Settings, Bell } from 'lucide-react';
+import { useEffect } from 'react';
+import { biometrics } from '@/lib/biometrics';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,6 +52,28 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
   const [settings, setSettings] = useState<AppSettings>(settingsService.get());
   const [newBudget, setNewBudget] = useState<Partial<BudgetGoal>>({ period: 'monthly' });
   const [saved, setSaved] = useState(false);
+  const [bioAvailable, setBioAvailable] = useState(false);
+
+  useEffect(() => {
+    biometrics.isAvailable().then(setBioAvailable);
+  }, []);
+
+  const toggleBio = async () => {
+    if (!settings.biometricLock) {
+      const success = await biometrics.authenticate();
+      if (success) {
+        const updated = { ...settings, biometricLock: true };
+        setSettings(updated);
+        settingsService.save(updated);
+        toast.success('Biometric lock enabled');
+      }
+    } else {
+      const updated = { ...settings, biometricLock: false };
+      setSettings(updated);
+      settingsService.save(updated);
+      toast.success('Biometric lock disabled');
+    }
+  };
 
   const update = (path: 'billedTo' | 'billedFrom', key: string, value: string) => {
     setSettings(s => ({ ...s, [path]: { ...s[path], [key]: value } }));
@@ -84,6 +108,24 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
 
   return (
     <div className="space-y-5 pb-24 sm:pb-8">
+      {/* System Settings */}
+      <Section icon={Settings} title="System">
+        <Button 
+          variant="outline" 
+          className="w-full justify-start gap-2 h-11 rounded-xl border-dashed border-primary/30 text-primary hover:bg-primary/5"
+          onClick={() => {
+            const event = new CustomEvent('simulate-sms', { 
+              detail: { body: "HDFC Bank: Rs. 1,250.00 spent at STARBUCKS on 01-MAY-26. Info: POS" } 
+            });
+            window.dispatchEvent(event);
+            toast.info('Simulated bank SMS received');
+          }}
+        >
+          <Bell className="h-4 w-4" />
+          Simulate Transaction SMS
+        </Button>
+      </Section>
+
       {/* Appearance */}
       <Section icon={Palette} title="Appearance">
         <div className="flex items-center justify-between">

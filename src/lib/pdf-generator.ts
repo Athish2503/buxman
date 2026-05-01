@@ -386,7 +386,8 @@ export const generateExpensesPDF = async (
     await Share.share({
       title: 'Expense Report',
       text: options.shareMessage || 'Attached is my reimbursement report.',
-      files: [res.uri]
+      url: res.uri, // Some apps prefer url for the file path
+      files: [res.uri], // Others prefer the files array
     });
   } else {
     pdf.save(fileName);

@@ -4,7 +4,7 @@ import {
   Edit, Trash2, Eye, Filter, Download, Search,
   Receipt, ChevronDown, CheckSquare, Square, X,
   SlidersHorizontal, FileText, FileSpreadsheet,
-  MoreVertical, ArrowUpDown, Tag, Share2
+  MoreVertical, ArrowUpDown, Tag, Share2, ZoomIn
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -33,6 +33,8 @@ import { ExpenseForm } from './expense-form';
 import { formatCurrency, cn } from '@/lib/utils';
 import { ExportDialog } from './export-dialog';
 import { ImageViewer } from './image-viewer';
+import { ExpenseItem } from './expense-item';
+import { PullToRefresh } from './pull-to-refresh';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -104,6 +106,16 @@ export function ExpenseList({
     rejected: filteredExpenses.filter(e => e.status === 'rejected').reduce((s, e) => s + e.amount, 0),
     count: filteredExpenses.length,
   }), [filteredExpenses]);
+
+  const handleRefresh = async () => {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    toast.success('Updated');
+  };
+
+  const handleStatusChange = (id: string, status: ExpenseStatus) => {
+    const exp = expenses.find(e => e.id === id);
+    if (exp) onUpdateExpense({ ...exp, status });
+  };
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -185,7 +197,6 @@ export function ExpenseList({
 
   const activeFilters = [filterCategory !== 'all', filterStatus !== 'all'].filter(Boolean).length;
 
-  // Filter panel (shared between Sheet on mobile and inline on desktop)
   const FilterPanel = () => (
     <div className="space-y-4 p-1">
       <div>
@@ -243,495 +254,131 @@ export function ExpenseList({
           ))}
         </div>
       </div>
-      {(filterCategory !== 'all' || filterStatus !== 'all') && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full text-muted-foreground h-8"
-          onClick={() => { setFilterCategory('all'); setFilterStatus('all'); }}
-        >
-          <X className="h-3.5 w-3.5 mr-1" /> Clear filters
-        </Button>
-      )}
     </div>
   );
 
-  if (expenses.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
-        <div className="h-20 w-20 rounded-2xl bg-gradient-primary flex items-center justify-center mb-5 shadow-glow">
-          <Receipt className="h-10 w-10 text-white" />
-        </div>
-        <h3 className="text-xl font-bold mb-2">No expenses yet</h3>
-        <p className="text-muted-foreground text-sm max-w-xs">
-          Add your first expense to start tracking reimbursements and generating invoices.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
-      {/* Bulk action bar */}
       {selected.size > 0 && (
         <div className="glass border border-primary/30 rounded-2xl p-3 flex flex-col gap-3 animate-slide-right shadow-2xl">
           <div className="flex items-center justify-between px-1">
-            <span className="text-xs font-bold text-primary uppercase tracking-wider">{selected.size} Expenses Selected</span>
+            <span className="text-xs font-bold text-primary uppercase tracking-wider">{selected.size} Selected</span>
             <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={clearSelection}>
               <X className="h-4 w-4" />
             </Button>
           </div>
-          
           <div className="flex flex-wrap gap-2">
             <div className="flex flex-wrap gap-1.5 flex-1">
               {(['approved', 'reimbursed', 'rejected'] as ExpenseStatus[]).map(s => (
-                <Button
-                  key={s}
-                  size="sm"
-                  variant="outline"
-                  className="h-8 text-[10px] px-2.5 capitalize font-bold"
-                  onClick={() => { onBatchStatus?.(Array.from(selected), s); clearSelection(); }}
-                >
+                <Button key={s} size="sm" variant="outline" className="h-8 text-[10px] px-2.5 capitalize font-bold" onClick={() => { onBatchStatus?.(Array.from(selected), s); clearSelection(); }}>
                   {s}
                 </Button>
               ))}
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button size="sm" variant="outline" className="h-8 text-[10px] px-2.5 text-destructive border-destructive/20 hover:bg-destructive/10 font-bold">
-                    Delete
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="glass border-border/50 max-w-sm mx-4">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete {selected.size} expenses?</AlertDialogTitle>
-                    <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction className="bg-destructive" onClick={() => { onBatchDelete?.(Array.from(selected)); clearSelection(); }}>
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-
-            <div className="flex gap-2">
-              <Button size="sm" className="h-8 text-[10px] px-3 bg-primary text-white shadow-glow font-bold gap-1.5" onClick={() => setExportDialogOpen(true)}>
-                <FileText className="h-3.5 w-3.5" /> Share PDF
-              </Button>
-              <Button size="sm" variant="outline" className="h-8 text-[10px] px-3 border-success/30 text-success font-bold gap-1.5" onClick={handleExportCSV}>
-                <FileSpreadsheet className="h-3.5 w-3.5" /> CSV
+              <Button size="sm" variant="outline" className="h-8 text-[10px] px-2.5 text-destructive border-destructive/20 font-bold" onClick={() => { onBatchDelete?.(Array.from(selected)); clearSelection(); }}>
+                Delete
               </Button>
             </div>
+            <Button size="sm" className="h-8 text-[10px] px-3 bg-primary text-white font-bold" onClick={() => setExportDialogOpen(true)}>
+              Share PDF
+            </Button>
           </div>
         </div>
       )}
 
-      {/* Search + Filter bar */}
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search vendor, notes, tags..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9 bg-muted/50 border-border/60 h-10"
-          />
-          {search && (
-            <button className="absolute right-3 top-1/2 -translate-y-1/2" onClick={() => setSearch('')}>
-              <X className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-            </button>
-          )}
+          <Input placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-muted/50 h-10" />
         </div>
-
-        {/* View Toggle */}
-        <div className="flex bg-muted/40 p-1 rounded-xl border border-border/40">
-          <button 
-            onClick={() => { setViewMode('cards'); haptics.light(); }}
-            className={cn("h-8 px-2.5 rounded-lg transition-all flex items-center gap-1.5 text-xs font-semibold", 
-              viewMode === 'cards' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}
-          >
-            <MoreVertical className="h-3.5 w-3.5 rotate-90 sm:rotate-0" />
-            <span className="hidden xs:inline">Cards</span>
-          </button>
-          <button 
-            onClick={() => { setViewMode('table'); haptics.light(); }}
-            className={cn("h-8 px-2.5 rounded-lg transition-all flex items-center gap-1.5 text-xs font-semibold", 
-              viewMode === 'table' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}
-          >
-            <ArrowUpDown className="h-3.5 w-3.5" />
-            <span className="hidden xs:inline">Table</span>
-          </button>
+        <div className="flex bg-muted/40 p-1 rounded-xl border">
+          <button onClick={() => setViewMode('cards')} className={cn("h-8 px-2.5 rounded-lg transition-all", viewMode === 'cards' ? "bg-background shadow-sm" : "text-muted-foreground")}><MoreVertical className="h-3.5 w-3.5 rotate-90" /></button>
+          <button onClick={() => setViewMode('table')} className={cn("h-8 px-2.5 rounded-lg transition-all", viewMode === 'table' ? "bg-background shadow-sm" : "text-muted-foreground")}><ArrowUpDown className="h-3.5 w-3.5" /></button>
         </div>
-
-        {/* Mobile: sheet filter */}
         <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
           <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className={cn("h-10 w-10 shrink-0 relative", activeFilters > 0 && "border-primary text-primary")}>
-              <SlidersHorizontal className="h-4 w-4" />
-              {activeFilters > 0 && (
-                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-white text-[9px] flex items-center justify-center font-bold">
-                  {activeFilters}
-                </span>
-              )}
-            </Button>
+            <Button variant="outline" size="icon" className="h-10 w-10 shrink-0"><SlidersHorizontal className="h-4 w-4" /></Button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="glass border-border/50 rounded-t-2xl max-h-[85vh] overflow-y-auto pb-8">
-            <SheetHeader className="mb-4">
-              <SheetTitle>Filter & Sort</SheetTitle>
-            </SheetHeader>
-            <FilterPanel />
-          </SheetContent>
+          <SheetContent side="bottom" className="glass rounded-t-2xl"><FilterPanel /></SheetContent>
         </Sheet>
-
-        {/* Export menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" className="h-10 w-10 shrink-0">
-              <Download className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="glass border-border/50">
-            <DropdownMenuItem onClick={() => setExportDialogOpen(true)} className="gap-2">
-              <FileText className="h-4 w-4 text-primary" />
-              Export as PDF
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleExportCSV} className="gap-2">
-              <FileSpreadsheet className="h-4 w-4 text-success" />
-              Export as CSV
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <DropdownMenuItem onSelect={e => e.preventDefault()} className="gap-2 text-destructive focus:text-destructive">
-                  <Trash2 className="h-4 w-4" />
-                  Delete All
-                </DropdownMenuItem>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="glass border-border/50 max-w-sm mx-4">
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete all {expenses.length} expenses?</AlertDialogTitle>
-                  <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction className="bg-destructive" onClick={onDeleteAll}>Delete All</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
 
-      {/* Results count + select-all */}
-      <div className="flex items-center justify-between px-1">
-        <p className="text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">{filteredExpenses.length}</span>
-          {filteredExpenses.length !== expenses.length && ` of ${expenses.length}`} expenses
-          {filteredExpenses.length > 0 && (
-            <span className="ml-1">· <span className="font-semibold text-foreground">{formatCurrency(summary.total)}</span></span>
-          )}
-        </p>
-        {filteredExpenses.length > 1 && (
-          <button
-            onClick={toggleSelectAll}
-            className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
-          >
-            {selected.size === filteredExpenses.length
-              ? <><CheckSquare className="h-3.5 w-3.5" /> Deselect all</>
-              : <><Square className="h-3.5 w-3.5" /> Select all</>
-            }
-          </button>
-        )}
-      </div>
-
-      {/* Expense view container */}
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
         {viewMode === 'cards' ? (
-          <div className="space-y-2 stagger-children">
-            {filteredExpenses.map(expense => {
-              const cfg = getCategoryConfig(expense.category);
-              const Icon = cfg.icon;
-              const isSelected = selected.has(expense.id);
-
-              return (
-                <div
+          <PullToRefresh onRefresh={handleRefresh}>
+            <div className="space-y-1 py-2">
+              {filteredExpenses.map(expense => (
+                <ExpenseItem
                   key={expense.id}
-                  className={cn(
-                    "group relative rounded-xl border transition-all duration-200",
-                    isSelected
-                      ? "border-primary/50 bg-primary/5"
-                      : "border-border/60 bg-card/80 hover:border-border hover:bg-card"
-                  )}
-                >
-                  {/* Selection tap area (left) */}
-                  <div
-                    className="absolute left-0 top-0 bottom-0 w-12 flex items-center justify-center cursor-pointer z-10"
-                    onClick={() => toggleSelect(expense.id)}
-                  >
-                    <div className={cn(
-                      "h-4 w-4 rounded border-2 flex items-center justify-center transition-all",
-                      isSelected ? "border-primary bg-primary" : "border-border/60 opacity-40 group-hover:opacity-100"
-                    )}>
-                      {isSelected && <CheckSquare className="h-3 w-3 text-white" />}
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-3 pl-12">
-                    {/* Category icon */}
-                    <div className={cn(
-                      "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105",
-                      cfg.bgColor
-                    )}>
-                      <Icon className={cn("h-5 w-5", cfg.color)} />
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <h3 className="font-semibold text-sm leading-tight truncate">{expense.vendor}</h3>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {cfg.label} · {format(new Date(expense.date), 'dd MMM yyyy')}
-                          </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="font-bold text-sm font-mono">{formatCurrency(expense.amount)}</p>
-                          <Badge className={cn("mt-1 text-[10px] py-0 px-1.5 h-4 rounded-full capitalize font-medium", STATUS_COLORS[expense.status])}>
-                            {expense.status}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      {/* Description */}
-                      {expense.description && (
-                        <p className="text-xs text-muted-foreground mt-1.5 line-clamp-1 italic">"{expense.description}"</p>
-                      )}
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-0.5 mt-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] rounded-lg" onClick={() => setSelectedExpense(expense)}>
-                          <Eye className="h-3 w-3 mr-1" /> View
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] rounded-lg" onClick={() => setEditingExpense(expense)}>
-                          <Edit className="h-3 w-3 mr-1" /> Edit
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          /* Table View optimized for mobile */
-          <div className="rounded-xl border border-border/60 bg-card/40 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-muted/30 border-b border-border/50">
-                    <th className="p-3 w-10">
-                      <Checkbox 
-                        checked={selected.size === filteredExpenses.length && filteredExpenses.length > 0} 
-                        onCheckedChange={toggleSelectAll}
-                        className="rounded border-border/50"
-                      />
-                    </th>
-                    <th className="p-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Vendor & Date</th>
-                    <th className="p-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right">Amount</th>
-                    <th className="p-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Status</th>
-                    <th className="p-3 w-10"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/20">
-                  {filteredExpenses.map(expense => {
-                    const cfg = getCategoryConfig(expense.category);
-                    const isSelected = selected.has(expense.id);
-                    return (
-                      <tr 
-                        key={expense.id} 
-                        className={cn(
-                          "hover:bg-muted/20 transition-colors",
-                          isSelected ? "bg-primary/5" : ""
-                        )}
-                        onClick={() => toggleSelect(expense.id)}
-                      >
-                        <td className="p-3" onClick={e => e.stopPropagation()}>
-                          <Checkbox 
-                            checked={isSelected} 
-                            onCheckedChange={() => toggleSelect(expense.id)}
-                            className="rounded border-border/50"
-                          />
-                        </td>
-                        <td className="p-3">
-                          <p className="text-xs font-bold truncate max-w-[120px]">{expense.vendor}</p>
-                          <p className="text-[10px] text-muted-foreground">{format(new Date(expense.date), 'dd/MM/yy')}</p>
-                        </td>
-                        <td className="p-3 text-right">
-                          <p className="text-xs font-mono font-bold">{formatCurrency(expense.amount)}</p>
-                          <p className="text-[9px] text-muted-foreground">{cfg.label.split(' ')[0]}</p>
-                        </td>
-                        <td className="p-3">
-                          <div className={cn("h-1.5 w-1.5 rounded-full", 
-                            expense.status === 'approved' ? "bg-emerald-500" : 
-                            expense.status === 'pending' ? "bg-amber-500" : 
-                            expense.status === 'reimbursed' ? "bg-violet-500" : "bg-rose-500"
-                          )} />
-                        </td>
-                        <td className="p-3 text-right" onClick={e => e.stopPropagation()}>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
-                                <MoreVertical className="h-3.5 w-3.5" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="glass">
-                              <DropdownMenuItem onClick={() => setSelectedExpense(expense)}><Eye className="h-3 w-3 mr-2" /> View</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setEditingExpense(expense)}><Edit className="h-3 w-3 mr-2" /> Edit</DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="text-destructive"
-                                onClick={() => onDeleteExpense(expense.id)}
-                              >
-                                <Trash2 className="h-3 w-3 mr-2" /> Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot className="bg-muted/20">
-                  <tr>
-                    <td colSpan={2} className="p-3 text-xs font-bold">Total ({filteredExpenses.length})</td>
-                    <td className="p-3 text-right text-xs font-bold text-primary">{formatCurrency(summary.total)}</td>
-                    <td colSpan={2}></td>
-                  </tr>
-                </tfoot>
-              </table>
+                  expense={expense}
+                  isSelected={selected.has(expense.id)}
+                  onToggleSelect={toggleSelect}
+                  onView={setSelectedExpense}
+                  onEdit={setEditingExpense}
+                  onDelete={onDeleteExpense}
+                  onStatusChange={handleStatusChange}
+                />
+              ))}
             </div>
-          </div>
-        )}
-
-        {filteredExpenses.length === 0 && (
-          <div className="text-center py-16 animate-fade-in">
-            <p className="text-muted-foreground text-sm">No expenses match your filters.</p>
-            <Button variant="link" size="sm" className="mt-2" onClick={() => { setFilterCategory('all'); setFilterStatus('all'); setSearch(''); }}>
-              Clear all filters
-            </Button>
+          </PullToRefresh>
+        ) : (
+          <div className="rounded-xl border border-border/60 bg-card/40 overflow-hidden overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-muted/30 border-b">
+                  <th className="p-3 w-10"><Checkbox checked={selected.size === filteredExpenses.length} onCheckedChange={toggleSelectAll} /></th>
+                  <th className="p-3 text-[10px] font-bold uppercase text-muted-foreground">Vendor</th>
+                  <th className="p-3 text-[10px] font-bold uppercase text-muted-foreground text-right">Amount</th>
+                  <th className="p-3 text-[10px] font-bold uppercase text-muted-foreground">Status</th>
+                  <th className="p-3 w-10"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {filteredExpenses.map(expense => (
+                  <tr key={expense.id} className={cn("hover:bg-muted/20", selected.has(expense.id) ? "bg-primary/5" : "")} onClick={() => toggleSelect(expense.id)}>
+                    <td className="p-3" onClick={e => e.stopPropagation()}><Checkbox checked={selected.has(expense.id)} onCheckedChange={() => toggleSelect(expense.id)} /></td>
+                    <td className="p-3"><p className="text-xs font-bold">{expense.vendor}</p><p className="text-[10px] text-muted-foreground">{format(new Date(expense.date), 'dd/MM/yy')}</p></td>
+                    <td className="p-3 text-right text-xs font-mono font-bold">{formatCurrency(expense.amount)}</td>
+                    <td className="p-3"><Badge className={cn("text-[9px] uppercase", STATUS_COLORS[expense.status])}>{expense.status}</Badge></td>
+                    <td className="p-3" onClick={e => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><MoreVertical className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="glass">
+                          <DropdownMenuItem onClick={() => setSelectedExpense(expense)}>View</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setEditingExpense(expense)}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive" onClick={() => onDeleteExpense(expense.id)}>Delete</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
 
-      {/* View Dialog */}
       <Dialog open={!!selectedExpense} onOpenChange={open => !open && setSelectedExpense(null)}>
-        <DialogContent className="glass border-border/50 max-w-sm mx-4 sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {selectedExpense && (() => {
-                const cfg = getCategoryConfig(selectedExpense.category);
-                const Icon = cfg.icon;
-                return (
-                  <>
-                    <div className={cn("h-7 w-7 rounded-lg flex items-center justify-center", cfg.bgColor)}>
-                      <Icon className={cn("h-4 w-4", cfg.color)} />
-                    </div>
-                    {selectedExpense.vendor}
-                  </>
-                );
-              })()}
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className="glass max-w-sm mx-4">
+          <DialogHeader><DialogTitle>{selectedExpense?.vendor}</DialogTitle></DialogHeader>
           {selectedExpense && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: 'Amount', value: formatCurrency(selectedExpense.amount) },
-                  { label: 'Date', value: format(new Date(selectedExpense.date), 'dd MMM yyyy') },
-                  { label: 'Category', value: getCategoryConfig(selectedExpense.category).label },
-                  { label: 'Status', value: null },
-                ].map(item => (
-                  <div key={item.label} className="bg-muted/40 rounded-xl p-3">
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">{item.label}</p>
-                    {item.label === 'Status' ? (
-                      <Badge className={cn("capitalize text-xs font-semibold", STATUS_COLORS[selectedExpense.status])}>
-                        {selectedExpense.status}
-                      </Badge>
-                    ) : (
-                      <p className="font-semibold text-sm">{item.value}</p>
-                    )}
-                  </div>
-                ))}
+                <div className="bg-muted/40 p-3 rounded-xl"><p className="text-[10px] uppercase text-muted-foreground">Amount</p><p className="font-bold">{formatCurrency(selectedExpense.amount)}</p></div>
+                <div className="bg-muted/40 p-3 rounded-xl"><p className="text-[10px] uppercase text-muted-foreground">Status</p><Badge className={STATUS_COLORS[selectedExpense.status]}>{selectedExpense.status}</Badge></div>
               </div>
-              {selectedExpense.description && (
-                <div className="bg-muted/40 rounded-xl p-3">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Notes</p>
-                  <p className="text-sm">{selectedExpense.description}</p>
-                </div>
-              )}
-              {(selectedExpense.tags && selectedExpense.tags.length > 0) && (
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-2">Tags</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedExpense.tags.map(t => (
-                      <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {selectedExpense.receiptImage && (
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-2">Receipt</p>
-                  <div 
-                    className="relative rounded-xl overflow-hidden border border-border/50 group cursor-zoom-in"
-                    onClick={() => setViewingReceipt(selectedExpense.receiptImage!)}
-                  >
-                    <img src={selectedExpense.receiptImage} alt="Receipt" className="w-full max-h-52 object-contain bg-black/5" />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors">
-                      <ZoomIn className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </div>
-                  <p className="text-[10px] text-center text-muted-foreground mt-2">Tap image to zoom</p>
-                </div>
-              )}
+              {selectedExpense.receiptImage && <img src={selectedExpense.receiptImage} className="w-full rounded-xl" />}
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      <ImageViewer 
-        src={viewingReceipt || ''}
-        isOpen={!!viewingReceipt}
-        onClose={() => setViewingReceipt(null)}
-        title={selectedExpense?.vendor ? `Receipt: ${selectedExpense.vendor}` : 'Receipt View'}
-      />
-
-      {/* Edit Dialog */}
+      <ImageViewer src={viewingReceipt || ''} isOpen={!!viewingReceipt} onClose={() => setViewingReceipt(null)} title="Receipt" />
       <Dialog open={!!editingExpense} onOpenChange={open => !open && setEditingExpense(null)}>
-        <DialogContent className="glass border-border/50 max-w-xl mx-4 max-h-[92vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Expense</DialogTitle>
-          </DialogHeader>
-          {editingExpense && (
-            <ExpenseForm
-              onSubmit={expense => { onUpdateExpense(expense); setEditingExpense(null); }}
-              initialData={editingExpense}
-              isEdit
-              onClose={() => setEditingExpense(null)}
-            />
-          )}
+        <DialogContent className="glass max-w-xl max-h-[92vh] overflow-y-auto">
+          {editingExpense && <ExpenseForm onSubmit={exp => { onUpdateExpense(exp); setEditingExpense(null); }} initialData={editingExpense} isEdit onClose={() => setEditingExpense(null)} />}
         </DialogContent>
       </Dialog>
-
-      <ExportDialog
-        isOpen={exportDialogOpen}
-        onClose={() => setExportDialogOpen(false)}
-        onConfirm={handleExportPDF}
-        title="Export PDF Report"
-        count={selected.size > 0 ? selected.size : filteredExpenses.length}
-      />
+      <ExportDialog isOpen={exportDialogOpen} onClose={() => setExportDialogOpen(false)} onConfirm={handleExportPDF} title="Export PDF" count={filteredExpenses.length} />
     </div>
   );
 }
