@@ -280,8 +280,10 @@ export function ExpenseForm({ onSubmit, initialData, isEdit = false }: ExpenseFo
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-gradient-primary hover:opacity-90 transition-opacity">
-          Add New Expense
+        <Button className="bg-gradient-primary hover:opacity-90 transition-opacity text-primary-foreground shadow-md shadow-glow">
+          <span className="text-lg leading-none mr-1">+</span>
+          <span className="hidden sm:inline">New Expense</span>
+          <span className="sm:hidden">Add</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
