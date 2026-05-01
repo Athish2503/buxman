@@ -23,15 +23,17 @@ import {
 import { Expense, ExpenseStatus, ExpenseSummary } from '@/types/expense';
 import { getCategoryConfig, categoryConfig } from '@/lib/categories';
 import { generateExpensesPDF } from '@/lib/pdf-generator';
+import { settingsService } from '@/lib/settings';
 import { ExpenseForm } from './expense-form';
 
 interface ExpenseListProps {
   expenses: Expense[];
   onUpdateExpense: (expense: Expense) => void;
   onDeleteExpense: (id: string) => void;
+  onDeleteAll: () => void;
 }
 
-export function ExpenseList({ expenses, onUpdateExpense, onDeleteExpense }: ExpenseListProps) {
+export function ExpenseList({ expenses, onUpdateExpense, onDeleteExpense, onDeleteAll }: ExpenseListProps) {
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -66,9 +68,11 @@ export function ExpenseList({ expenses, onUpdateExpense, onDeleteExpense }: Expe
   };
 
   const handleExportPDF = () => {
+    const settings = settingsService.get();
     generateExpensesPDF(filteredExpenses, summary, {
       title: 'Expense Reimbursement Invoice',
-      userInfo: { name: 'Employee Name', company: 'Company Name' }
+      billedTo: settings.billedTo,
+      billedFrom: settings.billedFrom,
     });
   };
 
