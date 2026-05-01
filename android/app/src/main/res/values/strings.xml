@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Reimburse</string>
+    <string name="title_activity_main">Reimburse</string>
+    <string name="package_name">com.pixel.reimburse</string>
+    <string name="custom_url_scheme">com.pixel.reimburse</string>
+</resources>
