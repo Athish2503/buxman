@@ -124,14 +124,38 @@ export function ExpenseList({ expenses, onUpdateExpense, onDeleteExpense, onDele
               <CardTitle className="text-base sm:text-lg font-semibold">
                 Expenses <span className="text-muted-foreground font-normal">({filteredExpenses.length})</span>
               </CardTitle>
-              <Button
-                onClick={handleExportPDF}
-                size="sm"
-                className="bg-gradient-primary hover:opacity-90 transition-opacity text-primary-foreground shadow-md"
-              >
-                <Download className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Export PDF</span>
-              </Button>
+              <div className="flex items-center gap-2">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive">
+                      <Trash2 className="h-4 w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Delete All</span>
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete all expenses?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently remove all {expenses.length} expense{expenses.length === 1 ? '' : 's'} from this device. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={onDeleteAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        Delete All
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <Button
+                  onClick={handleExportPDF}
+                  size="sm"
+                  className="bg-gradient-primary hover:opacity-90 transition-opacity text-primary-foreground shadow-md"
+                >
+                  <Download className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Export PDF</span>
+                </Button>
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2">
