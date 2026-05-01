@@ -90,7 +90,10 @@ const Index = () => {
               <p className="text-[10px] sm:text-xs text-muted-foreground -mt-0.5">Premium expense tracker</p>
             </div>
           </div>
-          <ExpenseForm onSubmit={handleAddExpense} />
+          <div className="flex items-center gap-1.5">
+            <SettingsDialog />
+            <ExpenseForm onSubmit={handleAddExpense} />
+          </div>
         </div>
       </header>
 
