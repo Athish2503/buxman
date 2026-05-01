@@ -45,6 +45,16 @@ const Index = () => {
     }
   };
 
+  const handleDeleteExpense = (id: string) => {
+    try {
+      storageService.deleteExpense(id);
+      setExpenses(storageService.getExpenses());
+      toast.success('Expense deleted');
+    } catch {
+      toast.error('Failed to delete expense');
+    }
+  };
+
   const handleDeleteAll = () => {
     try {
       storageService.clearAll();
