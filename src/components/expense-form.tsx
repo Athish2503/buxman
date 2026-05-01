@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -169,15 +170,17 @@ function FormBody({
       
       onSubmit(expense);
       
+      setSuccess(true);
+      await new Promise(r => setTimeout(r, 850));
+
       if (!isEdit) {
-        setSuccess(true);
-        await new Promise(r => setTimeout(r, 850));
         reset(); 
         setReceiptPreview(null); 
         setTags([]); 
-        setSuccess(false);
         onDone?.();
       }
+      
+      setSuccess(false);
       onClose?.();
     } finally {
       setIsProcessing(false);
@@ -452,7 +455,7 @@ function FormBody({
         }}
         isSubmitting={isSubmitting || isProcessing}
         success={success}
-        label={isEdit ? 'Swipe to Update' : 'Swipe to Add Expense'}
+        label={isEdit && !initialData?.receiptImage ? 'Swipe to Update' : 'Swipe to Add Expense'}
       />
     </form>
   );
@@ -483,81 +486,89 @@ export function ExpenseForm({ onSubmit, initialData, isEdit = false, onClose, tr
     return <FormBody onSubmit={onSubmit} initialData={initialData} isEdit onClose={onClose} />;
   }
 
-  const overlay = open ? createPortal(
-    <>
-      {/* Shared backdrop */}
-      <div
-        className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm animate-fade-in"
-        onClick={() => setOpen(false)}
-      />
+  const overlay = (
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-[9998] flex items-end sm:items-center justify-center">
+          {/* Shared backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setOpen(false)}
+          />
 
-      {isMobile ? (
-        /* ── Mobile: bottom sheet (only mounted on small viewports) ── */
-        <div
-          className="fixed bottom-0 left-0 right-0 z-[9999] rounded-t-3xl border-t border-border/40 animate-sheet-up"
-          style={{ background: 'hsl(var(--background))', maxHeight: '92dvh', display: 'flex', flexDirection: 'column' }}
-        >
-          {/* Drag handle */}
-          <div className="flex justify-center pt-3 pb-1 shrink-0">
-            <div className="h-1 w-10 rounded-full bg-muted-foreground/30" />
-          </div>
-          {/* Header — centered title, close on right */}
-          <div className="relative flex items-center justify-center px-5 py-3 shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
-                <Receipt className="h-3.5 w-3.5 text-white" />
-              </div>
-              <h2 className="text-sm font-bold leading-none">New Expense</h2>
-            </div>
-            <button
-              onClick={() => setOpen(false)}
-              className="absolute right-5 h-8 w-8 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground"
+          {isMobile ? (
+            /* ── Mobile: bottom sheet ── */
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative w-full z-[9999] rounded-t-3xl border-t border-border/40 overflow-hidden"
+              style={{ background: 'hsl(var(--background))', maxHeight: '92dvh', display: 'flex', flexDirection: 'column' }}
             >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          {/* Scrollable body */}
-          <div className="overflow-y-auto flex-1 px-5 pb-10" style={{ overscrollBehavior: 'contain' }}>
-            <FormBody onSubmit={onSubmit} onDone={() => setOpen(false)} />
-          </div>
-        </div>
-      ) : (
-        /* ── Desktop: centred modal (only mounted on large viewports) ── */
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-          onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}
-        >
-          <div
-            className="relative w-full max-w-xl rounded-2xl border border-border/50 shadow-2xl animate-scale-in overflow-hidden"
-            style={{ background: 'hsl(var(--background))', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border/30 shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
-                  <Sparkles className="h-4 w-4 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold leading-none">New Expense</h2>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Fill in the details below</p>
-                </div>
+              {/* Drag handle */}
+              <div className="flex justify-center pt-3 pb-1 shrink-0">
+                <div className="h-1 w-10 rounded-full bg-muted-foreground/30" />
               </div>
-              <button
-                onClick={() => setOpen(false)}
-                className="h-8 w-8 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="overflow-y-auto flex-1 px-6 py-5">
-              <FormBody onSubmit={onSubmit} onDone={() => setOpen(false)} />
-            </div>
-          </div>
+              {/* Header */}
+              <div className="relative flex items-center justify-center px-5 py-3 shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="h-7 w-7 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
+                    <Receipt className="h-3.5 w-3.5 text-white" />
+                  </div>
+                  <h2 className="text-sm font-bold leading-none">New Expense</h2>
+                </div>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="absolute right-5 h-8 w-8 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              {/* Scrollable body */}
+              <div className="overflow-y-auto flex-1 px-5 pb-10" style={{ overscrollBehavior: 'contain' }}>
+                <FormBody onSubmit={onSubmit} onDone={() => setOpen(false)} />
+              </div>
+            </motion.div>
+          ) : (
+            /* ── Desktop: centred modal ── */
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-xl z-[9999] rounded-2xl border border-border/50 shadow-2xl overflow-hidden"
+              style={{ background: 'hsl(var(--background))', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border/30 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
+                    <Sparkles className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold leading-none">New Expense</h2>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Fill in the details below</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="h-8 w-8 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="overflow-y-auto flex-1 px-6 py-5">
+                <FormBody onSubmit={onSubmit} onDone={() => setOpen(false)} />
+              </div>
+            </motion.div>
+          )}
         </div>
       )}
-    </>,
-    document.body
-  ) : null;
+    </AnimatePresence>
+  );
 
   return (
     <>
@@ -575,7 +586,7 @@ export function ExpenseForm({ onSubmit, initialData, isEdit = false, onClose, tr
         )}
       </div>
 
-      {overlay}
+      {createPortal(overlay, document.body)}
     </>
   );
 }

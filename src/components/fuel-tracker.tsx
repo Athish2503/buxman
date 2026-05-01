@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { Fuel, Car, Bike, Plus, Trash2, ArrowRight, IndianRupee, MapPin, GaugeCircle, TrendingUp, Settings } from 'lucide-react';
 import { FuelLog, VehicleRate } from '@/types/modules';
@@ -85,7 +86,12 @@ export function VehicleTracker() {
 
   if (mode === 'vehicles') {
     return (
-      <div className="space-y-4 animate-fade-in">
+      <motion.div 
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+        className="space-y-4"
+      >
         <div className="flex items-center gap-3 mb-4">
           <button onClick={() => setMode('dashboard')} className="h-8 w-8 rounded-xl bg-muted/50 flex items-center justify-center">
             <ArrowRight className="h-4 w-4 rotate-180" />
@@ -145,15 +151,17 @@ export function VehicleTracker() {
             Save to Garage
           </button>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
-
-
   // DASHBOARD MODE
   return (
-    <div className="space-y-6 animate-fade-in pb-24">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="space-y-6 pb-24"
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -200,7 +208,11 @@ export function VehicleTracker() {
       {stats ? (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-card to-muted/20 p-4 shadow-sm relative overflow-hidden group">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="rounded-2xl border border-border/60 bg-gradient-to-br from-card to-muted/20 p-4 shadow-sm relative overflow-hidden group"
+            >
               <div className="absolute -right-2 -top-2 opacity-5 group-hover:opacity-10 transition-opacity">
                 <TrendingUp className="h-16 w-16" />
               </div>
@@ -211,9 +223,14 @@ export function VehicleTracker() {
                 <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Efficiency</span>
               </div>
               <p className="text-2xl font-black font-mono tracking-tight text-foreground">{stats.avgEconomy.toFixed(1)} <span className="text-sm font-semibold text-muted-foreground">km/l</span></p>
-            </div>
+            </motion.div>
             
-            <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-card to-muted/20 p-4 shadow-sm relative overflow-hidden group">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="rounded-2xl border border-border/60 bg-gradient-to-br from-card to-muted/20 p-4 shadow-sm relative overflow-hidden group"
+            >
               <div className="absolute -right-2 -top-2 opacity-5 group-hover:opacity-10 transition-opacity">
                 <IndianRupee className="h-16 w-16" />
               </div>
@@ -224,7 +241,7 @@ export function VehicleTracker() {
                 <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cost / KM</span>
               </div>
               <p className="text-2xl font-black font-mono tracking-tight text-foreground">₹{stats.costPerKm.toFixed(2)}</p>
-            </div>
+            </motion.div>
           </div>
 
           {/* Economy Chart */}
@@ -287,56 +304,70 @@ export function VehicleTracker() {
       <div className="space-y-3">
         <h3 className="text-sm font-bold px-1">Recent Fill-ups</h3>
         
-        {activeLogs.length === 0 ? (
-          <div className="text-center py-12 border border-dashed border-border/40 rounded-2xl bg-card/20">
-            <Fuel className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-sm font-semibold text-muted-foreground">No fuel records</p>
-            <p className="text-xs text-muted-foreground mt-1 max-w-[200px] mx-auto">Add your first fill-up to start tracking efficiency.</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {activeLogs.map((log) => (
-              <div key={log.id} className="p-3.5 rounded-xl border border-border/40 bg-card flex flex-col gap-3 shadow-sm relative overflow-hidden">
-                {!log.isFullTank && (
-                  <div className="absolute top-0 right-0 w-16 h-16 overflow-hidden pointer-events-none">
-                    <div className="absolute top-2 -right-6 w-24 bg-muted/50 text-[8px] font-bold text-center py-0.5 rotate-45 text-muted-foreground">PARTIAL</div>
-                  </div>
-                )}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <p className="font-bold font-mono text-lg tracking-tight">{log.odometer.toLocaleString()} <span className="text-xs font-medium text-muted-foreground">km</span></p>
+        <AnimatePresence mode="popLayout">
+          {activeLogs.length === 0 ? (
+            <motion.div 
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="text-center py-12 border border-dashed border-border/40 rounded-2xl bg-card/20"
+            >
+              <Fuel className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-sm font-semibold text-muted-foreground">No fuel records</p>
+              <p className="text-xs text-muted-foreground mt-1 max-w-[200px] mx-auto">Add your first fill-up to start tracking efficiency.</p>
+            </motion.div>
+          ) : (
+            <div className="space-y-2">
+              {activeLogs.map((log, i) => (
+                <motion.div 
+                  key={log.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="p-3.5 rounded-xl border border-border/40 bg-card flex flex-col gap-3 shadow-sm relative overflow-hidden"
+                >
+                  {!log.isFullTank && (
+                    <div className="absolute top-0 right-0 w-16 h-16 overflow-hidden pointer-events-none">
+                      <div className="absolute top-2 -right-6 w-24 bg-muted/50 text-[8px] font-bold text-center py-0.5 rotate-45 text-muted-foreground">PARTIAL</div>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(log.date), 'dd MMM yyyy')} · {log.liters}L @ ₹{log.pricePerLiter}
-                    </p>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <p className="font-bold font-mono text-lg tracking-tight">{log.odometer.toLocaleString()} <span className="text-xs font-medium text-muted-foreground">km</span></p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(log.date), 'dd MMM yyyy')} · {log.liters}L @ ₹{log.pricePerLiter}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-lg text-primary">{formatCurrency(log.totalCost)}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-lg text-primary">{formatCurrency(log.totalCost)}</p>
-                  </div>
-                </div>
 
-                <div className="flex items-center justify-between border-t border-border/30 pt-3 mt-1">
-                  <div className="flex items-center gap-3">
-                    {log.economy ? (
-                      <span className="text-xs font-bold px-2.5 py-1 bg-success/15 text-success rounded-lg border border-success/20">
-                        {log.economy.toFixed(1)} km/l
-                      </span>
-                    ) : (
-                      <span className="text-xs font-semibold text-muted-foreground px-2 py-1 bg-muted/30 rounded-lg">
-                        {log.distanceSinceLast ? `+${log.distanceSinceLast} km` : 'First Log'}
-                      </span>
-                    )}
+                  <div className="flex items-center justify-between border-t border-border/30 pt-3 mt-1">
+                    <div className="flex items-center gap-3">
+                      {log.economy ? (
+                        <span className="text-xs font-bold px-2.5 py-1 bg-success/15 text-success rounded-lg border border-success/20">
+                          {log.economy.toFixed(1)} km/l
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold text-muted-foreground px-2 py-1 bg-muted/30 rounded-lg">
+                          {log.distanceSinceLast ? `+${log.distanceSinceLast} km` : 'First Log'}
+                        </span>
+                      )}
+                    </div>
+                    <button onClick={() => handleDelete(log.id)} className="h-7 w-7 text-muted-foreground hover:text-destructive flex items-center justify-center transition-colors">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
-                  <button onClick={() => handleDelete(log.id)} className="h-7 w-7 text-muted-foreground hover:text-destructive flex items-center justify-center transition-colors">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </AnimatePresence>
       </div>
-    </div>
+    </motion.div>
   );
 }

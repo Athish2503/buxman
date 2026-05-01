@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { X, Fuel, GaugeCircle, IndianRupee, CalendarDays, Car, Bike, Check } from 'lucide-react';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -79,45 +80,65 @@ export function VehicleLogForm({ onSuccess, trigger }: VehicleLogFormProps) {
     }, 1500);
   };
 
-  const overlay = open ? createPortal(
-    <>
-      <div className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setOpen(false)} />
-      
-      {isMobile ? (
-        <div className="fixed bottom-0 left-0 right-0 z-[9999] rounded-t-3xl border-t border-border/40 animate-sheet-up" style={{ background: 'hsl(var(--background))', maxHeight: '92dvh', display: 'flex', flexDirection: 'column' }}>
-          <div className="flex justify-center pt-3 pb-1 shrink-0"><div className="h-1 w-10 rounded-full bg-muted-foreground/30" /></div>
-          <div className="relative flex items-center justify-center px-5 py-3 shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
-                <Fuel className="h-3.5 w-3.5 text-white" />
+  const overlay = (
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-[9998] flex items-end sm:items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setOpen(false)}
+          />
+          
+          {isMobile ? (
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative w-full z-[9999] rounded-t-3xl border-t border-border/40 overflow-hidden"
+              style={{ background: 'hsl(var(--background))', maxHeight: '92dvh', display: 'flex', flexDirection: 'column' }}
+            >
+              <div className="flex justify-center pt-3 pb-1 shrink-0"><div className="h-1 w-10 rounded-full bg-muted-foreground/30" /></div>
+              <div className="relative flex items-center justify-center px-5 py-3 shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="h-7 w-7 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
+                    <Fuel className="h-3.5 w-3.5 text-white" />
+                  </div>
+                  <h2 className="text-sm font-bold">Log Fuel</h2>
+                </div>
+                <button onClick={() => setOpen(false)} className="absolute right-5 h-8 w-8 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground"><X className="h-4 w-4" /></button>
               </div>
-              <h2 className="text-sm font-bold">Log Fuel</h2>
-            </div>
-            <button onClick={() => setOpen(false)} className="absolute right-5 h-8 w-8 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground"><X className="h-4 w-4" /></button>
-          </div>
-          <div className="overflow-y-auto flex-1 px-5 pb-10 space-y-6 pt-4">
-             {renderForm()}
-          </div>
-        </div>
-      ) : (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}>
-          <div className="relative w-full max-w-lg rounded-2xl border border-border/50 shadow-2xl animate-scale-in overflow-hidden" style={{ background: 'hsl(var(--background))' }}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border/30">
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow"><Fuel className="h-4 w-4 text-white" /></div>
-                <h2 className="font-bold">Log Fuel Fill-up</h2>
+              <div className="overflow-y-auto flex-1 px-5 pb-10 space-y-6 pt-4">
+                 {renderForm()}
               </div>
-              <button onClick={() => setOpen(false)} className="h-8 w-8 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
-            </div>
-            <div className="p-6 space-y-6">
-              {renderForm()}
-            </div>
-          </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg z-[9999] rounded-2xl border border-border/50 shadow-2xl overflow-hidden"
+              style={{ background: 'hsl(var(--background))' }}
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border/30">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow"><Fuel className="h-4 w-4 text-white" /></div>
+                  <h2 className="font-bold">Log Fuel Fill-up</h2>
+                </div>
+                <button onClick={() => setOpen(false)} className="h-8 w-8 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="p-6 space-y-6">
+                {renderForm()}
+              </div>
+            </motion.div>
+          )}
         </div>
       )}
-    </>,
-    document.body
-  ) : null;
+    </AnimatePresence>
+  );
 
   function renderForm() {
     return (

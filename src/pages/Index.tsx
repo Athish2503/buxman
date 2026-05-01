@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Receipt, BarChart3, Settings,
   Wallet, TrendingUp, Clock, CheckCircle2, Moon, Sun,
@@ -211,6 +212,14 @@ const Index = () => {
         <div className="sm:ml-60">
           {/* Scrollable content */}
           <main className="px-4 sm:px-8 py-6 sm:py-10 pb-32 sm:pb-12 max-w-5xl mx-auto min-h-screen">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
             
             {/* Section Header (Integrated into content) */}
             <div className="mb-8 animate-fade-in">
@@ -510,10 +519,10 @@ const Index = () => {
 
             {/* ── SETTINGS TAB ── */}
             {activeTab === 'settings' && (
-              <div className="animate-fade-in">
                 <SettingsPage theme={theme} onThemeToggle={toggleTheme} />
-              </div>
-            )}
+              )}
+            </motion.div>
+            </AnimatePresence>
           </main>
 
           {/* Footer (desktop only) */}

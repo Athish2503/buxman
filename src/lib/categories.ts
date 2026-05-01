@@ -9,6 +9,7 @@ import {
   GraduationCap,
   Home,
   Heart,
+  Shirt,
   MoreHorizontal
 } from 'lucide-react';
 import { ExpenseCategory } from '@/types/expense';
@@ -111,6 +112,15 @@ export const categoryConfig: Record<ExpenseCategory, {
     gradientFrom: '#facc15',
     gradientTo: '#eab308',
     description: 'Home office, utilities'
+  },
+  clothing: {
+    label: 'Clothing',
+    icon: Shirt,
+    color: 'text-violet-400',
+    bgColor: 'bg-violet-500/15',
+    gradientFrom: '#8b5cf6',
+    gradientTo: '#d946ef',
+    description: 'Work attire, laundry'
   },
   other: {
     label: 'Other',

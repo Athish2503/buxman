@@ -144,6 +144,7 @@ export function VoiceInput({ onParse }: VoiceInputProps) {
       healthcare: ['doctor', 'medicine', 'hospital', 'clinic', 'pharmacy', 'health', 'medical', 'test', 'apollo', 'pharmeasy', 'dental', 'vision', 'physio'],
       entertainment: ['movie', 'pvr', 'theatre', 'netflix', 'hotstar', 'gaming', 'club', 'party', 'concert', 'event', 'booking', 'show', 'prime video', 'spotify'],
       home: ['electricity', 'water', 'gas bill', 'maintenance', 'plumber', 'electrician', 'cleaning', 'urban company', 'furniture', 'appliance', 'utility'],
+      clothing: ['shirt', 'pants', 'dress', 'clothes', 'fashion', 'zara', 'h&m', 'shopping', 'shoes', 'boots', 'jacket', 'nike', 'adidas', 'uniqlo', 'levis'],
     };
 
     for (const [cat, keywords] of Object.entries(catMappings)) {
