@@ -20,6 +20,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Checkbox } from '@/components/ui/checkbox';
 
 import { Expense, ExpenseStatus, ExpenseSummary } from '@/types/expense';
 import { getCategoryConfig, categoryConfig } from '@/lib/categories';
@@ -62,6 +63,9 @@ export function ExpenseList({
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filterOpen, setFilterOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => 
+    typeof window !== 'undefined' && window.innerWidth < 640 ? 'cards' : 'table'
+  );
 
   const filteredExpenses = useMemo(() => {
     let list = expenses.filter(e => {
@@ -121,14 +125,32 @@ export function ExpenseList({
 
   const handleExportPDF = () => {
     const settings = settingsService.get();
-    generateExpensesPDF(filteredExpenses, summary, {
+    const dataToExport = selected.size > 0 
+      ? filteredExpenses.filter(e => selected.has(e.id))
+      : filteredExpenses;
+    
+    const exportSummary = selected.size > 0 ? {
+      total: dataToExport.reduce((s, e) => s + e.amount, 0),
+      pending: dataToExport.filter(e => e.status === 'pending').reduce((s, e) => s + e.amount, 0),
+      approved: dataToExport.filter(e => e.status === 'approved').reduce((s, e) => s + e.amount, 0),
+      reimbursed: dataToExport.filter(e => e.status === 'reimbursed').reduce((s, e) => s + e.amount, 0),
+      rejected: dataToExport.filter(e => e.status === 'rejected').reduce((s, e) => s + e.amount, 0),
+      count: dataToExport.length,
+    } : summary;
+
+    generateExpensesPDF(dataToExport, exportSummary, {
       title: 'Expense Reimbursement Invoice',
       billedTo: settings.billedTo,
       billedFrom: settings.billedFrom,
     });
   };
 
-  const handleExportCSV = () => exportCSV(filteredExpenses);
+  const handleExportCSV = () => {
+    const dataToExport = selected.size > 0 
+      ? filteredExpenses.filter(e => selected.has(e.id))
+      : filteredExpenses;
+    exportCSV(dataToExport);
+  };
 
   const activeFilters = [filterCategory !== 'all', filterStatus !== 'all'].filter(Boolean).length;
 
@@ -254,6 +276,15 @@ export function ExpenseList({
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+
+            <div className="flex-1" />
+
+            <Button size="sm" variant="outline" className="h-7 text-xs border-primary/30 text-primary" onClick={handleExportPDF}>
+              <FileText className="h-3 w-3 mr-1" /> PDF
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs border-success/30 text-success" onClick={handleExportCSV}>
+              <FileSpreadsheet className="h-3 w-3 mr-1" /> CSV
+            </Button>
           </div>
           <Button size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0" onClick={clearSelection}>
             <X className="h-4 w-4" />
@@ -276,6 +307,26 @@ export function ExpenseList({
               <X className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
             </button>
           )}
+        </div>
+
+        {/* View Toggle */}
+        <div className="flex bg-muted/40 p-1 rounded-xl border border-border/40">
+          <button 
+            onClick={() => { setViewMode('cards'); haptics.light(); }}
+            className={cn("h-8 px-2.5 rounded-lg transition-all flex items-center gap-1.5 text-xs font-semibold", 
+              viewMode === 'cards' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}
+          >
+            <MoreVertical className="h-3.5 w-3.5 rotate-90 sm:rotate-0" />
+            <span className="hidden xs:inline">Cards</span>
+          </button>
+          <button 
+            onClick={() => { setViewMode('table'); haptics.light(); }}
+            className={cn("h-8 px-2.5 rounded-lg transition-all flex items-center gap-1.5 text-xs font-semibold", 
+              viewMode === 'table' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}
+          >
+            <ArrowUpDown className="h-3.5 w-3.5" />
+            <span className="hidden xs:inline">Table</span>
+          </button>
         </div>
 
         {/* Mobile: sheet filter */}
@@ -359,132 +410,174 @@ export function ExpenseList({
         )}
       </div>
 
-      {/* Expense cards */}
-      <div className="space-y-2 stagger-children">
-        {filteredExpenses.map(expense => {
-          const cfg = getCategoryConfig(expense.category);
-          const Icon = cfg.icon;
-          const isSelected = selected.has(expense.id);
+      {/* Expense view container */}
+      <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+        {viewMode === 'cards' ? (
+          <div className="space-y-2 stagger-children">
+            {filteredExpenses.map(expense => {
+              const cfg = getCategoryConfig(expense.category);
+              const Icon = cfg.icon;
+              const isSelected = selected.has(expense.id);
 
-          return (
-            <div
-              key={expense.id}
-              className={cn(
-                "group relative rounded-xl border transition-all duration-200 animate-fade-in-up",
-                isSelected
-                  ? "border-primary/50 bg-primary/5"
-                  : "border-border/60 bg-card/80 hover:border-border hover:bg-card"
-              )}
-            >
-              {/* Selection tap area (left) */}
-              <div
-                className="absolute left-0 top-0 bottom-0 w-12 flex items-center justify-center cursor-pointer z-10"
-                onClick={() => toggleSelect(expense.id)}
-              >
-                <div className={cn(
-                  "h-4 w-4 rounded border-2 flex items-center justify-center transition-all",
-                  isSelected ? "border-primary bg-primary" : "border-border/60 opacity-0 group-hover:opacity-100"
-                )}>
-                  {isSelected && <div className="h-2 w-2 rounded-sm bg-white" />}
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-3 pl-12">
-                {/* Category icon */}
-                <div className={cn(
-                  "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105",
-                  cfg.bgColor
-                )}>
-                  <Icon className={cn("h-5 w-5", cfg.color)} />
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-sm leading-tight truncate">{expense.vendor}</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {cfg.label} · {format(new Date(expense.date), 'dd MMM yyyy')}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="font-bold text-sm font-mono">{formatCurrency(expense.amount)}</p>
-                      <Badge className={cn("mt-1 text-[10px] py-0 px-1.5 h-4 rounded-full capitalize font-medium", STATUS_COLORS[expense.status])}>
-                        {expense.status}
-                      </Badge>
+              return (
+                <div
+                  key={expense.id}
+                  className={cn(
+                    "group relative rounded-xl border transition-all duration-200",
+                    isSelected
+                      ? "border-primary/50 bg-primary/5"
+                      : "border-border/60 bg-card/80 hover:border-border hover:bg-card"
+                  )}
+                >
+                  {/* Selection tap area (left) */}
+                  <div
+                    className="absolute left-0 top-0 bottom-0 w-12 flex items-center justify-center cursor-pointer z-10"
+                    onClick={() => toggleSelect(expense.id)}
+                  >
+                    <div className={cn(
+                      "h-4 w-4 rounded border-2 flex items-center justify-center transition-all",
+                      isSelected ? "border-primary bg-primary" : "border-border/60 opacity-40 group-hover:opacity-100"
+                    )}>
+                      {isSelected && <CheckSquare className="h-3 w-3 text-white" />}
                     </div>
                   </div>
 
-                  {/* Description */}
-                  {expense.description && (
-                    <p className="text-xs text-muted-foreground mt-1.5 line-clamp-1">{expense.description}</p>
-                  )}
-
-                  {/* Tags + Project */}
-                  {((expense.tags && expense.tags.length > 0) || expense.projectCode) && (
-                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                      {expense.projectCode && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary/15 text-secondary font-mono font-medium">
-                          {expense.projectCode}
-                        </span>
-                      )}
-                      {(expense.tags || []).slice(0, 2).map(tag => (
-                        <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground flex items-center gap-0.5">
-                          <Tag className="h-2 w-2" />{tag}
-                        </span>
-                      ))}
-                      {(expense.tags || []).length > 2 && (
-                        <span className="text-[10px] text-muted-foreground">+{expense.tags!.length - 2}</span>
-                      )}
+                  <div className="flex items-start gap-3 p-3 pl-12">
+                    {/* Category icon */}
+                    <div className={cn(
+                      "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105",
+                      cfg.bgColor
+                    )}>
+                      <Icon className={cn("h-5 w-5", cfg.color)} />
                     </div>
-                  )}
 
-                  {/* Actions — always visible on mobile, hover on desktop */}
-                  <div className="flex items-center gap-0.5 mt-2 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs rounded-lg"
-                      onClick={() => setSelectedExpense(expense)}
-                    >
-                      <Eye className="h-3.5 w-3.5 sm:mr-1" />
-                      <span className="hidden sm:inline">View</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs rounded-lg"
-                      onClick={() => setEditingExpense(expense)}
-                    >
-                      <Edit className="h-3.5 w-3.5 sm:mr-1" />
-                      <span className="hidden sm:inline">Edit</span>
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-destructive hover:text-destructive rounded-lg">
-                          <Trash2 className="h-3.5 w-3.5 sm:mr-1" />
-                          <span className="hidden sm:inline">Delete</span>
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h3 className="font-semibold text-sm leading-tight truncate">{expense.vendor}</h3>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {cfg.label} · {format(new Date(expense.date), 'dd MMM yyyy')}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-bold text-sm font-mono">{formatCurrency(expense.amount)}</p>
+                          <Badge className={cn("mt-1 text-[10px] py-0 px-1.5 h-4 rounded-full capitalize font-medium", STATUS_COLORS[expense.status])}>
+                            {expense.status}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {/* Description */}
+                      {expense.description && (
+                        <p className="text-xs text-muted-foreground mt-1.5 line-clamp-1 italic">"{expense.description}"</p>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-0.5 mt-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] rounded-lg" onClick={() => setSelectedExpense(expense)}>
+                          <Eye className="h-3 w-3 mr-1" /> View
                         </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="glass border-border/50 max-w-sm mx-4">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete expense?</AlertDialogTitle>
-                          <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction className="bg-destructive" onClick={() => onDeleteExpense(expense.id)}>
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] rounded-lg" onClick={() => setEditingExpense(expense)}>
+                          <Edit className="h-3 w-3 mr-1" /> Edit
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* Table View optimized for mobile */
+          <div className="rounded-xl border border-border/60 bg-card/40 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-muted/30 border-b border-border/50">
+                    <th className="p-3 w-10">
+                      <Checkbox 
+                        checked={selected.size === filteredExpenses.length && filteredExpenses.length > 0} 
+                        onCheckedChange={toggleSelectAll}
+                        className="rounded border-border/50"
+                      />
+                    </th>
+                    <th className="p-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Vendor & Date</th>
+                    <th className="p-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right">Amount</th>
+                    <th className="p-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Status</th>
+                    <th className="p-3 w-10"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/20">
+                  {filteredExpenses.map(expense => {
+                    const cfg = getCategoryConfig(expense.category);
+                    const isSelected = selected.has(expense.id);
+                    return (
+                      <tr 
+                        key={expense.id} 
+                        className={cn(
+                          "hover:bg-muted/20 transition-colors",
+                          isSelected ? "bg-primary/5" : ""
+                        )}
+                        onClick={() => toggleSelect(expense.id)}
+                      >
+                        <td className="p-3" onClick={e => e.stopPropagation()}>
+                          <Checkbox 
+                            checked={isSelected} 
+                            onCheckedChange={() => toggleSelect(expense.id)}
+                            className="rounded border-border/50"
+                          />
+                        </td>
+                        <td className="p-3">
+                          <p className="text-xs font-bold truncate max-w-[120px]">{expense.vendor}</p>
+                          <p className="text-[10px] text-muted-foreground">{format(new Date(expense.date), 'dd/MM/yy')}</p>
+                        </td>
+                        <td className="p-3 text-right">
+                          <p className="text-xs font-mono font-bold">{formatCurrency(expense.amount)}</p>
+                          <p className="text-[9px] text-muted-foreground">{cfg.label.split(' ')[0]}</p>
+                        </td>
+                        <td className="p-3">
+                          <div className={cn("h-1.5 w-1.5 rounded-full", 
+                            expense.status === 'approved' ? "bg-emerald-500" : 
+                            expense.status === 'pending' ? "bg-amber-500" : 
+                            expense.status === 'reimbursed' ? "bg-violet-500" : "bg-rose-500"
+                          )} />
+                        </td>
+                        <td className="p-3 text-right" onClick={e => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
+                                <MoreVertical className="h-3.5 w-3.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="glass">
+                              <DropdownMenuItem onClick={() => setSelectedExpense(expense)}><Eye className="h-3 w-3 mr-2" /> View</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setEditingExpense(expense)}><Edit className="h-3 w-3 mr-2" /> Edit</DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                className="text-destructive"
+                                onClick={() => onDeleteExpense(expense.id)}
+                              >
+                                <Trash2 className="h-3 w-3 mr-2" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="bg-muted/20">
+                  <tr>
+                    <td colSpan={2} className="p-3 text-xs font-bold">Total ({filteredExpenses.length})</td>
+                    <td className="p-3 text-right text-xs font-bold text-primary">{formatCurrency(summary.total)}</td>
+                    <td colSpan={2}></td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
-          );
-        })}
+          </div>
+        )}
 
         {filteredExpenses.length === 0 && (
           <div className="text-center py-16 animate-fade-in">

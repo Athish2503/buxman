@@ -10,6 +10,7 @@ export type ExpenseCategory =
   | 'communication'
   | 'training'
   | 'healthcare'
+  | 'home'
   | 'other';
 
 export interface Expense {

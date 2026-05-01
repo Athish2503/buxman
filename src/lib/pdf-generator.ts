@@ -1,4 +1,7 @@
 import jsPDF from 'jspdf';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 import { Expense, ExpenseSummary } from '@/types/expense';
 import { getCategoryConfig } from '@/lib/categories';
 import { format } from 'date-fns';
@@ -335,5 +338,30 @@ export const generateExpensesPDF = async (
     pdf.text(format(new Date(), "dd MMM yyyy 'at' HH:mm"), W - M, H - 6, { align: 'right' });
   }
 
-  pdf.save(`reimbursement-invoice-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+  const fileName = `reimbursement-invoice-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+
+  if (Capacitor.isNativePlatform()) {
+    const data = pdf.output('datauristring').split(',')[1];
+    const path = `Documents/${fileName}`;
+    
+    try {
+      const result = await Filesystem.writeFile({
+        path,
+        data,
+        directory: Directory.Cache,
+      });
+
+      await Share.share({
+        title: 'Expense Reimbursement Invoice',
+        text: 'Here is your expense reimbursement invoice.',
+        url: result.uri,
+        dialogTitle: 'Share Invoice',
+      });
+    } catch (e) {
+      console.error('Failed to save or share PDF:', e);
+      pdf.save(fileName);
+    }
+  } else {
+    pdf.save(fileName);
+  }
 };

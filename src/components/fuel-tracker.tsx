@@ -1,57 +1,27 @@
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Fuel, Car, Bike, Plus, Trash2, ArrowRight, IndianRupee, MapPin, GaugeCircle, TrendingUp } from 'lucide-react';
+import { Fuel, Car, Bike, Plus, Trash2, ArrowRight, IndianRupee, MapPin, GaugeCircle, TrendingUp, Settings } from 'lucide-react';
 import { FuelLog, VehicleRate } from '@/types/modules';
-import { mileageService, fuelService } from '@/lib/modules-storage';
+import { fuelService, mileageService } from '@/lib/modules-storage';
 import { haptics } from '@/lib/haptics';
 import { formatCurrency, cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { 
+  LineChart, Line, XAxis, YAxis, CartesianGrid, 
+  Tooltip, ResponsiveContainer, AreaChart, Area 
+} from 'recharts';
+import { VehicleLogForm } from './vehicle-log-form';
 
-export function FuelTracker() {
+export function VehicleTracker() {
   const [vehicles, setVehicles] = useState<VehicleRate[]>(() => mileageService.getVehicles());
   const [logs, setLogs] = useState<FuelLog[]>(() => fuelService.getLogs());
-  const [mode, setMode] = useState<'dashboard' | 'add'>('dashboard');
+  const [mode, setMode] = useState<'dashboard' | 'add' | 'vehicles'>('dashboard');
   
   const [activeVehId, setActiveVehId] = useState<string>(vehicles[0]?.id || '');
-
-  // Add Log State
-  const [odometer, setOdometer] = useState('');
-  const [liters, setLiters] = useState('');
-  const [price, setPrice] = useState('');
-  const [isFullTank, setIsFullTank] = useState(true);
-  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   const reload = () => {
     setVehicles(mileageService.getVehicles());
     setLogs(fuelService.getLogs());
-  };
-
-  const handleSaveFillup = () => {
-    if (!odometer || !liters || !price) { toast.error('Fill in all fields'); return; }
-    
-    const odoNum = Number(odometer);
-    const litNum = Number(liters);
-    const priceNum = Number(price);
-
-    const log: FuelLog = {
-      id: crypto.randomUUID(),
-      vehicleId: activeVehId,
-      date,
-      odometer: odoNum,
-      liters: litNum,
-      pricePerLiter: priceNum,
-      totalCost: litNum * priceNum,
-      isFullTank,
-      createdAt: new Date().toISOString()
-    };
-
-    fuelService.addLog(log);
-    haptics.success();
-    toast.success('Fill-up logged!');
-    setMode('dashboard');
-    setOdometer('');
-    setLiters('');
-    reload();
   };
 
   const handleDelete = (id: string) => {
@@ -66,7 +36,6 @@ export function FuelTracker() {
   const stats = useMemo(() => {
     if (activeLogs.length < 2) return null;
     
-    // Only count logs where we could calculate economy
     const economyLogs = activeLogs.filter(l => l.economy);
     const avgEconomy = economyLogs.length ? economyLogs.reduce((s, l) => s + l.economy!, 0) / economyLogs.length : 0;
     
@@ -74,114 +43,136 @@ export function FuelTracker() {
     const totalDist = activeLogs.reduce((s, l) => s + (l.distanceSinceLast || 0), 0);
     const costPerKm = totalDist > 0 ? totalSpent / totalDist : 0;
 
-    return { avgEconomy, totalSpent, totalDist, costPerKm };
+    const chartData = activeLogs
+      .filter(l => l.economy)
+      .slice(0, 10)
+      .reverse()
+      .map(l => ({
+        date: format(new Date(l.date), 'dd MMM'),
+        economy: Number(l.economy?.toFixed(1))
+      }));
+
+    return { avgEconomy, totalSpent, totalDist, costPerKm, chartData };
   }, [activeLogs]);
 
-  if (mode === 'add') {
-    const v = vehicles.find(v => v.id === activeVehId);
+  // Vehicle Management State
+  const [newVehName, setNewVehName] = useState('');
+  const [newVehRate, setNewVehRate] = useState('');
+  const [newVehIcon, setNewVehIcon] = useState<'car' | 'bike'>('car');
+  const [newPrice, setNewPrice] = useState('');
+
+  const handleSaveVehicle = () => {
+    if (!newVehName) return;
+    const v: VehicleRate = { 
+      id: crypto.randomUUID(), 
+      name: newVehName, 
+      ratePerKm: Number(newVehRate) || 0, 
+      icon: newVehIcon,
+      defaultFuelPrice: Number(newPrice) || 0,
+    };
+    mileageService.saveVehicles([...vehicles, v]);
+    setNewVehName(''); setNewVehRate(''); setNewPrice('');
+    haptics.success();
+    reload();
+    toast.success('Vehicle added');
+  };
+
+  const handleDeleteVehicle = (id: string) => {
+    mileageService.saveVehicles(vehicles.filter(v => v.id !== id));
+    haptics.heavy();
+    reload();
+  };
+
+  if (mode === 'vehicles') {
     return (
-      <div className="space-y-5 animate-fade-in pb-20">
-        <div className="flex items-center gap-3">
+      <div className="space-y-4 animate-fade-in">
+        <div className="flex items-center gap-3 mb-4">
           <button onClick={() => setMode('dashboard')} className="h-8 w-8 rounded-xl bg-muted/50 flex items-center justify-center">
             <ArrowRight className="h-4 w-4 rotate-180" />
           </button>
-          <h2 className="font-bold text-lg">Log Fuel</h2>
+          <h2 className="font-bold text-lg">My Garage</h2>
         </div>
 
-        <div className="rounded-2xl border border-border/60 bg-card/80 p-4 space-y-4 shadow-sm">
-          <div className="flex items-center gap-3 pb-3 border-b border-border/40">
-            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-              {v?.icon === 'car' ? <Car className="h-5 w-5" /> : <Bike className="h-5 w-5" />}
-            </div>
-            <div>
-              <p className="font-bold">{v?.name}</p>
-              <p className="text-xs text-muted-foreground">New fill-up record</p>
-            </div>
-          </div>
-
-          <div className="space-y-4 pt-2">
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5 flex items-center gap-1.5">
-                <GaugeCircle className="h-3 w-3" /> Current Odometer
-              </label>
-              <input 
-                type="number" value={odometer} onChange={e => setOdometer(e.target.value)} placeholder="e.g. 45200"
-                className="w-full h-12 px-4 rounded-xl bg-muted/30 border border-border/40 text-lg font-mono placeholder:text-muted-foreground/30 focus:border-primary/50"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5 flex items-center gap-1.5">
-                  <Fuel className="h-3 w-3" /> Liters Filled
-                </label>
-                <input 
-                  type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="0.0"
-                  className="w-full h-12 px-4 rounded-xl bg-muted/30 border border-border/40 text-lg font-mono focus:border-primary/50"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Price / Liter</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
-                  <input 
-                    type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="105.50"
-                    className="w-full h-12 pl-7 pr-4 rounded-xl bg-muted/30 border border-border/40 text-lg font-mono focus:border-primary/50"
-                  />
+        <div className="space-y-2">
+          {vehicles.map(v => (
+            <div key={v.id} className="flex items-center justify-between p-4 rounded-2xl border border-border/40 bg-card/60 glass">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+                  {v.icon === 'car' ? <Car className="h-5 w-5" /> : <Bike className="h-5 w-5" />}
+                </div>
+                <div>
+                  <p className="font-bold text-sm">{v.name}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Personal Vehicle</p>
                 </div>
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Date</label>
-                <input 
-                  type="date" value={date} onChange={e => setDate(e.target.value)}
-                  className="w-full h-12 px-3 rounded-xl bg-muted/30 border border-border/40 text-sm focus:border-primary/50"
-                />
-              </div>
-              <div className="flex flex-col justify-end">
-                <button
-                  onClick={() => setIsFullTank(!isFullTank)}
-                  className={cn(
-                    "w-full h-12 rounded-xl border text-sm font-bold transition-all",
-                    isFullTank ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-muted/30 border-border/40 text-muted-foreground'
-                  )}
-                >
-                  {isFullTank ? '✓ Full Tank' : 'Partial Tank'}
-                </button>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-border/40 mt-2">
-              <div className="flex justify-between items-center mb-4 px-1">
-                <span className="text-sm font-semibold text-foreground/80">Total Cost</span>
-                <span className="text-2xl font-bold font-mono text-primary">
-                  {formatCurrency(Number(liters || 0) * Number(price || 0))}
-                </span>
-              </div>
-              <button onClick={handleSaveFillup} className="w-full h-12 rounded-xl bg-gradient-primary text-white font-bold text-base shadow-glow flex items-center justify-center gap-2">
-                <Fuel className="h-5 w-5" /> Save Record
+              <button onClick={() => handleDeleteVehicle(v.id)} className="h-8 w-8 text-destructive flex items-center justify-center hover:bg-destructive/10 rounded-lg transition-colors">
+                <Trash2 className="h-4 w-4" />
               </button>
             </div>
+          ))}
+        </div>
+
+        <div className="p-5 rounded-2xl border border-border/40 bg-card/40 space-y-4 mt-6">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Add New Vehicle</p>
+          <div className="grid grid-cols-2 gap-2">
+            <input 
+              placeholder="Vehicle Name" value={newVehName} onChange={e => setNewVehName(e.target.value)}
+              className="h-12 px-4 rounded-xl bg-muted/30 border border-border/40 text-sm focus:border-primary/40"
+            />
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+              <input 
+                type="number" placeholder="Fuel Price" value={newPrice} onChange={e => setNewPrice(e.target.value)}
+                className="h-12 pl-7 pr-3 rounded-xl bg-muted/30 border border-border/40 text-sm w-full focus:border-primary/40"
+              />
+            </div>
           </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setNewVehIcon('car')}
+              className={cn("flex-1 h-12 rounded-xl border flex items-center justify-center gap-2 text-sm font-bold transition-all", newVehIcon === 'car' ? 'border-primary text-primary bg-primary/10 shadow-sm' : 'border-border/40 text-muted-foreground bg-muted/10')}
+            >
+              <Car className="h-4 w-4" /> Car
+            </button>
+            <button 
+              onClick={() => setNewVehIcon('bike')}
+              className={cn("flex-1 h-12 rounded-xl border flex items-center justify-center gap-2 text-sm font-bold transition-all", newVehIcon === 'bike' ? 'border-primary text-primary bg-primary/10 shadow-sm' : 'border-border/40 text-muted-foreground bg-muted/10')}
+            >
+              <Bike className="h-4 w-4" /> Bike
+            </button>
+          </div>
+          <button onClick={handleSaveVehicle} className="w-full h-12 rounded-xl bg-gradient-primary text-white text-sm font-bold mt-2 shadow-glow active:scale-95 transition-all">
+            Save to Garage
+          </button>
         </div>
       </div>
     );
   }
 
+
+
   // DASHBOARD MODE
   return (
-    <div className="space-y-5 animate-fade-in pb-24">
+    <div className="space-y-6 animate-fade-in pb-24">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-bold text-2xl tracking-tight">Vehicles</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Track mileage & fuel efficiency</p>
+          <h2 className="font-bold text-2xl tracking-tight">Car Hub</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Manage your personal vehicles</p>
         </div>
-        <button onClick={() => setMode('add')} className="h-10 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-bold flex items-center gap-2 shadow-glow active:scale-95 transition-all">
-          <Plus className="h-4 w-4" /> Fill Up
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setMode('vehicles')} className="h-10 w-10 rounded-xl bg-muted/50 border border-border/40 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+            <Settings className="h-5 w-5" />
+          </button>
+          <VehicleLogForm
+            onSuccess={reload}
+            trigger={
+              <button className="h-10 px-4 rounded-xl bg-gradient-primary text-white text-sm font-bold flex items-center gap-2 shadow-glow active:scale-95 transition-all">
+                <Fuel className="h-4 w-4" /> Log Fuel
+              </button>
+            }
+          />
+        </div>
       </div>
 
       {/* Vehicle Selector Tabs */}
@@ -207,30 +198,88 @@ export function FuelTracker() {
 
       {/* Analytics Hero */}
       {stats ? (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-card to-muted/20 p-4 shadow-sm">
-            <div className="flex items-center gap-1.5 mb-2">
-              <div className="h-6 w-6 rounded-md bg-success/20 flex items-center justify-center">
-                <TrendingUp className="h-3.5 w-3.5 text-success" />
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-card to-muted/20 p-4 shadow-sm relative overflow-hidden group">
+              <div className="absolute -right-2 -top-2 opacity-5 group-hover:opacity-10 transition-opacity">
+                <TrendingUp className="h-16 w-16" />
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Efficiency</span>
-            </div>
-            <p className="text-2xl font-black font-mono tracking-tight text-foreground">{stats.avgEconomy.toFixed(1)} <span className="text-sm font-semibold text-muted-foreground">km/l</span></p>
-          </div>
-          
-          <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-card to-muted/20 p-4 shadow-sm">
-            <div className="flex items-center gap-1.5 mb-2">
-              <div className="h-6 w-6 rounded-md bg-destructive/15 flex items-center justify-center">
-                <IndianRupee className="h-3.5 w-3.5 text-destructive" />
+              <div className="flex items-center gap-1.5 mb-2">
+                <div className="h-6 w-6 rounded-md bg-success/20 flex items-center justify-center">
+                  <TrendingUp className="h-3.5 w-3.5 text-success" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Efficiency</span>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cost / KM</span>
+              <p className="text-2xl font-black font-mono tracking-tight text-foreground">{stats.avgEconomy.toFixed(1)} <span className="text-sm font-semibold text-muted-foreground">km/l</span></p>
             </div>
-            <p className="text-2xl font-black font-mono tracking-tight text-foreground">₹{stats.costPerKm.toFixed(2)}</p>
+            
+            <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-card to-muted/20 p-4 shadow-sm relative overflow-hidden group">
+              <div className="absolute -right-2 -top-2 opacity-5 group-hover:opacity-10 transition-opacity">
+                <IndianRupee className="h-16 w-16" />
+              </div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <div className="h-6 w-6 rounded-md bg-destructive/15 flex items-center justify-center">
+                  <IndianRupee className="h-3.5 w-3.5 text-destructive" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cost / KM</span>
+              </div>
+              <p className="text-2xl font-black font-mono tracking-tight text-foreground">₹{stats.costPerKm.toFixed(2)}</p>
+            </div>
           </div>
+
+          {/* Economy Chart */}
+          {stats.chartData.length > 1 && (
+            <div className="rounded-2xl border border-border/60 bg-card/60 p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Economy Trend (km/l)</h4>
+                <div className="flex items-center gap-1.5">
+                   <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                   <span className="text-[9px] font-bold text-primary">LIVE DATA</span>
+                </div>
+              </div>
+              <div className="h-32 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={stats.chartData}>
+                    <defs>
+                      <linearGradient id="colorEconomy" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                    <XAxis 
+                      dataKey="date" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{fontSize: 9, fill: 'rgba(255,255,255,0.3)'}} 
+                    />
+                    <YAxis 
+                      hide 
+                      domain={['dataMin - 2', 'dataMax + 2']} 
+                    />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '12px', fontSize: '10px' }}
+                      itemStyle={{ color: '#fff', fontWeight: 'bold' }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="economy" 
+                      stroke="var(--primary)" 
+                      strokeWidth={3}
+                      fillOpacity={1} 
+                      fill="url(#colorEconomy)" 
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
         </div>
       ) : activeLogs.length > 0 ? (
-        <div className="rounded-2xl border border-warning/30 bg-warning/5 p-4 text-center">
-          <p className="text-sm font-medium text-warning">Log one more full-tank to see economy stats!</p>
+        <div className="rounded-2xl border border-warning/30 bg-warning/5 p-6 text-center shadow-inner">
+          <TrendingUp className="h-8 w-8 text-warning/40 mx-auto mb-3" />
+          <p className="text-sm font-bold text-warning">Log one more full-tank to unlock efficiency charts!</p>
+          <p className="text-[10px] text-warning/60 mt-1 uppercase tracking-wider">Economy tracking requires back-to-back logs</p>
         </div>
       ) : null}
 

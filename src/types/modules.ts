@@ -4,6 +4,7 @@ export interface VehicleRate {
   ratePerKm: number; // for reimbursement
   icon: 'car' | 'bike';
   initialOdometer?: number; // for Fuelio tracking
+  defaultFuelPrice?: number; // for auto-filling
 }
 
 export interface FuelLog {
@@ -34,6 +35,14 @@ export interface MileageLog {
   purpose: string;
   isBilled: boolean;
   expenseId?: string; 
+  createdAt: string;
+}
+
+export interface OdometerLog {
+  id: string;
+  vehicleId: string;
+  date: string;
+  reading: number;
   createdAt: string;
 }
 

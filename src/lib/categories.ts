@@ -7,6 +7,7 @@ import {
   PartyPopper,
   Phone,
   GraduationCap,
+  Home,
   Heart,
   MoreHorizontal
 } from 'lucide-react';
@@ -101,6 +102,15 @@ export const categoryConfig: Record<ExpenseCategory, {
     gradientFrom: '#f43f5e',
     gradientTo: '#fb7185',
     description: 'Medical expenses'
+  },
+  home: {
+    label: 'Home & Utilities',
+    icon: Home,
+    color: 'text-yellow-400',
+    bgColor: 'bg-yellow-500/15',
+    gradientFrom: '#facc15',
+    gradientTo: '#eab308',
+    description: 'Home office, utilities'
   },
   other: {
     label: 'Other',

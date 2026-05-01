@@ -35,8 +35,13 @@ export function MileageTracker({ onAddExpense }: MileageTrackerProps) {
   };
 
   const handleSaveVehicle = () => {
-    if (!newVehName || !newVehRate) return;
-    const v: VehicleRate = { id: crypto.randomUUID(), name: newVehName, ratePerKm: Number(newVehRate), icon: newVehIcon };
+    if (!newVehName) return;
+    const v: VehicleRate = { 
+      id: crypto.randomUUID(), 
+      name: newVehName, 
+      ratePerKm: Number(newVehRate) || 0, 
+      icon: newVehIcon 
+    };
     mileageService.saveVehicles([...vehicles, v]);
     setNewVehName(''); setNewVehRate('');
     haptics.success();
@@ -144,7 +149,7 @@ export function MileageTracker({ onAddExpense }: MileageTrackerProps) {
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
               <input 
-                type="number" placeholder="Rate/km" value={newVehRate} onChange={e => setNewVehRate(e.target.value)}
+                type="number" placeholder="Rate/km (Optional)" value={newVehRate} onChange={e => setNewVehRate(e.target.value)}
                 className="h-10 pl-7 pr-3 rounded-xl bg-muted/40 border border-border/40 text-sm w-full"
               />
             </div>

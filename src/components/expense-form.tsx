@@ -10,6 +10,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { SwipeToAdd } from '@/components/ui/swipe-to-add';
 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -58,135 +60,7 @@ export interface ExpenseFormProps {
   trigger?:    React.ReactNode;
 }
 
-/* ─── Swipe-to-add slider ─────────────────────────────────────────── */
-function SwipeToAdd({
-  onConfirm,
-  isSubmitting,
-  success,
-  label = 'Swipe to Add',
-}: {
-  onConfirm: () => void;
-  isSubmitting: boolean;
-  success: boolean;
-  label?: string;
-}) {
-  const trackRef  = useRef<HTMLDivElement>(null);
-  const thumbRef  = useRef<HTMLDivElement>(null);
-  const [pct, setPct]         = useState(0);      // 0-1 progress
-  const [dragging, setDragging] = useState(false);
-  const [done, setDone]       = useState(false);
-  const startX = useRef(0);
-  const trackW = useRef(0);
-  const THUMB  = 52; // thumb width in px
-  const THRESH = 0.82;
-  const lastTick = useRef(0);
 
-  const reset = () => { setPct(0); setDone(false); lastTick.current = 0; };
-
-  // keep in sync with parent success
-  useEffect(() => { if (!success) reset(); }, [success]);
-
-  const begin = (clientX: number) => {
-    if (done || isSubmitting) return;
-    startX.current = clientX;
-    trackW.current = (trackRef.current?.clientWidth ?? 200) - THUMB - 8;
-    setDragging(true);
-  };
-  const move = (clientX: number) => {
-    if (!dragging) return;
-    const delta = clientX - startX.current;
-    const raw   = Math.min(Math.max(delta / trackW.current, 0), 1);
-    setPct(raw);
-    
-    // Tactile ticks every 15%
-    const tick = Math.floor(raw / 0.15);
-    if (tick > lastTick.current && raw < THRESH) {
-      lastTick.current = tick;
-      haptics.selection();
-    }
-
-    if (raw >= THRESH) {
-      setDone(true);
-      setDragging(false);
-      setPct(1);
-      haptics.success();
-      onConfirm();
-    }
-  };
-  const end = () => {
-    if (!done) { setDragging(false); setPct(0); lastTick.current = 0; }
-  };
-
-  // Mouse
-  const onMouseDown = (e: React.MouseEvent) => begin(e.clientX);
-  useEffect(() => {
-    if (!dragging) return;
-    const mm = (e: MouseEvent) => move(e.clientX);
-    const mu = () => end();
-    window.addEventListener('mousemove', mm);
-    window.addEventListener('mouseup', mu);
-    return () => { window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu); };
-  }, [dragging, done]);
-
-  // Touch
-  const onTouchStart = (e: React.TouchEvent) => begin(e.touches[0].clientX);
-  const onTouchMove  = (e: React.TouchEvent) => move(e.touches[0].clientX);
-  const onTouchEnd   = () => end();
-
-  const fillOpacity = Math.max(0.15, pct);
-
-  return (
-    <div
-      ref={trackRef}
-      className="relative h-[52px] rounded-2xl overflow-hidden select-none cursor-grab active:cursor-grabbing"
-      style={{
-        background: success
-          ? 'linear-gradient(135deg, #10b981, #06b6d4)'
-          : `linear-gradient(135deg, hsl(262 85% 65% / ${fillOpacity}), hsl(186 95% 52% / ${fillOpacity * 0.6}))`,
-        boxShadow: success ? '0 0 24px hsl(152 68% 50% / 0.5)' : '0 0 24px hsl(262 85% 65% / 0.3)',
-        border: '1px solid hsl(262 85% 65% / 0.35)',
-        transition: success ? 'background 0.4s, box-shadow 0.4s' : undefined,
-      }}
-    >
-      {/* Label */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        {success ? (
-          <span className="flex items-center gap-2 text-white font-bold text-sm">
-            <Check className="h-4 w-4" strokeWidth={3} /> Added!
-          </span>
-        ) : isSubmitting ? (
-          <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-        ) : (
-          <span
-            className="text-sm font-bold tracking-wide"
-            style={{ color: `hsl(220 15% 94% / ${0.4 + pct * 0.6})` }}
-          >
-            {label}
-          </span>
-        )}
-      </div>
-
-      {/* Thumb */}
-      {!success && !isSubmitting && (
-        <div
-          ref={thumbRef}
-          onMouseDown={onMouseDown}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          className="absolute top-[4px] bottom-[4px] flex items-center justify-center rounded-xl bg-gradient-primary shadow-glow z-10"
-          style={{
-            width: THUMB,
-            left:  4 + pct * ((trackRef.current?.clientWidth ?? 200) - THUMB - 8),
-            transition: dragging ? 'none' : 'left 0.35s cubic-bezier(0.34,1.56,0.64,1)',
-          }}
-        >
-          <ArrowRight className="h-5 w-5 text-white" strokeWidth={2.5} />
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ═══════════════════════════════════════════════════════════════════
    Inner form body — shared by both mobile sheet and desktop modal
@@ -205,6 +79,7 @@ function FormBody({
   const [tagInput, setTagInput] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [success,  setSuccess]  = useState(false);
+  const [showVendors, setShowVendors] = useState(false);
 
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting }, reset } =
     useForm<FormData>({
@@ -228,9 +103,18 @@ function FormBody({
   const selCat = cat ? categoryConfig[cat as ExpenseCategory] : null;
 
   const vendors = useMemo(() => {
-    try { return vendorService.getFromExpenses(storageService.getExpenses()); }
+    try { 
+      const list = vendorService.getFromExpenses(storageService.getExpenses()); 
+      return list.sort();
+    }
     catch { return []; }
   }, []);
+
+  const filteredVendors = useMemo(() => {
+    const q = watch('vendor')?.toLowerCase() || '';
+    if (!q) return vendors.slice(0, 5);
+    return vendors.filter(v => v.toLowerCase().includes(q)).slice(0, 5);
+  }, [vendors, watch('vendor')]);
 
   const processFile = (file: File) => {
     if (!file.type.startsWith('image/')) return;
@@ -316,17 +200,31 @@ function FormBody({
         {errors.amount && <p className="text-xs text-destructive -mt-2 mb-2">{errors.amount.message}</p>}
 
         <div className="grid grid-cols-2 gap-3">
-          <div>
+          <div className="relative">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Merchant</p>
             <Input
-              list="vendors-list"
               {...register('vendor')}
+              onFocus={() => setShowVendors(true)}
+              onBlur={() => setTimeout(() => setShowVendors(false), 200)}
               placeholder="e.g. Swiggy"
               className="h-10 bg-background/50 border-white/10 text-sm placeholder:text-muted-foreground/40 focus:border-white/25"
+              autoComplete="off"
             />
-            <datalist id="vendors-list">
-              {vendors.map(v => <option key={v} value={v} />)}
-            </datalist>
+            {showVendors && filteredVendors.length > 0 && (
+              <div className="absolute top-[calc(100%+4px)] left-0 right-0 z-[100] bg-card border border-border/50 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                {filteredVendors.map(v => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => { setValue('vendor', v, { shouldValidate: true }); setShowVendors(false); }}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-muted/50 transition-colors border-b border-border/10 last:border-0 flex items-center gap-2"
+                  >
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary/40" />
+                    {v}
+                  </button>
+                ))}
+              </div>
+            )}
             {errors.vendor && <p className="text-[10px] text-destructive mt-0.5">{errors.vendor.message}</p>}
           </div>
           <div>
@@ -346,7 +244,7 @@ function FormBody({
       {/* ── Category grid ── */}
       <div className="mb-5">
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2.5">Category</p>
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
           {Object.entries(categoryConfig).map(([key, cfg]) => {
             const Icon = cfg.icon;
             const active = cat === key;
@@ -356,7 +254,7 @@ function FormBody({
                 type="button"
                 onClick={() => setValue('category', key, { shouldValidate: true })}
                 className={cn(
-                  'flex flex-col items-center gap-1 p-2 rounded-xl border transition-all duration-200 active:scale-95',
+                  'flex flex-col items-center gap-1 p-2 rounded-xl border transition-all duration-200 active:scale-95 overflow-hidden',
                   active ? 'scale-105 border-transparent' : 'border-border/40 bg-muted/30 hover:bg-muted/50'
                 )}
                 style={active ? {
@@ -365,10 +263,10 @@ function FormBody({
                   boxShadow:   `0 0 16px ${cfg.gradientFrom}40`,
                 } : {}}
               >
-                <div className={cn('h-7 w-7 rounded-lg flex items-center justify-center', active ? cfg.bgColor : 'bg-muted/50')}>
-                  <Icon className={cn('h-3.5 w-3.5', active ? cfg.color : 'text-muted-foreground')} />
+                <div className={cn('h-8 w-8 rounded-lg flex items-center justify-center mb-1', active ? cfg.bgColor : 'bg-muted/50')}>
+                  <Icon className={cn('h-4 w-4', active ? cfg.color : 'text-muted-foreground')} />
                 </div>
-                <span className={cn('text-[9px] font-semibold leading-tight text-center line-clamp-1', active ? cfg.color : 'text-muted-foreground')}>
+                <span className={cn('text-[8.5px] font-bold leading-tight text-center px-1 truncate w-full', active ? cfg.color : 'text-muted-foreground')}>
                   {cfg.label.split(' ')[0]}
                 </span>
               </button>
@@ -514,7 +412,11 @@ function FormBody({
 
       {/* ── Swipe / click to submit ── */}
       <SwipeToAdd
-        onConfirm={() => handleSubmit(onFormSubmit)()}
+        onConfirm={() => {
+          if (!isSubmitting && !success) {
+            handleSubmit(onFormSubmit)();
+          }
+        }}
         isSubmitting={isSubmitting}
         success={success}
         label={isEdit ? 'Swipe to Update' : 'Swipe to Add Expense'}

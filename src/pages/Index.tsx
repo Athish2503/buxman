@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   LayoutDashboard, Receipt, BarChart3, Settings,
   Wallet, TrendingUp, Clock, CheckCircle2, Moon, Sun,
-  Zap, ArrowRight, ChevronRight, Plus, Car
+  Zap, ArrowRight, ChevronRight, Plus, Car, Fuel
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, startOfMonth, subMonths, isSameMonth } from 'date-fns';
@@ -13,6 +13,7 @@ import { settingsService } from '@/lib/settings';
 import { haptics } from '@/lib/haptics';
 import { formatCurrency, formatCompactCurrency, cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/useTheme';
+import { mileageService, fuelService } from '@/lib/modules-storage';
 
 import { ExpenseForm } from '@/components/expense-form';
 import { ExpenseList } from '@/components/expense-list';
@@ -24,29 +25,29 @@ import { Onboarding } from '@/components/onboarding';
 import { MonthlySummary } from '@/components/monthly-summary';
 import { CategoryRings } from '@/components/category-rings';
 import { RecurringManager } from '@/components/recurring-manager';
-import { FuelTracker } from '@/components/fuel-tracker';
+import { VehicleTracker } from '@/components/fuel-tracker';
 import { ReceiptWallet } from '@/components/receipt-wallet';
 import { metaService } from '@/lib/recurring';
 
-type Tab = 'dashboard' | 'expenses' | 'analytics' | 'settings';
+type Tab = 'dashboard' | 'expenses' | 'vehicle' | 'analytics' | 'settings';
 
-const NAV_ITEMS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
+const NAV_ITEMS: { id: Tab; label: string; icon: any }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'expenses', label: 'Expenses', icon: Receipt },
+  { id: 'vehicle', label: 'Vehicle', icon: Car },
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
-// Split nav: 2 left of FAB, 2 right of FAB.
 const LEFT_NAV  = NAV_ITEMS.slice(0, 2);   // Dashboard, Expenses
-const RIGHT_NAV = NAV_ITEMS.slice(2, 4);   // Analytics, Settings
+const RIGHT_NAV = NAV_ITEMS.slice(2, 5);   // Vehicle, Analytics, Settings
 
 const Index = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [expenseSubTab, setExpenseSubTab] = useState<'all' | 'wallet'>('all');
-  const [dashboardTab, setDashboardTab] = useState<'expenses' | 'mileage'>('expenses');
+  const [dashboardTab, setDashboardTab] = useState<'expenses' | 'vehicle'>('expenses');
   const [navExpanded, setNavExpanded] = useState(false);
   const [onboarded, setOnboarded] = useState(true);
   const navRef = useRef<HTMLDivElement>(null);
@@ -131,6 +132,17 @@ const Index = () => {
   const thisMonthTotal = thisMonthExp.reduce((s, e) => s + e.amount, 0);
   const lastMonthTotal = lastMonthExp.reduce((s, e) => s + e.amount, 0);
   const monthTrend = lastMonthTotal > 0 ? ((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100 : 0;
+
+  const mileageLogs = mileageService.getLogs();
+  const totalMileageDistance = mileageLogs.reduce((s, l) => s + l.distance, 0);
+  const pendingMileageAmount = mileageLogs.filter(l => !l.isBilled).reduce((s, l) => s + l.totalAmount, 0);
+
+  const fuelLogs = fuelService.getLogs();
+  const avgEfficiency = useMemo(() => {
+    const ecoLogs = fuelLogs.filter(l => l.economy);
+    if (ecoLogs.length === 0) return 0;
+    return ecoLogs.reduce((s, l) => s + l.economy!, 0) / ecoLogs.length;
+  }, [fuelLogs]);
 
   const settings = settingsService.get();
 
@@ -253,11 +265,30 @@ const Index = () => {
             <div className="space-y-5 animate-fade-in">
               <div className="flex bg-muted/40 p-1 rounded-xl w-full sm:w-fit mb-2">
                 <button onClick={() => setDashboardTab('expenses')} className={cn("flex-1 px-6 py-1.5 rounded-lg text-xs font-bold transition-all", dashboardTab === 'expenses' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>Expenses</button>
-                <button onClick={() => setDashboardTab('mileage')} className={cn("flex-1 px-6 py-1.5 rounded-lg text-xs font-bold transition-all", dashboardTab === 'mileage' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>Mileage</button>
+                <button onClick={() => setDashboardTab('vehicle')} className={cn("flex-1 px-6 py-1.5 rounded-lg text-xs font-bold transition-all", dashboardTab === 'vehicle' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>Vehicle</button>
               </div>
 
-              {dashboardTab === 'mileage' && (
-                <FuelTracker />
+              {dashboardTab === 'vehicle' && (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-2xl border border-border/40 bg-card/60">
+                    <VehicleTracker />
+                  </div>
+                  <button 
+                    onClick={() => setActiveTab('vehicle')}
+                    className="w-full p-4 rounded-2xl border border-dashed border-primary/30 text-primary bg-primary/5 flex items-center justify-between hover:bg-primary/10 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                        <Car className="h-5 w-5" />
+                      </div>
+                      <div className="text-left">
+                        <p className="font-bold text-sm">Full Car Manager</p>
+                        <p className="text-[11px] opacity-70">Efficiency charts, service logs and more</p>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </div>
               )}
 
               {dashboardTab === 'expenses' && (
@@ -295,8 +326,8 @@ const Index = () => {
                     </div>
                   )}
 
-              {/* Stats grid — 2 cols on mobile, 4 on desktop */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* Stats grid — 2 cols on mobile, 5 on desktop */}
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 <StatCard
                   label="Total Expenses"
                   value={formatCompactCurrency(totalAmount)}
@@ -334,9 +365,18 @@ const Index = () => {
                   trend={lastMonthTotal > 0 ? { value: monthTrend, label: 'vs last month' } : undefined}
                   delay={180}
                 />
+                <StatCard
+                  label="Avg Efficiency"
+                  value={`${avgEfficiency.toFixed(1)}`}
+                  subLabel="km per liter"
+                  icon={Fuel}
+                  gradient="bg-indigo-500/15"
+                  iconColor="text-indigo-500"
+                  delay={240}
+                />
               </div>
 
-              {/* Chart + Budget row */}
+                {/* Chart + Budget row */}
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
                 {/* Spending trend */}
                 <div className="lg:col-span-3 rounded-2xl border border-border/60 bg-card/80 p-4">
@@ -442,6 +482,13 @@ const Index = () => {
             </div>
           )}
 
+          {/* ── VEHICLE TAB ── */}
+          {activeTab === 'vehicle' && (
+            <div className="animate-fade-in space-y-5">
+              <VehicleTracker />
+            </div>
+          )}
+
           {/* Vehicle tab moved to dashboard */}
           {/* ── ANALYTICS TAB ── */}
           {activeTab === 'analytics' && (
@@ -527,7 +574,7 @@ const Index = () => {
         onTouchStart={handleNavTouchStart}
         onTouchEnd={handleNavTouchEnd}
         className="sm:hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-40"
-        style={{ width: navExpanded ? 'calc(100vw - 24px)' : '320px', transition: 'width 0.38s cubic-bezier(0.34,1.56,0.64,1)' }}
+        style={{ width: navExpanded ? 'calc(100vw - 24px)' : '350px', transition: 'width 0.38s cubic-bezier(0.34,1.56,0.64,1)' }}
       >
         {/* Collapsed pill */}
         {!navExpanded && (
