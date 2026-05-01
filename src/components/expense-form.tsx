@@ -164,18 +164,20 @@ function FormBody({
 
       {/* ── Hero: amount + merchant + date ── */}
       <div
-        className="relative overflow-hidden rounded-2xl mb-5 p-4"
+        className="relative rounded-2xl mb-5 p-4"
         style={{
           background: selCat
             ? `linear-gradient(135deg, ${selCat.gradientFrom}20, ${selCat.gradientTo}0d)`
             : 'linear-gradient(135deg, hsl(262 85% 65%/0.12), hsl(186 95% 52%/0.06))',
         }}
       >
-        {/* glow blob */}
-        <div
-          className="absolute -top-8 -right-8 h-32 w-32 rounded-full blur-3xl opacity-30 pointer-events-none"
-          style={{ background: selCat?.gradientFrom ?? 'hsl(262 85% 65%)' }}
-        />
+        {/* glow blob — wrapped in hidden overflow to prevent page bleed */}
+        <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+          <div
+            className="absolute -top-8 -right-8 h-32 w-32 rounded-full blur-3xl opacity-30"
+            style={{ background: selCat?.gradientFrom ?? 'hsl(262 85% 65%)' }}
+          />
+        </div>
 
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
           {isEdit ? 'Edit Expense' : 'New Expense'}
@@ -429,18 +431,7 @@ function FormBody({
    JS breakpoint hook — avoids inline-style vs Tailwind specificity
    conflicts. Returns true when viewport < 640px (Tailwind sm).
 ═══════════════════════════════════════════════════════════════════ */
-function useIsMobile() {
-  const [mobile, setMobile] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 640 : false
-  );
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 639px)');
-    const handler = (e: MediaQueryListEvent) => setMobile(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-  return mobile;
-}
+
 
 export function ExpenseForm({ onSubmit, initialData, isEdit = false, onClose, trigger }: ExpenseFormProps) {
   const [open, setOpen] = useState(false);

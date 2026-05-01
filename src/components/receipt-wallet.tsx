@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Camera as CameraIcon, Check, Plus, Trash2, Receipt, Image as ImageIcon, ArrowRight } from 'lucide-react';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { ReceiptDraft } from '@/types/modules';
@@ -7,8 +7,10 @@ import { ExpenseForm } from './expense-form';
 import { Expense } from '@/types/expense';
 import { haptics } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
+import { useLongPress } from '@/hooks/useLongPress';
+import { notificationService } from '@/lib/notifications';
 
 interface ReceiptWalletProps {
   onAddExpense: (e: Expense) => void;
@@ -17,6 +19,41 @@ interface ReceiptWalletProps {
 export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
   const [receipts, setReceipts] = useState<ReceiptDraft[]>(() => walletService.getReceipts());
   const [processingReceipt, setProcessingReceipt] = useState<ReceiptDraft | null>(null);
+  const [longPressedId, setLongPressedId] = useState<string | null>(null);
+
+  // Check for old receipts on mount
+  useEffect(() => {
+    const oldest = receipts.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())[0];
+    if (oldest) {
+      const days = differenceInDays(new Date(), new Date(oldest.createdAt));
+      if (days >= 2) {
+        const messages = [
+          "💸 Don't you want money? You've got snaps pending!",
+          "🐢 Your receipts are getting lonely. Process them for reimbursement!",
+          "💎 Found some gold in your wallet! (Just kidding, it's just receipts that need logging)",
+          "🌲 Money doesn't grow on trees, but it stays in your pocket if you log these!"
+        ];
+        const randomMsg = messages[Math.floor(Math.random() * messages.length)];
+        
+        // Show In-App Toast
+        toast(randomMsg, {
+          duration: 6000,
+          icon: '💰',
+          description: `Oldest is ${days} days old`,
+          action: {
+            label: 'Fix now',
+            onClick: () => setProcessingReceipt(oldest)
+          }
+        });
+
+        // Trigger Native Mobile Notification
+        notificationService.scheduleFunnyReminder(
+          "Pixel Reimburse", 
+          randomMsg
+        );
+      }
+    }
+  }, []);
 
   const reload = () => setReceipts(walletService.getReceipts());
 
@@ -129,29 +166,84 @@ export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {receipts.map(r => (
-            <div 
+            <ReceiptItem 
               key={r.id} 
-              onClick={() => setProcessingReceipt(r)}
-              className="group relative aspect-[3/4] rounded-xl overflow-hidden border border-border/40 cursor-pointer active:scale-95 transition-transform"
-            >
-              <img src={r.imageUri} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="Draft" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-              
-              <button 
-                onClick={(e) => handleDelete(r.id, e)}
-                className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-
-              <div className="absolute bottom-2 left-2 right-2">
-                <p className="text-[10px] text-white/80 font-medium">{format(new Date(r.createdAt), 'dd MMM, HH:mm')}</p>
-                <div className="flex items-center gap-1 text-white text-xs font-bold mt-0.5">
-                  <Plus className="h-3 w-3" /> Process
-                </div>
-              </div>
-            </div>
+              receipt={r} 
+              onSelect={() => setProcessingReceipt(r)}
+              onDelete={(id) => {
+                walletService.removeReceipt(id);
+                haptics.heavy();
+                reload();
+              }}
+              isLongPressed={longPressedId === r.id}
+              setLongPressedId={setLongPressedId}
+            />
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReceiptItem({ receipt, onSelect, onDelete, isLongPressed, setLongPressedId }: { 
+  receipt: ReceiptDraft; 
+  onSelect: () => void; 
+  onDelete: (id: string) => void;
+  isLongPressed: boolean;
+  setLongPressedId: (id: string | null) => void;
+}) {
+  const longPressProps = useLongPress(
+    () => {
+      haptics.selection();
+      setLongPressedId(receipt.id);
+    },
+    () => {
+      if (!isLongPressed) onSelect();
+    }
+  );
+
+  return (
+    <div 
+      {...longPressProps}
+      className={cn(
+        "group relative aspect-[3/4] rounded-xl overflow-hidden border border-border/40 cursor-pointer active:scale-95 transition-transform",
+        isLongPressed && "scale-105 ring-2 ring-primary ring-offset-2 z-10"
+      )}
+    >
+      <img src={receipt.imageUri} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="Draft" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+      
+      {/* Options Overlay on Long Press */}
+      {isLongPressed && (
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center gap-2 p-2 animate-in fade-in zoom-in duration-200">
+          <button 
+            onClick={(e) => { e.stopPropagation(); onSelect(); setLongPressedId(null); }}
+            className="w-full h-9 rounded-lg bg-white text-black text-xs font-bold flex items-center justify-center gap-2"
+          >
+            <Check className="h-3.5 w-3.5" /> Process
+          </button>
+          <button 
+            onClick={(e) => { e.stopPropagation(); onDelete(receipt.id); setLongPressedId(null); }}
+            className="w-full h-9 rounded-lg bg-destructive text-white text-xs font-bold flex items-center justify-center gap-2"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Delete
+          </button>
+          <button 
+            onClick={(e) => { e.stopPropagation(); setLongPressedId(null); }}
+            className="text-[10px] text-white/70 font-medium underline mt-1"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Normal View Bottom Text */}
+      {!isLongPressed && (
+        <div className="absolute bottom-2 left-2 right-2">
+          <p className="text-[10px] text-white/80 font-medium">{format(new Date(receipt.createdAt), 'dd MMM, HH:mm')}</p>
+          <div className="flex items-center gap-1 text-white text-xs font-bold mt-0.5">
+            <Plus className="h-3 w-3" /> Process
+          </div>
         </div>
       )}
     </div>

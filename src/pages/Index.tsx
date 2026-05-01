@@ -40,7 +40,7 @@ const NAV_ITEMS: { id: Tab; label: string; icon: any }[] = [
 ];
 
 const LEFT_NAV  = NAV_ITEMS.slice(0, 2);   // Dashboard, Expenses
-const RIGHT_NAV = NAV_ITEMS.slice(2, 5);   // Vehicle, Analytics, Settings
+const RIGHT_NAV = NAV_ITEMS.slice(2);      // Vehicle, Analytics, Settings
 
 const Index = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -48,7 +48,6 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [expenseSubTab, setExpenseSubTab] = useState<'all' | 'wallet'>('all');
   const [dashboardTab, setDashboardTab] = useState<'expenses' | 'vehicle'>('expenses');
-  const [navExpanded, setNavExpanded] = useState(false);
   const [onboarded, setOnboarded] = useState(true);
   const navRef = useRef<HTMLDivElement>(null);
   const { theme, toggle: toggleTheme } = useTheme();
@@ -57,26 +56,7 @@ const Index = () => {
     setOnboarded(metaService.get().onboardingDone);
   }, []);
 
-  // Swipe to expand nav logic
-  const navTouchStartX = useRef(0);
-  const handleNavTouchStart = (e: React.TouchEvent) => { navTouchStartX.current = e.touches[0].clientX; };
-  const handleNavTouchEnd = (e: React.TouchEvent) => {
-    const delta = navTouchStartX.current - e.changedTouches[0].clientX;
-    if (delta > 40 && !navExpanded) { haptics.selection(); setNavExpanded(true); } // swipe left
-    if (delta < -40 && navExpanded) { haptics.selection(); setNavExpanded(false); } // swipe right
-  };
 
-  // Close expanded nav when tapping outside
-  useEffect(() => {
-    if (!navExpanded) return;
-    const handler = (e: MouseEvent) => {
-      if (navRef.current && !navRef.current.contains(e.target as Node)) {
-        setNavExpanded(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [navExpanded]);
 
   useEffect(() => {
     try {
@@ -568,113 +548,65 @@ const Index = () => {
         </footer>
       </div>
 
-      {/* ── Floating Bottom Nav (mobile) ── */}
+      {/* ── Scrollable Bottom Nav (mobile) ── */}
       <nav
         ref={navRef}
-        onTouchStart={handleNavTouchStart}
-        onTouchEnd={handleNavTouchEnd}
-        className="sm:hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-40"
-        style={{ width: navExpanded ? 'calc(100vw - 24px)' : '350px', transition: 'width 0.38s cubic-bezier(0.34,1.56,0.64,1)' }}
+        className="sm:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92vw] max-w-md"
       >
-        {/* Collapsed pill */}
-        {!navExpanded && (
-          <div className="mobile-float-nav flex items-center justify-between px-3 py-2 gap-1">
+        <div className="mobile-float-nav flex items-center overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-smooth p-1">
+          {/* Dashboard & Expenses */}
+          {LEFT_NAV.map(item => {
+            const Icon = item.icon;
+            const active = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => { setActiveTab(item.id); haptics.selection(); }}
+                className={cn(
+                  "flex-shrink-0 w-[19%] flex flex-col items-center gap-1 py-2 px-1 rounded-2xl transition-all duration-200 snap-center",
+                  active ? "text-primary bg-primary/15" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Icon className={cn("h-5 w-5 transition-transform", active && "scale-110")} />
+                <span className="text-[9px] font-bold tracking-tight">{item.label}</span>
+              </button>
+            );
+          })}
 
-            {/* LEFT items */}
-            {LEFT_NAV.map(item => {
-              const Icon = item.icon;
-              const active = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={cn(
-                    "flex-1 flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-2xl transition-all duration-200",
-                    active
-                      ? "text-primary bg-primary/15"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Icon className={cn("h-[18px] w-[18px] transition-transform duration-200", active && "scale-110")} />
-                  <span className="text-[9px] font-semibold tracking-wide">{item.label}</span>
-                </button>
-              );
-            })}
-
-            {/* CENTER — Add Expense FAB */}
-            <div className="relative flex-shrink-0 mx-1">
-              <ExpenseForm
-                onSubmit={handleAddExpense}
-                trigger={
-                  <button
-                    className="h-14 w-14 rounded-full bg-gradient-primary shadow-glow flex items-center justify-center transition-all duration-300 active:scale-95 hover:scale-105"
-                    aria-label="Add expense"
-                  >
-                    <Plus className="h-6 w-6 text-white" strokeWidth={2.5} />
-                  </button>
-                }
-              />
-            </div>
-
-            {/* RIGHT items */}
-            {RIGHT_NAV.map(item => {
-              const Icon = item.icon;
-              const active = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={cn(
-                    "flex-1 flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-2xl transition-all duration-200",
-                    active
-                      ? "text-primary bg-primary/15"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Icon className={cn("h-[18px] w-[18px] transition-transform duration-200", active && "scale-110")} />
-                  <span className="text-[9px] font-semibold tracking-wide">{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Expanded full-width rail (swipe state) */}
-        {navExpanded && (
-          <div className="mobile-float-nav flex items-center px-2 py-2 gap-1 animate-scale-in">
-            {NAV_ITEMS.map(item => {
-              const Icon = item.icon;
-              const active = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => { setActiveTab(item.id); setNavExpanded(false); }}
-                  className={cn(
-                    "flex-1 flex flex-col items-center gap-0.5 py-2 px-1 rounded-2xl transition-all duration-200",
-                    active
-                      ? "text-primary bg-primary/15"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Icon className={cn("h-5 w-5 transition-transform", active && "scale-110")} />
-                  <span className="text-[9px] font-semibold tracking-wide">{item.label}</span>
-                </button>
-              );
-            })}
-            {/* Collapsed Add button in expanded mode */}
+          {/* Fixed Center FAB */}
+          <div className="flex-shrink-0 w-[24%] flex justify-center snap-center px-1">
             <ExpenseForm
-              onSubmit={(e) => { handleAddExpense(e); setNavExpanded(false); }}
+              onSubmit={handleAddExpense}
               trigger={
                 <button
-                  className="h-10 w-10 rounded-full bg-gradient-primary shadow-glow flex items-center justify-center flex-shrink-0 transition-all active:scale-95"
+                  className="h-14 w-14 rounded-full bg-gradient-primary shadow-glow flex items-center justify-center transition-all duration-300 active:scale-90 hover:scale-105"
                   aria-label="Add expense"
                 >
-                  <Plus className="h-5 w-5 text-white" strokeWidth={2.5} />
+                  <Plus className="h-7 w-7 text-white" strokeWidth={3} />
                 </button>
               }
             />
           </div>
-        )}
+
+          {/* Remaining items (Vehicle, Analytics, Settings) */}
+          {RIGHT_NAV.map(item => {
+            const Icon = item.icon;
+            const active = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => { setActiveTab(item.id); haptics.selection(); }}
+                className={cn(
+                  "flex-shrink-0 w-[19%] flex flex-col items-center gap-1 py-2 px-1 rounded-2xl transition-all duration-200 snap-center",
+                  active ? "text-primary bg-primary/15" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Icon className={cn("h-5 w-5 transition-transform", active && "scale-110")} />
+                <span className="text-[9px] font-bold tracking-tight">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </nav>
     </div>
   );
