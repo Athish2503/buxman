@@ -32,6 +32,7 @@ import { haptics } from '@/lib/haptics';
 import { ExpenseForm } from './expense-form';
 import { formatCurrency, cn } from '@/lib/utils';
 import { ExportDialog } from './export-dialog';
+import { ImageViewer } from './image-viewer';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -69,6 +70,7 @@ export function ExpenseList({
     typeof window !== 'undefined' && window.innerWidth < 640 ? 'cards' : 'table'
   );
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
 
   const filteredExpenses = useMemo(() => {
     let list = expenses.filter(e => {
@@ -682,13 +684,29 @@ export function ExpenseList({
               {selectedExpense.receiptImage && (
                 <div>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-2">Receipt</p>
-                  <img src={selectedExpense.receiptImage} alt="Receipt" className="w-full rounded-xl border border-border/50 max-h-52 object-contain" />
+                  <div 
+                    className="relative rounded-xl overflow-hidden border border-border/50 group cursor-zoom-in"
+                    onClick={() => setViewingReceipt(selectedExpense.receiptImage!)}
+                  >
+                    <img src={selectedExpense.receiptImage} alt="Receipt" className="w-full max-h-52 object-contain bg-black/5" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors">
+                      <ZoomIn className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-center text-muted-foreground mt-2">Tap image to zoom</p>
                 </div>
               )}
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      <ImageViewer 
+        src={viewingReceipt || ''}
+        isOpen={!!viewingReceipt}
+        onClose={() => setViewingReceipt(null)}
+        title={selectedExpense?.vendor ? `Receipt: ${selectedExpense.vendor}` : 'Receipt View'}
+      />
 
       {/* Edit Dialog */}
       <Dialog open={!!editingExpense} onOpenChange={open => !open && setEditingExpense(null)}>

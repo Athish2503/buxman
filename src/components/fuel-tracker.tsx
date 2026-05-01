@@ -157,7 +157,7 @@ export function VehicleTracker() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-bold text-2xl tracking-tight">Car Hub</h2>
+          <h2 className="font-bold text-2xl tracking-tight"> ParkHub</h2>
           <p className="text-sm text-muted-foreground mt-0.5">Manage your personal vehicles</p>
         </div>
         <div className="flex gap-2">

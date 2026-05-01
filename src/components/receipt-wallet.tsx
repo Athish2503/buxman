@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Camera as CameraIcon, Check, Plus, Trash2, Receipt, Image as ImageIcon, ArrowRight } from 'lucide-react';
+import { Camera as CameraIcon, Check, Plus, Trash2, Receipt, Image as ImageIcon, ArrowRight, Eye } from 'lucide-react';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { ReceiptDraft } from '@/types/modules';
 import { walletService } from '@/lib/modules-storage';
@@ -11,6 +11,7 @@ import { format, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
 import { useLongPress } from '@/hooks/useLongPress';
 import { notificationService } from '@/lib/notifications';
+import { ImageViewer } from './image-viewer';
 
 interface ReceiptWalletProps {
   onAddExpense: (e: Expense) => void;
@@ -20,6 +21,7 @@ export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
   const [receipts, setReceipts] = useState<ReceiptDraft[]>(() => walletService.getReceipts());
   const [processingReceipt, setProcessingReceipt] = useState<ReceiptDraft | null>(null);
   const [longPressedId, setLongPressedId] = useState<string | null>(null);
+  const [viewingReceipt, setViewingReceipt] = useState<ReceiptDraft | null>(null);
 
   // Check for old receipts on mount
   useEffect(() => {
@@ -175,20 +177,35 @@ export function ReceiptWallet({ onAddExpense }: ReceiptWalletProps) {
                 haptics.heavy();
                 reload();
               }}
+              onView={(r) => setViewingReceipt(r)}
               isLongPressed={longPressedId === r.id}
               setLongPressedId={setLongPressedId}
             />
           ))}
         </div>
       )}
+
+      {viewingReceipt && (
+        <ImageViewer
+          src={viewingReceipt.imageUri}
+          isOpen={!!viewingReceipt}
+          onClose={() => setViewingReceipt(null)}
+          onDelete={() => {
+            walletService.removeReceipt(viewingReceipt.id);
+            reload();
+          }}
+          title={`Receipt from ${format(new Date(viewingReceipt.createdAt), 'dd MMM yyyy')}`}
+        />
+      )}
     </div>
   );
 }
 
-function ReceiptItem({ receipt, onSelect, onDelete, isLongPressed, setLongPressedId }: { 
+function ReceiptItem({ receipt, onSelect, onDelete, onView, isLongPressed, setLongPressedId }: { 
   receipt: ReceiptDraft; 
   onSelect: () => void; 
   onDelete: (id: string) => void;
+  onView: (r: ReceiptDraft) => void;
   isLongPressed: boolean;
   setLongPressedId: (id: string | null) => void;
 }) {
@@ -198,13 +215,13 @@ function ReceiptItem({ receipt, onSelect, onDelete, isLongPressed, setLongPresse
       setLongPressedId(receipt.id);
     },
     () => {
-      if (!isLongPressed) onSelect();
+      if (!isLongPressed) onView(receipt);
     }
   );
 
   return (
     <div 
-      {...longPressProps}
+      {...(!isLongPressed ? longPressProps : {})}
       className={cn(
         "group relative aspect-[3/4] rounded-xl overflow-hidden border border-border/40 cursor-pointer active:scale-95 transition-transform",
         isLongPressed && "scale-105 ring-2 ring-primary ring-offset-2 z-10"
@@ -216,6 +233,12 @@ function ReceiptItem({ receipt, onSelect, onDelete, isLongPressed, setLongPresse
       {/* Options Overlay on Long Press */}
       {isLongPressed && (
         <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center gap-2 p-2 animate-in fade-in zoom-in duration-200">
+          <button 
+            onClick={(e) => { e.stopPropagation(); onView(receipt); setLongPressedId(null); }}
+            className="w-full h-9 rounded-lg bg-white/20 backdrop-blur-md text-white text-xs font-bold flex items-center justify-center gap-2 border border-white/20"
+          >
+            <Eye className="h-3.5 w-3.5" /> View Full
+          </button>
           <button 
             onClick={(e) => { e.stopPropagation(); onSelect(); setLongPressedId(null); }}
             className="w-full h-9 rounded-lg bg-white text-black text-xs font-bold flex items-center justify-center gap-2"
