@@ -147,6 +147,7 @@ const Index = () => {
           expenses={expenses}
           onUpdateExpense={handleUpdateExpense}
           onDeleteExpense={handleDeleteExpense}
+          onDeleteAll={handleDeleteAll}
         />
 
         <footer className="mt-16 pt-8 border-t border-border/50 text-center text-xs text-muted-foreground">
