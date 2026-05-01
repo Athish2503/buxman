@@ -81,6 +81,7 @@ function FormBody({
   const [success,  setSuccess]  = useState(false);
   const [showVendors, setShowVendors] = useState(false);
 
+  const [isProcessing, setIsProcessing] = useState(false);
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting }, reset } =
     useForm<FormData>({
       resolver: zodResolver(expenseSchema),
@@ -134,33 +135,48 @@ function FormBody({
   };
 
   const onFormSubmit = async (data: FormData) => {
-    const expense: Expense = {
-      id:           initialData?.id || crypto.randomUUID(),
-      vendor:       data.vendor,
-      amount:       data.amount,
-      date:         data.date,
-      category:     data.category as ExpenseCategory,
-      description:  data.description || '',
-      status:       data.status as ExpenseStatus,
-      currency:     'INR',
-      receiptImage: receiptPreview || initialData?.receiptImage,
-      tags,
-      projectCode:  data.projectCode || undefined,
-      createdAt:    initialData?.createdAt || new Date().toISOString(),
-      updatedAt:    new Date().toISOString(),
-    };
-    onSubmit(expense);
-    if (!isEdit) {
-      setSuccess(true);
-      await new Promise(r => setTimeout(r, 850));
-      reset(); setReceiptPreview(null); setTags([]); setSuccess(false);
-      onDone?.();
+    if (isProcessing) return;
+    setIsProcessing(true);
+    
+    try {
+      const expense: Expense = {
+        id:           initialData?.id || crypto.randomUUID(),
+        vendor:       data.vendor,
+        amount:       data.amount,
+        date:         data.date,
+        category:     data.category as ExpenseCategory,
+        description:  data.description || '',
+        status:       data.status as ExpenseStatus,
+        currency:     'INR',
+        receiptImage: receiptPreview || initialData?.receiptImage,
+        tags,
+        projectCode:  data.projectCode || undefined,
+        createdAt:    initialData?.createdAt || new Date().toISOString(),
+        updatedAt:    new Date().toISOString(),
+      };
+      
+      onSubmit(expense);
+      
+      if (!isEdit) {
+        setSuccess(true);
+        await new Promise(r => setTimeout(r, 850));
+        reset(); 
+        setReceiptPreview(null); 
+        setTags([]); 
+        setSuccess(false);
+        onDone?.();
+      }
+      onClose?.();
+    } finally {
+      setIsProcessing(false);
     }
-    onClose?.();
   };
 
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)} className="flex flex-col">
+    <form 
+      onSubmit={(e) => { e.preventDefault(); }} 
+      className="flex flex-col"
+    >
 
       {/* ── Hero: amount + merchant + date ── */}
       <div
@@ -415,11 +431,11 @@ function FormBody({
       {/* ── Swipe / click to submit ── */}
       <SwipeToAdd
         onConfirm={() => {
-          if (!isSubmitting && !success) {
+          if (!isSubmitting && !success && !isProcessing) {
             handleSubmit(onFormSubmit)();
           }
         }}
-        isSubmitting={isSubmitting}
+        isSubmitting={isSubmitting || isProcessing}
         success={success}
         label={isEdit ? 'Swipe to Update' : 'Swipe to Add Expense'}
       />

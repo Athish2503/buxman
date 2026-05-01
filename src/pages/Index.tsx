@@ -187,58 +187,31 @@ const Index = () => {
         </nav>
 
         {/* Bottom: theme toggle + add */}
-        <div className="p-3 border-t border-border/30 space-y-2">
-          <button
-            onClick={toggleTheme}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-all"
-          >
-            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-          </button>
+        <div className="p-3 border-t border-border/30">
           <ExpenseForm onSubmit={handleAddExpense} />
         </div>
       </aside>
 
       {/* ── Main content ── */}
       <div className="sm:ml-60">
-        {/* Top bar (mobile) */}
-        <header className="sm:hidden sticky top-0 z-20 glass border-b border-border/40">
-          <div className="flex items-center justify-between px-4 h-14">
-            <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
-                <Receipt className="h-4 w-4 text-white" />
-              </div>
-              <span className="font-bold text-sm tracking-tight">Reimburse</span>
-            </div>
-            <button
-              onClick={toggleTheme}
-              className="h-8 w-8 rounded-xl border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground"
-            >
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-          </div>
-        </header>
-
-        {/* Page header (desktop) */}
-        <header className="hidden sm:flex sticky top-0 z-20 glass border-b border-border/40 items-center justify-between px-6 h-14">
-          <div>
-            <h2 className="text-sm font-bold capitalize">
-              {NAV_ITEMS.find(n => n.id === activeTab)?.label}
-            </h2>
-            <p className="text-[11px] text-muted-foreground">{format(now, 'EEEE, dd MMMM yyyy')}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            {expenses.length > 0 && (
-              <div className="text-right">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total Pending</p>
-                <p className="text-sm font-bold text-warning">{formatCompactCurrency(pendingAmount)}</p>
-              </div>
-            )}
-          </div>
-        </header>
-
         {/* Scrollable content */}
-        <main className="px-4 sm:px-6 py-5 sm:py-6 pb-32 sm:pb-8 max-w-5xl mx-auto">
+        <main className="px-4 sm:px-8 py-6 sm:py-10 pb-32 sm:pb-12 max-w-5xl mx-auto min-h-screen">
+          
+          {/* Section Header (Integrated into content) */}
+          <div className="mb-8 animate-fade-in">
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight mb-1 capitalize">
+              {NAV_ITEMS.find(n => n.id === activeTab)?.label}
+            </h1>
+            <div className="flex items-center gap-3">
+              <p className="text-xs sm:text-sm text-muted-foreground font-medium">{format(now, 'EEEE, dd MMMM yyyy')}</p>
+              {activeTab === 'dashboard' && expenses.length > 0 && (
+                <>
+                  <div className="h-1 w-1 rounded-full bg-muted-foreground/30" />
+                  <p className="text-xs sm:text-sm text-warning font-bold">{formatCompactCurrency(pendingAmount)} Pending</p>
+                </>
+              )}
+            </div>
+          </div>
 
           {/* ── DASHBOARD TAB ── */}
           {activeTab === 'dashboard' && (
@@ -422,15 +395,6 @@ const Index = () => {
               {/* ── EXPENSES TAB ── */}
           {activeTab === 'expenses' && (
             <div className="animate-fade-in space-y-5">
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <h2 className="font-bold text-lg">Expense Center</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">{expenses.length} total · {formatCurrency(totalAmount)}</p>
-                </div>
-                <div className="sm:hidden">
-                  <ExpenseForm onSubmit={handleAddExpense} />
-                </div>
-              </div>
 
               {/* Navigation pills */}
               <div className="flex bg-muted/40 p-1 rounded-xl w-full sm:w-fit">
@@ -473,9 +437,8 @@ const Index = () => {
           {/* ── ANALYTICS TAB ── */}
           {activeTab === 'analytics' && (
             <div className="space-y-5 animate-fade-in">
-              <div>
-                <h2 className="font-bold text-lg">Analytics</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Visual breakdown of your spending patterns</p>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs text-muted-foreground">Visual breakdown of your spending patterns</p>
               </div>
 
               {expenses.length === 0 ? (
@@ -533,10 +496,6 @@ const Index = () => {
           {/* ── SETTINGS TAB ── */}
           {activeTab === 'settings' && (
             <div className="animate-fade-in">
-              <div className="mb-5">
-                <h2 className="font-bold text-lg">Settings</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Manage your invoice details and preferences</p>
-              </div>
               <SettingsPage theme={theme} onThemeToggle={toggleTheme} />
             </div>
           )}
