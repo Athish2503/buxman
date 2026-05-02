@@ -199,50 +199,62 @@ export function MonthlyBarChart({ expenses }: ChartsProps) {
   );
 }
 
-export function VehicleEfficiencyChart({ logs }: { logs: any[] }) {
+export function VehicleEfficiencyChart({ logs, vehicles }: { logs: any[], vehicles: any[] }) {
   const data = useMemo(() => {
-    return [...logs]
-      .filter(l => l.economy)
-      .slice(0, 12)
-      .reverse()
-      .map(l => ({
-        date: format(new Date(l.date), 'dd MMM'),
-        economy: Number(l.economy?.toFixed(1))
-      }));
-  }, [logs]);
+    // Get unique dates across all logs for X-axis
+    const dates = Array.from(new Set(logs.filter(l => l.economy).map(l => format(new Date(l.date), 'dd MMM')))).reverse();
+    
+    return dates.map(date => {
+      const point: any = { date };
+      vehicles.forEach(v => {
+        const vLog = logs.find(l => l.vehicleId === v.id && format(new Date(l.date), 'dd MMM') === date);
+        if (vLog?.economy) {
+          point[v.name] = Number(vLog.economy.toFixed(1));
+        }
+      });
+      return point;
+    });
+  }, [logs, vehicles]);
 
-  if (data.length < 2) return (
+  if (logs.filter(l => l.economy).length < 2) return (
     <div className="h-48 flex items-center justify-center text-xs text-muted-foreground border border-dashed border-border/40 rounded-2xl">
-      Need 2+ full tank logs to show trend
+      Need 2+ logs with economy data to show trend
     </div>
   );
+
+  const COLORS = ['hsl(142 71% 45%)', 'hsl(262 85% 65%)', 'hsl(38 95% 58%)', 'hsl(199 89% 48%)'];
 
   return (
     <ResponsiveContainer width="100%" height={200}>
       <AreaChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
         <defs>
-          <linearGradient id="ecoGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="hsl(142 71% 45%)" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="hsl(142 71% 45%)" stopOpacity={0} />
-          </linearGradient>
+          {vehicles.map((v, i) => (
+            <linearGradient key={v.id} id={`ecoGrad-${v.id}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={COLORS[i % COLORS.length]} stopOpacity={0.2} />
+              <stop offset="95%" stopColor={COLORS[i % COLORS.length]} stopOpacity={0} />
+            </linearGradient>
+          ))}
         </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border) / 0.4)" />
         <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
         <YAxis hide domain={['dataMin - 2', 'dataMax + 2']} />
         <Tooltip 
-          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: 'none', borderRadius: '12px', fontSize: '10px' }}
-          itemStyle={{ color: 'hsl(142 71% 45%)', fontWeight: 'bold' }}
+          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: 'none', borderRadius: '12px', fontSize: '10px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
         />
-        <Area 
-          type="monotone" 
-          dataKey="economy" 
-          name="Economy" 
-          stroke="hsl(142 71% 45%)" 
-          strokeWidth={3} 
-          fill="url(#ecoGrad)" 
-          dot={{ r: 3, fill: 'hsl(142 71% 45%)', strokeWidth: 0 }}
-          activeDot={{ r: 5, fill: 'hsl(142 71% 45%)' }} 
-        />
+        {vehicles.map((v, i) => (
+          <Area 
+            key={v.id}
+            type="monotone" 
+            dataKey={v.name} 
+            name={v.name} 
+            stroke={COLORS[i % COLORS.length]} 
+            strokeWidth={3} 
+            fill={`url(#ecoGrad-${v.id})`} 
+            dot={{ r: 3, fill: COLORS[i % COLORS.length], strokeWidth: 0 }}
+            activeDot={{ r: 5, fill: COLORS[i % COLORS.length] }} 
+          />
+        ))}
+        {vehicles.length > 1 && <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />}
       </AreaChart>
     </ResponsiveContainer>
   );

@@ -53,25 +53,51 @@ export const fuelService = {
   },
   
   addLog(log: FuelLog) {
-    let all = this.getLogs();
+    const all = [log, ...this.getLogs()];
+    this.saveAll(all);
+  },
+  
+  updateLog(updated: FuelLog) {
+    const all = this.getLogs().map(l => l.id === updated.id ? updated : l);
+    this.saveAll(all);
+  },
+
+  saveAll(logs: FuelLog[]) {
+    // Re-calculate all economy/distance stats whenever list changes to ensure accuracy
+    // Sort by odometer ascending first to calculate forwards
+    const sorted = [...logs].sort((a, b) => a.odometer - b.odometer);
     
-    // Calculate distance and economy if there's a previous log for this vehicle
-    const vehicleLogs = all.filter(l => l.vehicleId === log.vehicleId).sort((a, b) => b.odometer - a.odometer);
-    const prev = vehicleLogs.find(l => l.odometer < log.odometer);
-    
-    if (prev) {
-      log.distanceSinceLast = log.odometer - prev.odometer;
-      if (log.isFullTank && prev.isFullTank) {
-        log.economy = log.distanceSinceLast / log.liters;
+    const processed = sorted.map((log, index) => {
+      const prev = sorted.slice(0, index).reverse().find(l => l.vehicleId === log.vehicleId);
+      
+      if (prev) {
+        log.distanceSinceLast = log.odometer - prev.odometer;
+        
+        // Calculate economy: distance since last / liters added this time
+        // This provides an "interval efficiency" estimate even for partial fills
+        if (log.liters > 0) {
+          log.economy = log.distanceSinceLast / log.liters;
+          
+          // Calculate trend (comparison to previous log's economy)
+          if (prev.economy) {
+            const diff = log.economy - prev.economy;
+            log.economyTrend = (diff / prev.economy) * 100;
+          }
+        }
+      } else {
+        log.distanceSinceLast = undefined;
+        log.economy = undefined;
+        log.economyTrend = undefined;
       }
-    }
-    
-    all = [log, ...all];
-    storageEngine.set(KEYS.fuel, JSON.stringify(all));
+      return log;
+    });
+
+    storageEngine.set(KEYS.fuel, JSON.stringify(processed));
   },
   
   removeLog(id: string) {
-    storageEngine.set(KEYS.fuel, JSON.stringify(this.getLogs().filter(l => l.id !== id)));
+    const remaining = this.getLogs().filter(l => l.id !== id);
+    this.saveAll(remaining);
   }
 };
 

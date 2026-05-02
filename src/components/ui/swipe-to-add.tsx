@@ -46,15 +46,24 @@ export function SwipeToAdd({
   const magnetOpacity = useTransform(pct, [0.6, 0.9], [0, 1]);
 
   const lastTick = useRef(0);
+  const isTriggered = useRef(false);
+
+  useEffect(() => {
+    isTriggered.current = false;
+  }, [success, isSubmitting]);
+
   useEffect(() => {
     return pct.on('change', (v) => {
-      if (done || success || isSubmitting) return;
+      if (done || success || isSubmitting || isTriggered.current) return;
+      
       const tick = Math.floor(v / 0.15);
       if (tick > lastTick.current && v < 0.9) {
         lastTick.current = tick;
         haptics.selection();
       }
-      if (v >= 0.98 && !done) {
+
+      if (v >= 0.98 && !done && !isTriggered.current) {
+        isTriggered.current = true;
         setDone(true);
         haptics.success();
         onConfirm();

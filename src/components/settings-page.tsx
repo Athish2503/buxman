@@ -614,6 +614,65 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
         </div>
         
         <div className="grid grid-cols-1 gap-2">
+           <div className="p-5 rounded-3xl bg-card/30 border border-border/40 space-y-4">
+             <div className="flex items-center gap-3">
+               <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+                 <Database className="h-5 w-5 text-primary" />
+               </div>
+               <div>
+                 <h4 className="text-sm font-bold">Migration Hub</h4>
+                 <p className="text-[10px] text-muted-foreground">Backup & restore your full ecosystem</p>
+               </div>
+             </div>
+
+             <div className="grid grid-cols-2 gap-3">
+               <Button 
+                 variant="outline" 
+                 className="h-14 rounded-2xl border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary gap-2 font-bold transition-all"
+                 onClick={() => {
+                   import('@/lib/data-migration').then(m => m.dataMigrationService.downloadBackup());
+                   toast.success('Generating secure backup...', { description: 'Save this file to a safe location.' });
+                 }}
+               >
+                 <ChevronRight className="h-4 w-4 rotate-90" />
+                 Export All
+               </Button>
+
+               <label className="relative cursor-pointer">
+                 <input 
+                   type="file" 
+                   accept=".json"
+                   className="sr-only"
+                   onChange={async (e) => {
+                     const file = e.target.files?.[0];
+                     if (!file) return;
+                     
+                     const reader = new FileReader();
+                     reader.onload = async (event) => {
+                       const content = event.target?.result as string;
+                       const m = await import('@/lib/data-migration');
+                       const success = await m.dataMigrationService.importData(content);
+                       if (success) {
+                         toast.success('System Restored!', { 
+                           description: 'Your data has been imported. The app will now reload.',
+                           duration: 2000
+                         });
+                         setTimeout(() => window.location.reload(), 2000);
+                       } else {
+                         toast.error('Restore Failed', { description: 'The backup file is invalid or corrupted.' });
+                       }
+                     };
+                     reader.readAsText(file);
+                   }}
+                 />
+                 <div className="h-14 rounded-2xl border border-dashed border-border/60 hover:border-primary/40 hover:bg-muted/50 flex items-center justify-center gap-2 text-sm font-bold text-muted-foreground transition-all">
+                   <ChevronRight className="h-4 w-4 -rotate-90" />
+                   Import Data
+                 </div>
+               </label>
+             </div>
+           </div>
+
            {[
              { label: 'Clean Expenses', icon: Receipt, type: 'expenses' },
              { label: 'Wipe Fuel Logs', icon: Fuel, type: 'fuel' },

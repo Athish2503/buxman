@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
-import { Fuel, Car, Bike, Plus, Trash2, ArrowRight, IndianRupee, MapPin, GaugeCircle, TrendingUp, Settings } from 'lucide-react';
+import { Fuel, Car, Bike, Plus, Trash2, ArrowRight, IndianRupee, MapPin, GaugeCircle, TrendingUp, Settings, Pencil } from 'lucide-react';
 import { FuelLog, VehicleRate } from '@/types/modules';
 import { fuelService, mileageService } from '@/lib/modules-storage';
 import { haptics } from '@/lib/haptics';
@@ -20,10 +20,29 @@ export function VehicleTracker() {
   
   const [activeVehId, setActiveVehId] = useState<string>(vehicles[0]?.id || '');
 
+  // Trigger re-calculation for legacy data
+  useEffect(() => {
+    const needsMigration = logs.some(l => l.distanceSinceLast === undefined && logs.length > 1);
+    if (needsMigration) {
+      console.log('[FuelTracker] Migrating legacy logs to new metric system...');
+      fuelService.saveAll(logs);
+      setLogs(fuelService.getLogs());
+    }
+  }, []);
+
   const reload = () => {
     setVehicles(mileageService.getVehicles());
     setLogs(fuelService.getLogs());
   };
+
+  const fleetStats = useMemo(() => {
+    const totalSpent = logs.reduce((s, l) => s + l.totalCost, 0);
+    const totalDist = logs.reduce((s, l) => s + (l.distanceSinceLast || 0), 0);
+    const totalLiters = logs.reduce((s, l) => s + l.liters, 0);
+    const avgEconomy = totalLiters > 0 ? totalDist / totalLiters : 0;
+    
+    return { totalSpent, totalDist, avgEconomy, vehicleCount: vehicles.length };
+  }, [logs, vehicles]);
 
   const handleDelete = (id: string) => {
     fuelService.removeLog(id);
@@ -100,22 +119,52 @@ export function VehicleTracker() {
         </div>
 
         <div className="space-y-2">
-          {vehicles.map(v => (
-            <div key={v.id} className="flex items-center justify-between p-4 rounded-2xl border border-border/40 bg-card/60 glass">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
-                  {v.icon === 'car' ? <Car className="h-5 w-5" /> : <Bike className="h-5 w-5" />}
+          {vehicles.map(v => {
+            const vLogs = logs.filter(l => l.vehicleId === v.id);
+            const economies = vLogs.filter(l => l.economy).map(l => l.economy!);
+            const avgEco = economies.length > 0 ? economies.reduce((s, e) => s + e, 0) / economies.length : 0;
+            const latestLog = vLogs.sort((a,b) => b.odometer - a.odometer)[0];
+            
+            return (
+              <div key={v.id} className="flex flex-col p-4 rounded-2xl border border-border/40 bg-card/60 glass gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+                      {v.icon === 'car' ? <Car className="h-5 w-5" /> : <Bike className="h-5 w-5" />}
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm">{v.name}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Personal Vehicle</p>
+                    </div>
+                  </div>
+                  <button onClick={() => handleDeleteVehicle(v.id)} className="h-8 w-8 text-destructive flex items-center justify-center hover:bg-destructive/10 rounded-lg transition-colors">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
-                <div>
-                  <p className="font-bold text-sm">{v.name}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Personal Vehicle</p>
+                
+                <div className="grid grid-cols-2 gap-2 pt-3 border-t border-border/10">
+                  <div className="p-2 rounded-xl bg-muted/20">
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Avg Efficiency</p>
+                    <p className="text-sm font-black text-primary">{avgEco.toFixed(1)} <span className="text-[10px] font-medium opacity-60">km/l</span></p>
+                  </div>
+                  <div className="p-2 rounded-xl bg-muted/20">
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Latest Trend</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-black">{latestLog?.economy?.toFixed(1) || '0.0'} <span className="text-[10px] font-medium opacity-60">km/l</span></p>
+                      {latestLog?.economyTrend !== undefined && (
+                        <div className={cn(
+                          "flex items-center",
+                          latestLog.economyTrend >= 0 ? "text-success" : "text-destructive"
+                        )}>
+                          {latestLog.economyTrend >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingUp className="h-3 w-3 rotate-180" />}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-              <button onClick={() => handleDeleteVehicle(v.id)} className="h-8 w-8 text-destructive flex items-center justify-center hover:bg-destructive/10 rounded-lg transition-colors">
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="p-5 rounded-2xl border border-border/40 bg-card/40 space-y-4 mt-6">
@@ -183,9 +232,28 @@ export function VehicleTracker() {
         </div>
       </div>
 
+      {/* Fleet Overview Dashboard */}
+      {vehicles.length > 1 && (
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-primary/5 border border-primary/10 rounded-2xl p-3 text-center">
+            <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Fleet Economy</p>
+            <p className="text-sm font-black text-primary">{fleetStats.avgEconomy.toFixed(1)} <span className="text-[8px] font-bold opacity-60">km/l</span></p>
+          </div>
+          <div className="bg-card border border-border/40 rounded-2xl p-3 text-center shadow-sm">
+            <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Total Distance</p>
+            <p className="text-sm font-black">{fleetStats.totalDist.toLocaleString()} <span className="text-[8px] font-bold opacity-60">km</span></p>
+          </div>
+          <div className="bg-card border border-border/40 rounded-2xl p-3 text-center shadow-sm">
+            <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Total Spend</p>
+            <p className="text-sm font-black">₹{Math.round(fleetStats.totalSpent).toLocaleString()}</p>
+          </div>
+        </div>
+      )}
+
       {/* Vehicle Selector Tabs */}
       {vehicles.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 shrink-0 mr-1">Vehicles</p>
           {vehicles.map(v => (
             <button
               key={v.id}
@@ -193,7 +261,7 @@ export function VehicleTracker() {
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-xl border whitespace-nowrap transition-all",
                 activeVehId === v.id 
-                  ? 'bg-primary/10 border-primary/30 text-primary' 
+                  ? 'bg-primary/10 border-primary/30 text-primary shadow-sm scale-105 z-10' 
                   : 'bg-card/50 border-border/40 text-muted-foreground'
               )}
             >
@@ -216,11 +284,21 @@ export function VehicleTracker() {
               <div className="absolute -right-2 -top-2 opacity-5 group-hover:opacity-10 transition-opacity">
                 <TrendingUp className="h-16 w-16" />
               </div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <div className="h-6 w-6 rounded-md bg-success/20 flex items-center justify-center">
-                  <TrendingUp className="h-3.5 w-3.5 text-success" />
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-6 w-6 rounded-md bg-success/20 flex items-center justify-center">
+                    <TrendingUp className="h-3.5 w-3.5 text-success" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Efficiency</span>
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Efficiency</span>
+                {activeLogs[0]?.economyTrend !== undefined && (
+                  <span className={cn(
+                    "text-[10px] font-bold",
+                    activeLogs[0].economyTrend >= 0 ? "text-success" : "text-destructive"
+                  )}>
+                    {activeLogs[0].economyTrend >= 0 ? '+' : ''}{activeLogs[0].economyTrend.toFixed(1)}%
+                  </span>
+                )}
               </div>
               <p className="text-2xl font-black font-mono tracking-tight text-foreground">{stats.avgEconomy.toFixed(1)} <span className="text-sm font-semibold text-muted-foreground">km/l</span></p>
             </motion.div>
@@ -249,10 +327,7 @@ export function VehicleTracker() {
             <div className="rounded-2xl border border-border/60 bg-card/60 p-4 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Economy Trend (km/l)</h4>
-                <div className="flex items-center gap-1.5">
-                   <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                   <span className="text-[9px] font-bold text-primary">LIVE DATA</span>
-                </div>
+                
               </div>
               <div className="h-32 w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -347,20 +422,51 @@ export function VehicleTracker() {
                   </div>
 
                   <div className="flex items-center justify-between border-t border-border/30 pt-3 mt-1">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
                       {log.economy ? (
-                        <span className="text-xs font-bold px-2.5 py-1 bg-success/15 text-success rounded-lg border border-success/20">
-                          {log.economy.toFixed(1)} km/l
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold px-2.5 py-1 bg-primary/10 text-primary rounded-lg border border-primary/20">
+                            {log.economy.toFixed(1)} km/l
+                          </span>
+                          
+                          {log.economyTrend !== undefined && (
+                            <div className={cn(
+                              "flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-black",
+                              log.economyTrend >= 0 
+                                ? "bg-success/15 text-success border border-success/20" 
+                                : "bg-destructive/15 text-destructive border border-destructive/20"
+                            )}>
+                              {log.economyTrend >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingUp className="h-3 w-3 rotate-180" />}
+                              {Math.abs(log.economyTrend).toFixed(1)}%
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-xs font-semibold text-muted-foreground px-2 py-1 bg-muted/30 rounded-lg">
-                          {log.distanceSinceLast ? `+${log.distanceSinceLast} km` : 'First Log'}
+                          First Log
+                        </span>
+                      )}
+
+                      {log.distanceSinceLast && (
+                        <span className="text-[10px] font-bold text-muted-foreground/60 flex items-center gap-1">
+                          <MapPin className="h-3 w-3" /> {log.distanceSinceLast} km covered
                         </span>
                       )}
                     </div>
-                    <button onClick={() => handleDelete(log.id)} className="h-7 w-7 text-muted-foreground hover:text-destructive flex items-center justify-center transition-colors">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <VehicleLogForm
+                        onSuccess={reload}
+                        editLog={log}
+                        trigger={
+                          <button className="h-8 w-8 text-muted-foreground hover:text-primary flex items-center justify-center transition-colors">
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        }
+                      />
+                      <button onClick={() => handleDelete(log.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive flex items-center justify-center transition-colors">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               ))}

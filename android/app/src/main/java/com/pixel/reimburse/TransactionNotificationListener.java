@@ -27,7 +27,10 @@ public class TransactionNotificationListener extends NotificationListenerService
         // Basic check for transaction-related keywords
         if (fullText.contains("rs.") || fullText.contains("inr") || 
             fullText.contains("debited") || fullText.contains("spent") || 
-            fullText.contains("transaction") || fullText.contains("paid to")) {
+            fullText.contains("transaction") || fullText.contains("paid to") ||
+            fullText.contains("vpa") || fullText.contains("upi") ||
+            fullText.contains("merchant") || fullText.contains("credited") ||
+            fullText.contains("purchased") || fullText.contains("spent on")) {
             
             Log.d(TAG, "Transaction-like notification detected from: " + packageName);
             

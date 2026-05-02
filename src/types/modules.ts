@@ -21,6 +21,7 @@ export interface FuelLog {
   // Computed (set during save or calculation)
   distanceSinceLast?: number;
   economy?: number; // km per liter
+  economyTrend?: number; // percentage change vs previous
   
   createdAt: string;
 }

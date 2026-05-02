@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Receipt, BarChart3, Settings,
   Wallet, TrendingUp, Clock, CheckCircle2, Moon, Sun,
-  Zap, ArrowRight, ChevronRight, Plus, Car, Fuel, RefreshCw, Briefcase,
+  Zap, ArrowRight, ChevronRight, Plus, Car, Bike, Fuel, RefreshCw, Briefcase,
   GaugeCircle, IndianRupee
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -142,31 +142,44 @@ const Index = () => {
     return ((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100;
   }, [thisMonthTotal, lastMonthTotal]);
 
-  const vehicleStats = useMemo(() => {
-    const mLogs = mileageService.getLogs();
+  const vehicleSummaries = useMemo(() => {
+    const vList = mileageService.getVehicles();
     const fLogs = fuelService.getLogs();
-    const totalDist = mLogs.reduce((s, l) => s + l.distance, 0);
-    const totalCost = fLogs.reduce((s, l) => s + l.totalCost, 0);
-    const totalLiters = fLogs.reduce((s, l) => s + l.liters, 0);
     
-    const avgEff = totalLiters > 0 ? (totalLiters / (totalDist / 100)) : 0;
-    const cpKm = totalDist > 0 ? (totalCost / totalDist) : 0;
-    
-    const economies = fLogs.filter(l => l.economy).map(l => l.economy!);
-    const recentEco = economies.slice(0, 3).reduce((s, e) => s + e, 0) / Math.max(1, economies.slice(0, 3).length);
-    const overallEco = economies.reduce((s, e) => s + e, 0) / Math.max(1, economies.length);
-    
-    return {
-      avgEfficiency: avgEff,
-      costPerKm: cpKm,
-      trend: recentEco > overallEco ? 'Positive' : economies.length > 0 ? 'Neutral' : 'N/A',
-      efficiencyPercent: Math.min(100, Math.max(20, (recentEco / Math.max(1, overallEco)) * 50)) || 0,
-      totalDistance: totalDist,
-      totalCost: totalCost,
-      overallEco: overallEco
-    };
+    return vList.map(v => {
+      const vLogs = fLogs.filter(l => l.vehicleId === v.id);
+      const economies = vLogs.filter(l => l.economy).map(l => l.economy!);
+      const avgEco = economies.length > 0 ? economies.reduce((s, e) => s + e, 0) / economies.length : 0;
+      const latestLog = vLogs[0];
+      const trend = latestLog?.economyTrend || 0;
+      const totalDist = vLogs.reduce((s, l) => s + (l.distanceSinceLast || 0), 0);
+      const totalCost = vLogs.reduce((s, l) => s + l.totalCost, 0);
+
+      return {
+        ...v,
+        avgEco,
+        latestEco: latestLog?.economy || 0,
+        trend,
+        totalDist,
+        totalCost,
+        costPerKm: totalDist > 0 ? totalCost / totalDist : 0
+      };
+    }).sort((a, b) => b.totalDist - a.totalDist);
   }, [expenses]); 
 
+  const vehicleStats = useMemo(() => {
+    const fLogs = fuelService.getLogs();
+    const totalDist = vehicleSummaries.reduce((s, v) => s + v.totalDist, 0);
+    const totalCost = vehicleSummaries.reduce((s, v) => s + v.totalCost, 0);
+    const overallEco = vehicleSummaries.reduce((s, v) => s + v.avgEco, 0) / Math.max(1, vehicleSummaries.filter(v => v.avgEco > 0).length);
+    
+    return {
+      totalDistance: totalDist,
+      totalCost: totalCost,
+      overallEco: overallEco,
+      costPerKm: totalDist > 0 ? totalCost / totalDist : 0
+    };
+  }, [vehicleSummaries]);
   const settings = settingsService.get();
 
   if (isLoading) {
@@ -338,7 +351,7 @@ const Index = () => {
                             <TrendingUp className="h-4 w-4" />
                           </div>
                         </div>
-                        <VehicleEfficiencyChart logs={fuelService.getLogs()} />
+                        <VehicleEfficiencyChart logs={fuelService.getLogs()} vehicles={mileageService.getVehicles()} />
                       </div>
 
                       <div className="rounded-2xl border border-border/60 bg-card/80 p-5">
@@ -365,6 +378,37 @@ const Index = () => {
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {vehicleSummaries.map(v => (
+                        <div key={v.id} className="rounded-2xl border border-border/40 bg-card/60 p-4 flex flex-col gap-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                                {v.icon === 'car' ? <Car className="h-4 w-4" /> : <Bike className="h-4 w-4" />}
+                              </div>
+                              <p className="font-bold text-sm">{v.name}</p>
+                            </div>
+                            <div className={cn(
+                              "text-[10px] font-black px-2 py-0.5 rounded-full border",
+                              v.trend >= 0 ? "bg-success/10 text-success border-success/20" : "bg-destructive/10 text-destructive border-destructive/20"
+                            )}>
+                              {v.trend >= 0 ? '+' : ''}{v.trend.toFixed(1)}%
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 mt-1">
+                            <div>
+                              <p className="text-[9px] text-muted-foreground uppercase font-bold">Avg. Economy</p>
+                              <p className="text-sm font-black">{v.avgEco.toFixed(1)} <span className="text-[10px] font-medium opacity-60">km/l</span></p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] text-muted-foreground uppercase font-bold">Cost / KM</p>
+                              <p className="text-sm font-black text-primary">₹ {v.costPerKm.toFixed(1)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
                     <button 
                       onClick={() => setActiveTab('vehicle')}
                       className="w-full py-4 rounded-2xl border border-border/40 bg-muted/20 hover:bg-muted/30 transition-all flex items-center justify-center gap-2 group"
@@ -384,29 +428,46 @@ const Index = () => {
                         </div>
                         <div className="rounded-2xl border border-border/40 bg-card/60 p-4 lg:col-span-1">
                           <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-sm font-bold tracking-tight">Vehicle Efficiency</h3>
+                            <h3 className="text-sm font-bold tracking-tight">Fleet Efficiency</h3>
                             <Car className="h-4 w-4 text-muted-foreground" />
                           </div>
                           <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-muted-foreground">Mileage Trend</span>
-                              <span className={cn("text-xs font-bold", vehicleStats.trend === 'Positive' ? 'text-success' : 'text-warning')}>{vehicleStats.trend}</span>
-                            </div>
-                            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                              <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${vehicleStats.efficiencyPercent}%` }}
-                                className={cn("h-full", vehicleStats.trend === 'Positive' ? 'bg-success' : 'bg-warning')} 
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 mt-4">
-                              <div className="p-2 rounded-xl bg-muted/30">
-                                <p className="text-[9px] text-muted-foreground uppercase font-bold">Avg. Fuel</p>
-                                <p className="text-sm font-bold">{vehicleStats.avgEfficiency > 0 ? `${vehicleStats.avgEfficiency.toFixed(1)}L / 100k` : 'N/A'}</p>
+                            {vehicleSummaries.map(v => (
+                              <div key={v.id} className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    {v.icon === 'car' ? <Car className="h-3 w-3 text-primary" /> : <Bike className="h-3 w-3 text-primary" />}
+                                    <span className="text-xs font-bold">{v.name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-xs font-black">{v.avgEco.toFixed(1)} <span className="text-[10px] font-normal text-muted-foreground">km/l</span></span>
+                                    {v.trend !== 0 && (
+                                      <div className={cn(
+                                        "flex items-center text-[10px] font-bold",
+                                        v.trend > 0 ? "text-success" : "text-destructive"
+                                      )}>
+                                        {v.trend > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingUp className="h-3 w-3 rotate-180" />}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                                  <motion.div 
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${Math.min(100, (v.avgEco / 20) * 100)}%` }}
+                                    className={cn("h-full", v.trend >= 0 ? "bg-primary" : "bg-warning")} 
+                                  />
+                                </div>
                               </div>
+                            ))}
+                            <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-border/30">
                               <div className="p-2 rounded-xl bg-muted/30">
-                                <p className="text-[9px] text-muted-foreground uppercase font-bold">Cost / km</p>
-                                <p className="text-sm font-bold">{vehicleStats.costPerKm > 0 ? `₹ ${vehicleStats.costPerKm.toFixed(1)}` : 'N/A'}</p>
+                                <p className="text-[9px] text-muted-foreground uppercase font-bold">Avg. Cost</p>
+                                <p className="text-sm font-bold">₹ {vehicleStats.costPerKm.toFixed(1)}/km</p>
+                              </div>
+                              <div className="p-2 rounded-xl bg-muted/30 text-right">
+                                <p className="text-[9px] text-muted-foreground uppercase font-bold">Total Dist</p>
+                                <p className="text-sm font-bold">{vehicleStats.totalDistance.toLocaleString()} km</p>
                               </div>
                             </div>
                           </div>

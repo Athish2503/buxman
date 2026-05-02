@@ -16,31 +16,46 @@ import { format } from 'date-fns';
 interface VehicleLogFormProps {
   onSuccess: () => void;
   trigger?: React.ReactNode;
+  editLog?: FuelLog;
 }
 
-export function VehicleLogForm({ onSuccess, trigger }: VehicleLogFormProps) {
+export function VehicleLogForm({ onSuccess, trigger, editLog }: VehicleLogFormProps) {
   const [open, setOpen] = useState(false);
   const isMobile = useIsMobile();
   
   const [vehicles] = useState<VehicleRate[]>(() => mileageService.getVehicles());
-  const [activeVehId, setActiveVehId] = useState(vehicles[0]?.id || '');
+  const [activeVehId, setActiveVehId] = useState(editLog?.vehicleId || vehicles[0]?.id || '');
   
-  const [odometer, setOdometer] = useState('');
-  const [liters, setLiters] = useState('');
-  const [price, setPrice] = useState('');
-  const [isFullTank, setIsFullTank] = useState(true);
-  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [odometer, setOdometer] = useState(editLog?.odometer.toString() || '');
+  const [liters, setLiters] = useState(editLog?.liters.toString() || '');
+  const [price, setPrice] = useState(editLog?.pricePerLiter.toString() || '');
+  const [isFullTank, setIsFullTank] = useState(editLog?.isFullTank ?? true);
+  const [date, setDate] = useState(editLog?.date || format(new Date(), 'yyyy-MM-dd'));
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  // Auto-fill price when vehicle changes
+  // Update state when editLog changes
   useEffect(() => {
-    const v = vehicles.find(v => v.id === activeVehId);
-    if (v?.defaultFuelPrice) {
-      setPrice(v.defaultFuelPrice.toString());
+    if (editLog) {
+      setActiveVehId(editLog.vehicleId);
+      setOdometer(editLog.odometer.toString());
+      setLiters(editLog.liters.toString());
+      setPrice(editLog.pricePerLiter.toString());
+      setIsFullTank(editLog.isFullTank);
+      setDate(editLog.date);
     }
-  }, [activeVehId, vehicles]);
+  }, [editLog]);
+
+  // Auto-fill price when vehicle changes (only for new logs)
+  useEffect(() => {
+    if (!editLog) {
+      const v = vehicles.find(v => v.id === activeVehId);
+      if (v?.defaultFuelPrice) {
+        setPrice(v.defaultFuelPrice.toString());
+      }
+    }
+  }, [activeVehId, vehicles, editLog]);
 
   const handleSave = async () => {
     if (!odometer || !liters || !price) {
@@ -48,13 +63,14 @@ export function VehicleLogForm({ onSuccess, trigger }: VehicleLogFormProps) {
       return;
     }
 
+    if (isSubmitting || success) return;
     setIsSubmitting(true);
     
-    // Simulate network delay for the swipe animation feel
+    // Simulate delay
     await new Promise(r => setTimeout(r, 600));
 
     const log: FuelLog = {
-      id: crypto.randomUUID(),
+      id: editLog?.id || crypto.randomUUID(),
       vehicleId: activeVehId,
       date,
       odometer: Number(odometer),
@@ -62,22 +78,29 @@ export function VehicleLogForm({ onSuccess, trigger }: VehicleLogFormProps) {
       pricePerLiter: Number(price),
       totalCost: Number(liters) * Number(price),
       isFullTank,
-      createdAt: new Date().toISOString()
+      createdAt: editLog?.createdAt || new Date().toISOString()
     };
 
-    fuelService.addLog(log);
+    if (editLog) {
+      fuelService.updateLog(log);
+    } else {
+      fuelService.addLog(log);
+    }
+
     setSuccess(true);
     haptics.success();
-    toast.success('Fuel log saved!');
+    toast.success(editLog ? 'Fuel log updated!' : 'Fuel log saved!');
 
     setTimeout(() => {
       setOpen(false);
       setSuccess(false);
       setIsSubmitting(false);
-      setOdometer('');
-      setLiters('');
+      if (!editLog) {
+        setOdometer('');
+        setLiters('');
+      }
       onSuccess();
-    }, 1500);
+    }, 1200);
   };
 
   const overlay = (
@@ -107,7 +130,7 @@ export function VehicleLogForm({ onSuccess, trigger }: VehicleLogFormProps) {
                   <div className="h-7 w-7 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
                     <Fuel className="h-3.5 w-3.5 text-white" />
                   </div>
-                  <h2 className="text-sm font-bold">Log Fuel</h2>
+                  <h2 className="text-sm font-bold">{editLog ? 'Edit Fuel Log' : 'Log Fuel'}</h2>
                 </div>
                 <button onClick={() => setOpen(false)} className="absolute right-5 h-8 w-8 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground"><X className="h-4 w-4" /></button>
               </div>
@@ -126,7 +149,7 @@ export function VehicleLogForm({ onSuccess, trigger }: VehicleLogFormProps) {
               <div className="flex items-center justify-between px-6 py-4 border-b border-border/30">
                 <div className="flex items-center gap-2.5">
                   <div className="h-8 w-8 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow"><Fuel className="h-4 w-4 text-white" /></div>
-                  <h2 className="font-bold">Log Fuel Fill-up</h2>
+                  <h2 className="font-bold">{editLog ? 'Edit Fuel Record' : 'Log Fuel Fill-up'}</h2>
                 </div>
                 <button onClick={() => setOpen(false)} className="h-8 w-8 rounded-xl bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
               </div>
@@ -229,7 +252,7 @@ export function VehicleLogForm({ onSuccess, trigger }: VehicleLogFormProps) {
             onConfirm={handleSave} 
             isSubmitting={isSubmitting} 
             success={success} 
-            label="Swipe to Log Fuel"
+            label={editLog ? "Swipe to Update Record" : "Swipe to Log Fuel"}
           />
         </div>
       </div>

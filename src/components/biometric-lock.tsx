@@ -13,30 +13,52 @@ interface BiometricLockProps {
 
 export function BiometricLock({ children, enabled }: BiometricLockProps) {
   const [isLocked, setIsLocked] = useState(enabled);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   useEffect(() => {
     if (enabled) {
-      handleAuth();
+      // If we are currently locked, try to auth immediately
+      if (isLocked && !isAuthenticating) {
+        handleAuth();
+      }
       
       // Re-lock on app resume (Banking style security)
       const handleResume = () => {
         setIsLocked(true);
-        handleAuth();
+        // handleAuth will be triggered by the isLocked change if we want it automatic
+        // but it's better to call it here to ensure it happens on resume
       };
       
-      document.addEventListener('resume', handleResume);
-      window.addEventListener('focus', () => {
+      const handleFocus = () => {
         // Optional: lock on focus if not native but enabled
         if (!Capacitor.isNativePlatform() && enabled) {
-          // setIsLocked(true); // Can be annoying on web, but good for testing
+          // setIsLocked(true); 
         }
-      });
+      };
 
-      return () => document.removeEventListener('resume', handleResume);
+      document.addEventListener('resume', handleResume);
+      window.addEventListener('focus', handleFocus);
+
+      return () => {
+        document.removeEventListener('resume', handleResume);
+        window.removeEventListener('focus', handleFocus);
+      };
+    } else {
+      setIsLocked(false);
     }
   }, [enabled]);
 
+  // Handle re-auth when isLocked becomes true
+  useEffect(() => {
+    if (enabled && isLocked && !isAuthenticating) {
+      handleAuth();
+    }
+  }, [isLocked, enabled]);
+
   const handleAuth = async () => {
+    if (isAuthenticating) return;
+    
+    setIsAuthenticating(true);
     try {
       const success = await biometrics.authenticate();
       if (success) {
@@ -49,6 +71,8 @@ export function BiometricLock({ children, enabled }: BiometricLockProps) {
       console.error('Auth error:', error);
       // Fallback if native auth fails/errors
       if (!Capacitor.isNativePlatform()) setIsLocked(false);
+    } finally {
+      setIsAuthenticating(false);
     }
   };
 

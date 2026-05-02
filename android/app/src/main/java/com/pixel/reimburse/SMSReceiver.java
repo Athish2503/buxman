@@ -36,7 +36,9 @@ public class SMSReceiver extends BroadcastReceiver {
                         if (lowerBody.contains("rs.") || lowerBody.contains("inr") || 
                             lowerBody.contains("debited") || lowerBody.contains("spent") || 
                             lowerBody.contains("transaction") || lowerBody.contains("vpa") ||
-                            lowerBody.contains("paid to") || lowerBody.contains("credited")) {
+                            lowerBody.contains("paid to") || lowerBody.contains("credited") ||
+                            lowerBody.contains("upi") || lowerBody.contains("merchant") ||
+                            lowerBody.contains("purchased") || lowerBody.contains("spent on")) {
                             
                             Log.d(TAG, "Transaction SMS detected!");
 

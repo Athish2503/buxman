@@ -32,17 +32,24 @@ export function SMSExpenseNudge({ onAdd }: SMSExpenseNudgeProps) {
     };
 
     // Check for pending transaction on mount (Cold start)
-    if ((window as any).NativeBridge?.getPendingTransaction) {
-      const pending = (window as any).NativeBridge.getPendingTransaction();
-      if (pending) {
-        handleTransaction({ detail: { body: pending } });
+    const checkPending = () => {
+      if ((window as any).NativeBridge?.getPendingTransaction) {
+        const pending = (window as any).NativeBridge.getPendingTransaction();
+        if (pending) {
+          console.log('[SMSNudge] Found pending transaction on mount');
+          handleTransaction({ detail: { body: pending } });
+        }
       }
-    }
+    };
+
+    // Run check after a short delay to ensure bridge is ready
+    const timer = setTimeout(checkPending, 1000);
 
     window.addEventListener('simulate-sms', handleTransaction);
     window.addEventListener('notification-transaction', handleTransaction);
     
     return () => {
+      clearTimeout(timer);
       window.removeEventListener('simulate-sms', handleTransaction);
       window.removeEventListener('notification-transaction', handleTransaction);
     };

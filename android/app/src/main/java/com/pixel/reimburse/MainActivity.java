@@ -150,9 +150,18 @@ public class MainActivity extends BridgeActivity {
 
     private void dispatchTransaction(String body) {
         if (body == null) return;
+        
+        // Encode body to Base64 to avoid issues with special characters in JS
+        String encodedBody = "";
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            encodedBody = java.util.Base64.getEncoder().encodeToString(body.getBytes());
+        } else {
+            encodedBody = android.util.Base64.encodeToString(body.getBytes(), android.util.Base64.NO_WRAP);
+        }
+
+        final String finalEncoded = encodedBody;
         bridge.getWebView().post(() -> bridge.getWebView().evaluateJavascript(
-            "window.dispatchEvent(new CustomEvent('notification-transaction', { detail: { body: '" + 
-            body.replace("'", "\\'").replace("\n", " ") + "' } }));",
+            "window.dispatchEvent(new CustomEvent('notification-transaction', { detail: { body: atob('" + finalEncoded + "') } }));",
             null
         ));
     }
