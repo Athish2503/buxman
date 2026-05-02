@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { storageEngine } from './storage-engine';
 
 const DATA_VERSION = '1.0';
@@ -38,16 +39,20 @@ export const dataMigrationService = {
    */
   async importData(jsonString: string): Promise<boolean> {
     try {
+      console.log('[Data Migration] Starting import...');
       const data = JSON.parse(jsonString) as FullExportData;
       
       // Basic validation
-      if (!data.version || !Array.isArray(data.expenses)) {
-        throw new Error('Invalid backup file format');
+      if (!data.version) {
+        throw new Error('Missing version in backup file');
       }
 
       // Helper to set data if it exists in the import
       const syncKey = (key: string, value: any) => {
-        if (value && (Array.isArray(value) ? value.length > 0 : Object.keys(value).length > 0)) {
+        // If value is an array, we import it (even if empty)
+        // If value is an object, we import it (even if empty)
+        if (value !== undefined && value !== null) {
+          console.log(`[Data Migration] Syncing ${key}...`);
           storageEngine.set(key, JSON.stringify(value));
         }
       };
@@ -60,6 +65,7 @@ export const dataMigrationService = {
       syncKey('reimburse_fuel_v1', data.fuel);
       syncKey('reimburse_wallet_v1', data.wallet);
 
+      console.log('[Data Migration] Import successful');
       return true;
     } catch (error) {
       console.error('[Data Migration] Import failed:', error);
@@ -68,19 +74,59 @@ export const dataMigrationService = {
   },
 
   /**
-   * Downloads the data as a JSON file
+   * Downloads the data as a JSON file (Web) or shares it (Mobile)
    */
-  downloadBackup() {
+  async downloadBackup() {
     const data = this.exportAllData();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const json = JSON.stringify(data, null, 2);
     const date = new Date().toISOString().split('T')[0];
-    a.href = url;
-    a.download = `pixel-reimburse-backup-${date}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const fileName = `pixel-reimburse-backup-${date}.json`;
+
+    // Handle Mobile Native Platform
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+        const { Share } = await import('@capacitor/share');
+
+        // 1. Write file to temporary storage
+        const result = await Filesystem.writeFile({
+          path: fileName,
+          data: json,
+          directory: Directory.Cache,
+          encoding: Encoding.UTF8,
+        });
+
+        // 2. Open Native Share sheet
+        await Share.share({
+          title: 'Pixel Reimburse Backup',
+          text: 'Backup of your financial data',
+          url: result.uri,
+          dialogTitle: 'Save or Share Backup',
+        });
+        
+        return true;
+      } catch (e) {
+        console.error('[Data Migration] Native export failed:', e);
+        return false;
+      }
+    }
+
+    // Handle Web Platform
+    try {
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return true;
+    } catch (e) {
+      console.error('[Data Migration] Web export failed:', e);
+      return false;
+    }
   }
 };
+

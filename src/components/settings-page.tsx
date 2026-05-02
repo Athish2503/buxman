@@ -686,47 +686,87 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
                <Button 
                  variant="outline" 
                  className="h-20 flex-col rounded-3xl border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary gap-1 font-bold transition-all group"
-                 onClick={() => {
-                   import('@/lib/data-migration').then(m => m.dataMigrationService.downloadBackup());
-                   toast.success('Backup generated successfully');
+                 onClick={async () => {
+                   toast.info('Generating backup...');
+                   try {
+                     const m = await import('@/lib/data-migration');
+                     const success = await m.dataMigrationService.downloadBackup();
+                     if (success) {
+                       toast.success('Backup ready for sharing');
+                     } else {
+                       toast.error('Could not generate backup');
+                     }
+                   } catch (err) {
+                     console.error('Export error:', err);
+                     toast.error('Export failed');
+                   }
                  }}
                >
                  <ChevronRight className="h-5 w-5 rotate-90 group-hover:translate-y-1 transition-transform" />
                  <span className="text-[10px] uppercase tracking-widest">Export All</span>
                </Button>
  
-               <label className="relative cursor-pointer">
-                 <input 
-                   type="file" 
-                   accept=".json"
-                   className="sr-only"
-                   onChange={async (e) => {
-                     const file = e.target.files?.[0];
-                     if (!file) return;
-                     const reader = new FileReader();
-                     reader.onload = async (event) => {
-                       const content = event.target?.result as string;
-                       const m = await import('@/lib/data-migration');
-                       const success = await m.dataMigrationService.importData(content);
-                       if (success) {
-                         setShowConfirm({
-                           title: 'Restore Complete!',
-                           description: 'Your data has been successfully imported. The application needs to reload to apply changes.',
-                           variant: 'info',
-                           onConfirm: () => window.location.reload()
-                         });
-                       } else {
-                         toast.error('Import Failed', { description: 'The file is invalid or corrupted.' });
-                       }
-                     };
-                     reader.readAsText(file);
-                   }}
-                 />
-                 <div className="h-20 rounded-3xl border border-dashed border-border/60 hover:border-primary/40 hover:bg-muted/50 flex flex-col items-center justify-center gap-1 text-[10px] uppercase tracking-widest font-black text-muted-foreground transition-all group">
-                   <ChevronRight className="h-5 w-5 -rotate-90 group-hover:-translate-y-1 transition-transform" />
-                   Import Data
-                 </div>
-               </label>
+               <div className="relative">
+                  <input 
+                    id="import-data-input"
+                    type="file" 
+                    accept=".json"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      
+                      toast.info('Processing backup file...');
+                      const reader = new FileReader();
+                      
+                      reader.onload = async (event) => {
+                        try {
+                          const content = event.target?.result as string;
+                          if (!content) throw new Error('File is empty');
+                          
+                          const m = await import('@/lib/data-migration');
+                          const success = await m.dataMigrationService.importData(content);
+                          
+                          // Reset input value so it can be triggered again even if same file
+                          e.target.value = '';
+                          
+                          if (success) {
+                            setShowConfirm({
+                              title: 'Restore Complete!',
+                              description: 'Your data has been successfully imported. The application needs to reload to apply changes.',
+                              variant: 'info',
+                              onConfirm: () => {
+                                toast.info('Reloading app...');
+                                setTimeout(() => window.location.reload(), 500);
+                              }
+                            });
+                          } else {
+                            toast.error('Import Failed', { description: 'The file format is incorrect or incompatible.' });
+                          }
+                        } catch (err) {
+                          console.error('Import error:', err);
+                          toast.error('Error parsing file');
+                          e.target.value = '';
+                        }
+                      };
+                      
+                      reader.onerror = () => {
+                        toast.error('Failed to read file');
+                        e.target.value = '';
+                      };
+                      
+                      reader.readAsText(file);
+                    }}
+                  />
+                  <Button 
+                    variant="outline"
+                    className="h-20 w-full flex-col rounded-3xl border border-dashed border-border/60 hover:border-primary/40 hover:bg-muted/50 flex items-center justify-center gap-1 transition-all group"
+                    onClick={() => document.getElementById('import-data-input')?.click()}
+                  >
+                    <ChevronRight className="h-5 w-5 -rotate-90 group-hover:-translate-y-1 transition-transform" />
+                    <span className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">Import Data</span>
+                  </Button>
+                </div>
              </div>
            </div>
  
