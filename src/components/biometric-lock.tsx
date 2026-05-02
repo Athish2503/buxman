@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ShieldCheck, Fingerprint, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
@@ -14,24 +14,38 @@ interface BiometricLockProps {
 export function BiometricLock({ children, enabled }: BiometricLockProps) {
   const [isLocked, setIsLocked] = useState(enabled);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const isAuthenticatingRef = useRef(false);
+  const lastAuthTime = useRef<number>(0);
 
   useEffect(() => {
     if (enabled) {
       // If we are currently locked, try to auth immediately
-      if (isLocked && !isAuthenticating) {
+      if (isLocked && !isAuthenticatingRef.current) {
         handleAuth();
       }
       
       // Re-lock on app resume (Banking style security)
       const handleResume = () => {
+        // 1. If we are currently in the middle of authenticating, ignore resume
+        // (The biometric prompt itself triggers resume on Android when it closes)
+        if (isAuthenticatingRef.current) {
+          console.log('[BiometricLock] Ignoring resume during active authentication');
+          return;
+        }
+
+        // 2. Cooldown: If we just authenticated successfully (within 2 seconds), ignore resume
+        const now = Date.now();
+        if (now - lastAuthTime.current < 2000) {
+          console.log('[BiometricLock] Ignoring resume event during success cooldown');
+          return;
+        }
+
+        // 3. Only lock if we are currently unlocked
         setIsLocked(true);
-        // handleAuth will be triggered by the isLocked change if we want it automatic
-        // but it's better to call it here to ensure it happens on resume
       };
       
       const handleFocus = () => {
-        // Optional: lock on focus if not native but enabled
-        if (!Capacitor.isNativePlatform() && enabled) {
+        if (!Capacitor.isNativePlatform() && enabled && !isLocked) {
           // setIsLocked(true); 
         }
       };
@@ -46,22 +60,24 @@ export function BiometricLock({ children, enabled }: BiometricLockProps) {
     } else {
       setIsLocked(false);
     }
-  }, [enabled]);
+  }, [enabled, isLocked]);
 
   // Handle re-auth when isLocked becomes true
   useEffect(() => {
-    if (enabled && isLocked && !isAuthenticating) {
+    if (enabled && isLocked && !isAuthenticatingRef.current) {
       handleAuth();
     }
   }, [isLocked, enabled]);
 
   const handleAuth = async () => {
-    if (isAuthenticating) return;
+    if (isAuthenticatingRef.current) return;
     
     setIsAuthenticating(true);
+    isAuthenticatingRef.current = true;
     try {
       const success = await biometrics.authenticate();
       if (success) {
+        lastAuthTime.current = Date.now();
         setIsLocked(false);
         haptics.success();
       } else {
@@ -69,10 +85,10 @@ export function BiometricLock({ children, enabled }: BiometricLockProps) {
       }
     } catch (error) {
       console.error('Auth error:', error);
-      // Fallback if native auth fails/errors
       if (!Capacitor.isNativePlatform()) setIsLocked(false);
     } finally {
       setIsAuthenticating(false);
+      isAuthenticatingRef.current = false;
     }
   };
 

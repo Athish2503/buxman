@@ -2,7 +2,7 @@ apply plugin: 'com.android.application'
 
 android {
     namespace = "com.pixel.reimburse"
-    compileSdk = rootProject.ext.compileSdkVersion
+    compileSdk 36
     defaultConfig {
         applicationId "com.pixel.reimburse"
         minSdkVersion rootProject.ext.minSdkVersion
