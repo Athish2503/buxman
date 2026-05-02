@@ -65,73 +65,75 @@ public class MainActivity extends BridgeActivity {
         }
         
         // Add JS Interface for native calls
-        bridge.getWebView().addJavascriptInterface(new Object() {
-            @JavascriptInterface
-            public void openNotificationSettings() {
-                Intent intent = new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
-                startActivity(intent);
-            }
-
-            @JavascriptInterface
-            public void openOverlaySettings() {
-                Intent intent = new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        android.net.Uri.parse("package:" + getPackageName()));
-                startActivity(intent);
-            }
-
-            @JavascriptInterface
-            public void requestSMSPermission() {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                    requestPermissions(new String[]{
-                        android.Manifest.permission.RECEIVE_SMS, 
-                        android.Manifest.permission.READ_SMS
-                    }, 101);
-                }
-            }
-
-            @JavascriptInterface
-            public boolean checkSMSPermission() {
-                return android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M ||
-                    (checkSelfPermission(android.Manifest.permission.RECEIVE_SMS) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
-                     checkSelfPermission(android.Manifest.permission.READ_SMS) == android.content.pm.PackageManager.PERMISSION_GRANTED);
-            }
-
-            @JavascriptInterface
-            public void requestMicrophonePermission() {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                    requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, 102);
-                }
-            }
-
-            @JavascriptInterface
-            public boolean checkMicrophonePermission() {
-                return android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M ||
-                    checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED;
-            }
-
-            @JavascriptInterface
-            public boolean checkNotificationPermission() {
-                String packageName = getPackageName();
-                String enabledListeners = android.provider.Settings.Secure.getString(getContentResolver(), "enabled_notification_listeners");
-                return enabledListeners != null && enabledListeners.contains(packageName);
-            }
-
-            @JavascriptInterface
-            public boolean checkOverlayPermission() {
-                return android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M || 
-                    android.provider.Settings.canDrawOverlays(MainActivity.this);
-            }
-
-            @JavascriptInterface
-            public String getPendingTransaction() {
-                String temp = pendingTransaction;
-                pendingTransaction = null; // Clear after read
-                return temp;
-            }
-        }, "NativeBridge");
+        bridge.getWebView().addJavascriptInterface(new NativeBridge(), "NativeBridge");
 
         // Check if we were started with transaction data
         handleIntent(getIntent());
+    }
+
+    public class NativeBridge {
+        @JavascriptInterface
+        public void openNotificationSettings() {
+            Intent intent = new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
+            startActivity(intent);
+        }
+
+        @JavascriptInterface
+        public void openOverlaySettings() {
+            Intent intent = new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    android.net.Uri.parse("package:" + getPackageName()));
+            startActivity(intent);
+        }
+
+        @JavascriptInterface
+        public void requestSMSPermission() {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                requestPermissions(new String[]{
+                    android.Manifest.permission.RECEIVE_SMS, 
+                    android.Manifest.permission.READ_SMS
+                }, 101);
+            }
+        }
+
+        @JavascriptInterface
+        public boolean checkSMSPermission() {
+            return android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M ||
+                (checkSelfPermission(android.Manifest.permission.RECEIVE_SMS) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                 checkSelfPermission(android.Manifest.permission.READ_SMS) == android.content.pm.PackageManager.PERMISSION_GRANTED);
+        }
+
+        @JavascriptInterface
+        public void requestMicrophonePermission() {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, 102);
+            }
+        }
+
+        @JavascriptInterface
+        public boolean checkMicrophonePermission() {
+            return android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M ||
+                checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        }
+
+        @JavascriptInterface
+        public boolean checkNotificationPermission() {
+            String packageName = getPackageName();
+            String enabledListeners = android.provider.Settings.Secure.getString(getContentResolver(), "enabled_notification_listeners");
+            return enabledListeners != null && enabledListeners.contains(packageName);
+        }
+
+        @JavascriptInterface
+        public boolean checkOverlayPermission() {
+            return android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M || 
+                android.provider.Settings.canDrawOverlays(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public String getPendingTransaction() {
+            String temp = pendingTransaction;
+            pendingTransaction = null; // Clear after read
+            return temp;
+        }
     }
 
     @Override
@@ -149,7 +151,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void dispatchTransaction(String body) {
-        if (body == null) return;
+        if (body == null || bridge == null || bridge.getWebView() == null) return;
         
         // Encode body to Base64 to avoid issues with special characters in JS
         String encodedBody = "";
@@ -160,10 +162,33 @@ public class MainActivity extends BridgeActivity {
         }
 
         final String finalEncoded = encodedBody;
-        bridge.getWebView().post(() -> bridge.getWebView().evaluateJavascript(
-            "window.dispatchEvent(new CustomEvent('notification-transaction', { detail: { body: atob('" + finalEncoded + "') } }));",
-            null
-        ));
+        bridge.getWebView().post(() -> {
+            if (bridge.getWebView() != null) {
+                bridge.getWebView().evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('notification-transaction', { detail: { body: atob('" + finalEncoded + "') } }));",
+                    null
+                );
+            }
+        });
+    }
+
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (bridge != null && bridge.getWebView() != null) {
+            bridge.getWebView().onPause();
+            bridge.getWebView().pauseTimers();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (bridge != null && bridge.getWebView() != null) {
+            bridge.getWebView().onResume();
+            bridge.getWebView().resumeTimers();
+        }
     }
 
     @Override
@@ -172,5 +197,9 @@ public class MainActivity extends BridgeActivity {
         if (transactionReceiver != null) {
             unregisterReceiver(transactionReceiver);
         }
+        if (bridge != null && bridge.getWebView() != null) {
+            bridge.getWebView().destroy();
+        }
     }
+
 }

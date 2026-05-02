@@ -41,10 +41,19 @@ public class TransactionNotificationListener extends NotificationListenerService
             sendBroadcast(broadcastIntent);
 
             // 2. Start MainActivity to bring it to the foreground (Overlay)
-            Intent activityIntent = new Intent(this, MainActivity.class);
-            activityIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-            activityIntent.putExtra("body", title + ": " + text);
-            startActivity(activityIntent);
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q || 
+                android.provider.Settings.canDrawOverlays(this)) {
+                
+                Intent activityIntent = new Intent(this, MainActivity.class);
+                activityIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                activityIntent.putExtra("body", title + ": " + text);
+                startActivity(activityIntent);
+            } else {
+                Log.w(TAG, "Overlay permission not granted, sending notification fallback");
+                NotificationHelper.showTransactionNotification(this, title + ": " + text);
+            }
+
+
         }
     }
 

@@ -89,12 +89,21 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
   // Category Editor State
   const [editingCategory, setEditingCategory] = useState<CategoryDefinition | null>(null);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
-
   const [permissionsStatus, setPermissionsStatus] = useState({
     sms: false,
     notifications: false,
     overlay: false
   });
+  const [showConfirm, setShowConfirm] = useState<{
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    variant: 'destructive' | 'warning' | 'info';
+  } | null>(null);
+  const [advDeleteType, setAdvDeleteType] = useState<string | null>(null);
+  const [advDeleteDays, setAdvDeleteDays] = useState('30');
+  const [advDeleteStart, setAdvDeleteStart] = useState('');
+  const [advDeleteEnd, setAdvDeleteEnd] = useState('');
 
   useEffect(() => {
     biometrics.isAvailable().then(setBioAvailable);
@@ -421,7 +430,6 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
           })}
         </div>
       </div>
-
     </div>
   );
 
@@ -597,14 +605,63 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
     </div>
   );
 
+  const executeAdvancedDelete = (type: string) => {
+    const keys: Record<string, string> = {
+      expenses: 'reimburse_expenses_v2',
+      fuel: 'reimburse_fuel_v1',
+      wallet: 'reimburse_wallet_v1',
+      mileage: 'reimburse_mileage_v1'
+    };
+    
+    const key = keys[type];
+    if (!key) return;
+
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+
+    try {
+      let data = JSON.parse(raw);
+      const now = new Date();
+      
+      const filtered = data.filter((item: any) => {
+        const itemDate = new Date(item.date || item.createdAt);
+        
+        // Filter by days
+        if (advDeleteDays && !advDeleteStart && !advDeleteEnd) {
+          const diff = (now.getTime() - itemDate.getTime()) / (1000 * 60 * 60 * 24);
+          return diff < Number(advDeleteDays);
+        }
+        
+        // Filter by range
+        if (advDeleteStart || advDeleteEnd) {
+          const start = advDeleteStart ? new Date(advDeleteStart) : new Date(0);
+          const end = advDeleteEnd ? new Date(advDeleteEnd) : new Date();
+          return itemDate < start || itemDate > end;
+        }
+
+        return true;
+      });
+
+      const deletedCount = data.length - filtered.length;
+      localStorage.setItem(key, JSON.stringify(filtered));
+      toast.success(`${deletedCount} records deleted`);
+      setAdvDeleteType(null);
+    } catch (e) {
+      toast.error('Failed to parse data for filtering');
+    }
+  };
+
   const renderDataManagement = () => (
     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
       <SubModuleHeader title="Data Management" onBack={() => setActiveTab('overview')} />
       
       <div className="space-y-4">
-        <div className="bg-amber-500/10 border border-amber-500/20 p-5 rounded-3xl flex items-start gap-3">
-          <ShieldAlert className="h-6 w-6 text-amber-500 shrink-0" />
-          <div>
+        <div className="bg-amber-500/10 border border-amber-500/20 p-5 rounded-3xl flex items-start gap-3 relative overflow-hidden group">
+          <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12 transition-transform group-hover:scale-110">
+            <ShieldAlert className="h-20 w-20 text-amber-500" />
+          </div>
+          <ShieldAlert className="h-6 w-6 text-amber-500 shrink-0 relative z-10" />
+          <div className="relative z-10">
             <h4 className="text-sm font-bold text-amber-500">Local-Only Storage</h4>
             <p className="text-[11px] text-amber-200/70 leading-relaxed mt-1">
               Your data never leaves this device. This means erasing it is permanent. 
@@ -614,30 +671,30 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
         </div>
         
         <div className="grid grid-cols-1 gap-2">
-           <div className="p-5 rounded-3xl bg-card/30 border border-border/40 space-y-4">
-             <div className="flex items-center gap-3">
-               <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center">
-                 <Database className="h-5 w-5 text-primary" />
+           <div className="p-6 rounded-[2.5rem] bg-card/30 border border-border/40 space-y-6 relative overflow-hidden">
+             <div className="flex items-center gap-4">
+               <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center shadow-inner">
+                 <Database className="h-6 w-6 text-primary" />
                </div>
                <div>
-                 <h4 className="text-sm font-bold">Migration Hub</h4>
-                 <p className="text-[10px] text-muted-foreground">Backup & restore your full ecosystem</p>
+                 <h4 className="text-sm font-bold">Secure Ecosystem Sync</h4>
+                 <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-0.5">Backup & Recovery Hub</p>
                </div>
              </div>
-
+ 
              <div className="grid grid-cols-2 gap-3">
                <Button 
                  variant="outline" 
-                 className="h-14 rounded-2xl border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary gap-2 font-bold transition-all"
+                 className="h-20 flex-col rounded-3xl border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary gap-1 font-bold transition-all group"
                  onClick={() => {
                    import('@/lib/data-migration').then(m => m.dataMigrationService.downloadBackup());
-                   toast.success('Generating secure backup...', { description: 'Save this file to a safe location.' });
+                   toast.success('Backup generated successfully');
                  }}
                >
-                 <ChevronRight className="h-4 w-4 rotate-90" />
-                 Export All
+                 <ChevronRight className="h-5 w-5 rotate-90 group-hover:translate-y-1 transition-transform" />
+                 <span className="text-[10px] uppercase tracking-widest">Export All</span>
                </Button>
-
+ 
                <label className="relative cursor-pointer">
                  <input 
                    type="file" 
@@ -646,139 +703,297 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
                    onChange={async (e) => {
                      const file = e.target.files?.[0];
                      if (!file) return;
-                     
                      const reader = new FileReader();
                      reader.onload = async (event) => {
                        const content = event.target?.result as string;
                        const m = await import('@/lib/data-migration');
                        const success = await m.dataMigrationService.importData(content);
                        if (success) {
-                         toast.success('System Restored!', { 
-                           description: 'Your data has been imported. The app will now reload.',
-                           duration: 2000
+                         setShowConfirm({
+                           title: 'Restore Complete!',
+                           description: 'Your data has been successfully imported. The application needs to reload to apply changes.',
+                           variant: 'info',
+                           onConfirm: () => window.location.reload()
                          });
-                         setTimeout(() => window.location.reload(), 2000);
                        } else {
-                         toast.error('Restore Failed', { description: 'The backup file is invalid or corrupted.' });
+                         toast.error('Import Failed', { description: 'The file is invalid or corrupted.' });
                        }
                      };
                      reader.readAsText(file);
                    }}
                  />
-                 <div className="h-14 rounded-2xl border border-dashed border-border/60 hover:border-primary/40 hover:bg-muted/50 flex items-center justify-center gap-2 text-sm font-bold text-muted-foreground transition-all">
-                   <ChevronRight className="h-4 w-4 -rotate-90" />
+                 <div className="h-20 rounded-3xl border border-dashed border-border/60 hover:border-primary/40 hover:bg-muted/50 flex flex-col items-center justify-center gap-1 text-[10px] uppercase tracking-widest font-black text-muted-foreground transition-all group">
+                   <ChevronRight className="h-5 w-5 -rotate-90 group-hover:-translate-y-1 transition-transform" />
                    Import Data
                  </div>
                </label>
              </div>
            </div>
-
-           {[
-             { label: 'Clean Expenses', icon: Receipt, type: 'expenses' },
-             { label: 'Wipe Fuel Logs', icon: Fuel, type: 'fuel' },
-             { label: 'Clear Wallet', icon: Camera, type: 'wallet' },
-             { label: 'Delete Vehicles', icon: Car, type: 'mileage' }
-           ].map(item => (
-              <Button 
-                key={item.type}
-                variant="outline" 
-                className="justify-between h-14 px-5 rounded-3xl border-destructive/10 bg-destructive/5 hover:bg-destructive/10 text-destructive group transition-all"
-                onClick={() => {
-                  toast.error(`Erase all ${item.type}?`, {
-                    description: 'This action is permanent and cannot be undone.',
-                    action: {
-                      label: 'Erase Data',
-                      onClick: () => {
-                        const keys: Record<string, string[]> = {
-                          expenses: ['reimburse_expenses_v2'],
-                          fuel: ['reimburse_fuel_v1'],
-                          wallet: ['reimburse_wallet_v1'],
-                          mileage: ['reimburse_mileage_v1', 'reimburse_vehicles_v1']
-                        };
-                        keys[item.type].forEach(k => localStorage.removeItem(k));
-                        toast.success(`${item.label} cleared`);
-                      }
-                    }
-                  });
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <item.icon className="h-5 w-5" />
-                  <span className="text-sm font-bold">{item.label}</span>
-                </div>
-                <ChevronRight className="h-5 w-5 opacity-30 group-hover:opacity-100" />
-              </Button>
-           ))}
-
+ 
+           <div className="mt-4 px-2">
+             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 mb-4 ml-1">Advanced Selective Eraser</p>
+             <div className="space-y-2">
+               {[
+                 { label: 'Expenses', icon: Receipt, type: 'expenses' },
+                 { label: 'Fuel Logs', icon: Fuel, type: 'fuel' },
+                 { label: 'Wallet', icon: Camera, type: 'wallet' },
+                 { label: 'Vehicles', icon: Car, type: 'mileage' }
+               ].map(item => (
+                 <div key={item.type} className="group flex items-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1 justify-between h-14 px-5 rounded-3xl border-border/40 bg-card/20 hover:bg-destructive/5 hover:text-destructive hover:border-destructive/20 transition-all"
+                      onClick={() => {
+                        setShowConfirm({
+                          title: `Delete all ${item.label}?`,
+                          description: `This will permanently erase every single ${item.label.toLowerCase()} record from your device storage.`,
+                          variant: 'destructive',
+                          onConfirm: () => {
+                            const keys: Record<string, string[]> = {
+                              expenses: ['reimburse_expenses_v2'],
+                              fuel: ['reimburse_fuel_v1'],
+                              wallet: ['reimburse_wallet_v1'],
+                              mileage: ['reimburse_mileage_v1', 'reimburse_vehicles_v1']
+                            };
+                            keys[item.type].forEach(k => localStorage.removeItem(k));
+                            toast.success(`${item.label} wiped clean`);
+                            window.location.reload();
+                          }
+                        });
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <item.icon className="h-5 w-5 opacity-60 group-hover:opacity-100" />
+                        <span className="text-sm font-bold">{item.label}</span>
+                      </div>
+                      <ChevronRight className="h-4 w-4 opacity-20 group-hover:opacity-100 transition-opacity" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setAdvDeleteType(item.type)}
+                      className="h-14 w-14 rounded-3xl bg-muted/20 hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all shrink-0"
+                    >
+                      <MoreHorizontal className="h-5 w-5" />
+                    </Button>
+                 </div>
+               ))}
+             </div>
+           </div>
+ 
            <Button 
               variant="destructive" 
-              className="h-16 mt-4 shadow-xl shadow-destructive/20 font-black text-sm uppercase tracking-widest gap-3 rounded-3xl"
+              className="h-20 mt-8 shadow-2xl shadow-destructive/20 font-black text-xs uppercase tracking-[0.3em] gap-3 rounded-[2.5rem] relative overflow-hidden group"
               onClick={() => {
-                toast.error('FACTORY RESET?', {
-                  description: 'This will delete EVERYTHING and restart the app. Are you sure?',
-                  action: {
-                    label: 'RESET APP',
-                    onClick: () => {
-                      localStorage.clear();
-                      window.location.reload();
-                    }
+                setShowConfirm({
+                  title: 'ULTIMATE FACTORY RESET?',
+                  description: 'This is the point of no return. Every single preference, expense, vehicle, and setting will be obliterated. Are you absolutely certain?',
+                  variant: 'destructive',
+                  onConfirm: () => {
+                    localStorage.clear();
+                    window.location.reload();
                   }
                 });
               }}
             >
-              <RotateCcw className="h-5 w-5" />
-              Factory Reset App
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+              <RotateCcw className="h-6 w-6 group-hover:rotate-180 transition-transform duration-500" />
+              Factory Reset Application
             </Button>
         </div>
       </div>
     </div>
   );
 
+
   return (
-    <div className="max-w-2xl mx-auto pb-24 px-1">
-      {/* Dynamic Header */}
-      <div className="flex flex-col gap-1 mb-8 px-2">
-        <h2 className="text-3xl font-black tracking-tight flex items-center gap-3">
-          <Settings className="h-8 w-8 text-primary" />
-          Settings
-        </h2>
-        <p className="text-xs text-muted-foreground font-medium uppercase tracking-[0.2em]">Preferences & Infrastructure</p>
-      </div>
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.2 }}
-        >
-          {activeTab === 'overview' && renderOverview()}
-          {activeTab === 'organization' && renderOrganization()}
-          {activeTab === 'smart' && renderSmartFeatures()}
-          {activeTab === 'categories' && renderCategories()}
-          {activeTab === 'budgets' && renderBudgets()}
-          {activeTab === 'security' && renderSecurity()}
-          {activeTab === 'data' && renderDataManagement()}
-        </motion.div>
-      </AnimatePresence>
-
-      {/* Global Persistence Reminder */}
-      {activeTab !== 'overview' && (
-        <div className="mt-12 text-center p-6 border-t border-border/20">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mb-4">Auto-saving active</p>
-          <Button 
-            variant="ghost" 
-            onClick={() => setActiveTab('overview')}
-            className="rounded-full gap-2 text-xs font-bold"
-          >
-            <ChevronLeft className="h-4 w-4" /> Return to Settings Overview
-          </Button>
+    <>
+      <div className="max-w-2xl mx-auto pb-24 px-1">
+        <div className="flex flex-col gap-1 mb-8 px-2">
+          <h2 className="text-3xl font-black tracking-tight flex items-center gap-3">
+            <Settings className="h-8 w-8 text-primary" />
+            Settings
+          </h2>
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-[0.2em]">Preferences & Infrastructure</p>
         </div>
-      )}
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+          >
+            {activeTab === 'overview' && renderOverview()}
+            {activeTab === 'organization' && renderOrganization()}
+            {activeTab === 'smart' && renderSmartFeatures()}
+            {activeTab === 'categories' && renderCategories()}
+            {activeTab === 'budgets' && renderBudgets()}
+            {activeTab === 'security' && renderSecurity()}
+            {activeTab === 'data' && renderDataManagement()}
+          </motion.div>
+        </AnimatePresence>
+
+        {activeTab !== 'overview' && (
+          <div className="mt-12 text-center p-6 border-t border-border/20">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mb-4">Auto-saving active</p>
+            <Button 
+              variant="ghost" 
+              onClick={() => setActiveTab('overview')}
+              className="rounded-full gap-2 text-xs font-bold"
+            >
+              <ChevronLeft className="h-4 w-4" /> Return to Settings Overview
+            </Button>
+          </div>
+        )}
+      </div>
 
       {createPortal(
         <AnimatePresence>
+          {showConfirm && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-background/80 backdrop-blur-md"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                className="w-full max-w-sm bg-card border border-border shadow-2xl rounded-[2.5rem] overflow-hidden"
+              >
+                <div className="p-8 text-center space-y-6">
+                  <div className={cn(
+                    "h-20 w-20 rounded-[2rem] mx-auto flex items-center justify-center shadow-lg",
+                    showConfirm.variant === 'destructive' ? "bg-destructive/10 text-destructive shadow-destructive/10" : 
+                    showConfirm.variant === 'warning' ? "bg-amber-500/10 text-amber-500 shadow-amber-500/10" : 
+                    "bg-primary/10 text-primary shadow-primary/10"
+                  )}>
+                    {showConfirm.variant === 'destructive' ? <Trash2 className="h-10 w-10" /> : <ShieldAlert className="h-10 w-10" />}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-black tracking-tight">{showConfirm.title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{showConfirm.description}</p>
+                  </div>
+
+                  <div className="flex flex-col gap-2 pt-2">
+                    <Button 
+                      className={cn(
+                        "h-14 rounded-2xl font-bold text-white shadow-lg transition-all active:scale-95",
+                        showConfirm.variant === 'destructive' ? "bg-destructive shadow-destructive/20" : "bg-primary shadow-primary/20"
+                      )}
+                      onClick={() => {
+                        showConfirm.onConfirm();
+                        setShowConfirm(null);
+                      }}
+                    >
+                      Confirm Action
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      className="h-12 rounded-2xl font-bold text-muted-foreground"
+                      onClick={() => setShowConfirm(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {advDeleteType && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4 bg-background/80 backdrop-blur-md"
+            >
+              <motion.div 
+                initial={{ y: 100, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 100, opacity: 0 }}
+                className="w-full max-w-md bg-card border border-border shadow-2xl rounded-[2.5rem] overflow-hidden"
+              >
+                <div className="p-8 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-lg font-bold">Advanced Filter</h4>
+                      <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-0.5">Selective Deletion: {advDeleteType}</p>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => setAdvDeleteType(null)} className="rounded-full">
+                      <X className="h-5 w-5" />
+                    </Button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 ml-1">Time Horizon (Days)</Label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {['7', '30', '90', '180'].map(d => (
+                          <button
+                            key={d}
+                            onClick={() => { setAdvDeleteDays(d); setAdvDeleteStart(''); setAdvDeleteEnd(''); }}
+                            className={cn(
+                              "h-10 rounded-xl border text-xs font-bold transition-all",
+                              advDeleteDays === d && !advDeleteStart ? "bg-primary/10 border-primary text-primary" : "border-border/40 text-muted-foreground"
+                            )}
+                          >
+                            {d}d
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="relative py-2 flex items-center justify-center">
+                       <div className="absolute inset-x-0 h-px bg-border/40" />
+                       <span className="relative bg-card px-3 text-[9px] font-black text-muted-foreground/40 uppercase">Or custom range</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 ml-1">Start Date</Label>
+                        <Input 
+                          type="date" value={advDeleteStart} onChange={e => { setAdvDeleteStart(e.target.value); setAdvDeleteDays(''); }}
+                          className="h-12 rounded-2xl bg-muted/30 border-border/40 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 ml-1">End Date</Label>
+                        <Input 
+                          type="date" value={advDeleteEnd} onChange={e => { setAdvDeleteEnd(e.target.value); setAdvDeleteDays(''); }}
+                          className="h-12 rounded-2xl bg-muted/30 border-border/40 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-destructive/5 border border-destructive/10">
+                      <p className="text-[10px] text-destructive font-bold leading-relaxed text-center">
+                        Warning: This will delete data {advDeleteStart || advDeleteEnd ? `between ${advDeleteStart || 'ever'} and ${advDeleteEnd || 'today'}` : `older than ${advDeleteDays} days`}.
+                      </p>
+                    </div>
+
+                    <Button 
+                      className="w-full h-14 rounded-2xl bg-destructive text-white font-black uppercase tracking-widest shadow-lg shadow-destructive/20"
+                      onClick={() => {
+                        setShowConfirm({
+                          title: 'Confirm Surgical Deletion?',
+                          description: 'You are about to delete records based on your custom filter. This cannot be undone.',
+                          variant: 'destructive',
+                          onConfirm: () => executeAdvancedDelete(advDeleteType!)
+                        });
+                      }}
+                    >
+                      Delete Selected
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
           {editingCategory && (
             <motion.div 
               initial={{ opacity: 0 }}
@@ -928,6 +1143,6 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
         document.body
       )}
 
-    </div>
+    </>
   );
 }

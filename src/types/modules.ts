@@ -3,7 +3,11 @@ export interface VehicleRate {
   name: string;
   ratePerKm: number; // for reimbursement
   icon: 'car' | 'bike';
-  initialOdometer?: number; // for Fuelio tracking
+  fuelType?: 'petrol' | 'diesel' | 'cng' | 'electric';
+  licensePlate?: string;
+  insuranceExpiry?: string;
+  serviceInterval?: number; // km
+  lastServiceOdo?: number;   // km
   defaultFuelPrice?: number; // for auto-filling
 }
 

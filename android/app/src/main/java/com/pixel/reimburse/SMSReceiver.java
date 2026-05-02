@@ -49,11 +49,20 @@ public class SMSReceiver extends BroadcastReceiver {
                             context.sendBroadcast(broadcastIntent);
 
                             // 2. Start MainActivity to bring it to the foreground (Nudge)
-                            // We use a small delay or check to ensure we don't spam if multiple PDUs
-                            Intent activityIntent = new Intent(context, MainActivity.class);
-                            activityIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-                            activityIntent.putExtra("body", body);
-                            context.startActivity(activityIntent);
+                            // On Android 10+, this requires "Display over other apps" permission
+                            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q || 
+                                android.provider.Settings.canDrawOverlays(context)) {
+                                
+                                Intent activityIntent = new Intent(context, MainActivity.class);
+                                activityIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                                activityIntent.putExtra("body", body);
+                                context.startActivity(activityIntent);
+                            } else {
+                                Log.w(TAG, "Overlay permission not granted, sending notification fallback");
+                                NotificationHelper.showTransactionNotification(context, body);
+                            }
+
+
                         }
                     }
                 }

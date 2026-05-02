@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
-import { Fuel, Car, Bike, Plus, Trash2, ArrowRight, IndianRupee, MapPin, GaugeCircle, TrendingUp, Settings, Pencil } from 'lucide-react';
+import { Fuel, Car, Bike, Plus, Trash2, ArrowRight, IndianRupee, MapPin, GaugeCircle, TrendingUp, Settings, Pencil, ChevronUp, ChevronDown, Wrench, ShieldAlert, CreditCard, Calendar } from 'lucide-react';
 import { FuelLog, VehicleRate } from '@/types/modules';
 import { fuelService, mileageService } from '@/lib/modules-storage';
 import { haptics } from '@/lib/haptics';
@@ -52,6 +52,7 @@ export function VehicleTracker() {
 
   // Analytics for active vehicle
   const activeLogs = useMemo(() => logs.filter(l => l.vehicleId === activeVehId).sort((a,b) => b.odometer - a.odometer), [logs, activeVehId]);
+  const activeVeh = useMemo(() => vehicles.find(v => v.id === activeVehId), [vehicles, activeVehId]);
   
   const stats = useMemo(() => {
     if (activeLogs.length < 2) return null;
@@ -80,21 +81,73 @@ export function VehicleTracker() {
   const [newVehRate, setNewVehRate] = useState('');
   const [newVehIcon, setNewVehIcon] = useState<'car' | 'bike'>('car');
   const [newPrice, setNewPrice] = useState('');
+  const [newFuelType, setNewFuelType] = useState<VehicleRate['fuelType']>('petrol');
+  const [licensePlate, setLicensePlate] = useState('');
+  const [insuranceExpiry, setInsuranceExpiry] = useState('');
+  const [serviceInterval, setServiceInterval] = useState('');
+  
+  const [editingVehId, setEditingVehId] = useState<string | null>(null);
 
   const handleSaveVehicle = () => {
     if (!newVehName) return;
-    const v: VehicleRate = { 
-      id: crypto.randomUUID(), 
-      name: newVehName, 
-      ratePerKm: Number(newVehRate) || 0, 
+    
+    const newVeh: VehicleRate = {
+      id: editingVehId || crypto.randomUUID(),
+      name: newVehName,
       icon: newVehIcon,
-      defaultFuelPrice: Number(newPrice) || 0,
+      defaultFuelPrice: Number(newPrice) || undefined,
+      ratePerKm: Number(newVehRate) || (newVehIcon === 'car' ? 12 : 6),
+      fuelType: newFuelType,
+      licensePlate,
+      insuranceExpiry,
+      serviceInterval: Number(serviceInterval) || undefined,
     };
-    mileageService.saveVehicles([...vehicles, v]);
-    setNewVehName(''); setNewVehRate(''); setNewPrice('');
-    haptics.success();
+
+    let updated: VehicleRate[];
+    if (editingVehId) {
+      updated = vehicles.map(v => v.id === editingVehId ? newVeh : v);
+    } else {
+      updated = [...vehicles, newVeh];
+    }
+
+    mileageService.saveVehicles(updated);
+    setNewVehName('');
+    setNewVehRate('');
+    setNewPrice('');
+    setLicensePlate('');
+    setInsuranceExpiry('');
+    setServiceInterval('');
+    setEditingVehId(null);
     reload();
-    toast.success('Vehicle added');
+    toast.success(editingVehId ? 'Vehicle updated' : 'Vehicle added to garage');
+  };
+
+  const handleEditVehicle = (v: VehicleRate) => {
+    setEditingVehId(v.id);
+    setNewVehName(v.name);
+    setNewVehIcon(v.icon);
+    setNewVehRate(v.ratePerKm?.toString() || '');
+    setNewPrice(v.defaultFuelPrice?.toString() || '');
+    setNewFuelType(v.fuelType || 'petrol');
+    setLicensePlate(v.licensePlate || '');
+    setInsuranceExpiry(v.insuranceExpiry || '');
+    setServiceInterval(v.serviceInterval?.toString() || '');
+  };
+
+  const handleMoveVehicle = (id: string, direction: 'up' | 'down') => {
+    const idx = vehicles.findIndex(v => v.id === id);
+    if (idx === -1) return;
+    
+    const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= vehicles.length) return;
+    
+    const updated = [...vehicles];
+    const [moved] = updated.splice(idx, 1);
+    updated.splice(newIdx, 0, moved);
+    
+    mileageService.saveVehicles(updated);
+    reload();
+    haptics.selection();
   };
 
   const handleDeleteVehicle = (id: string) => {
@@ -111,35 +164,57 @@ export function VehicleTracker() {
         exit={{ opacity: 0, x: -20 }}
         className="space-y-4"
       >
-        <div className="flex items-center gap-3 mb-4">
-          <button onClick={() => setMode('dashboard')} className="h-8 w-8 rounded-xl bg-muted/50 flex items-center justify-center">
-            <ArrowRight className="h-4 w-4 rotate-180" />
-          </button>
-          <h2 className="font-bold text-lg">My Garage</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setMode('dashboard')} className="h-8 w-8 rounded-xl bg-muted/50 flex items-center justify-center">
+              <ArrowRight className="h-4 w-4 rotate-180" />
+            </button>
+            <h2 className="font-bold text-lg">My Garage</h2>
+          </div>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{vehicles.length} Vehicles</p>
         </div>
 
-        <div className="space-y-2">
-          {vehicles.map(v => {
+        <div className="space-y-3">
+          {vehicles.map((v, idx) => {
             const vLogs = logs.filter(l => l.vehicleId === v.id);
             const economies = vLogs.filter(l => l.economy).map(l => l.economy!);
             const avgEco = economies.length > 0 ? economies.reduce((s, e) => s + e, 0) / economies.length : 0;
             const latestLog = vLogs.sort((a,b) => b.odometer - a.odometer)[0];
             
+            // Service check
+            const needsService = v.serviceInterval && latestLog && latestLog.odometer % v.serviceInterval < 500;
+            const insuranceSoon = v.insuranceExpiry && new Date(v.insuranceExpiry).getTime() - new Date().getTime() < 30 * 24 * 60 * 60 * 1000;
+
             return (
-              <div key={v.id} className="flex flex-col p-4 rounded-2xl border border-border/40 bg-card/60 glass gap-4">
+              <div key={v.id} className="flex flex-col p-4 rounded-2xl border border-border/40 bg-card/60 glass gap-4 relative overflow-hidden group">
+                {needsService && <div className="absolute top-0 right-0 p-1.5 bg-warning text-warning-foreground rounded-bl-xl shadow-sm z-10 animate-pulse"><Wrench className="h-3 w-3" /></div>}
+                
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
                       {v.icon === 'car' ? <Car className="h-5 w-5" /> : <Bike className="h-5 w-5" />}
                     </div>
                     <div>
-                      <p className="font-bold text-sm">{v.name}</p>
-                      <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Personal Vehicle</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-sm">{v.name}</p>
+                        {v.fuelType && <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground border border-border/30">{v.fuelType}</span>}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">{v.licensePlate || 'No Plate Added'}</p>
                     </div>
                   </div>
-                  <button onClick={() => handleDeleteVehicle(v.id)} className="h-8 w-8 text-destructive flex items-center justify-center hover:bg-destructive/10 rounded-lg transition-colors">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  
+                  <div className="flex items-center gap-0.5">
+                    <div className="flex flex-col gap-0.5 mr-2">
+                      <button onClick={() => handleMoveVehicle(v.id, 'up')} disabled={idx === 0} className="h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-primary disabled:opacity-20"><ChevronUp className="h-4 w-4" /></button>
+                      <button onClick={() => handleMoveVehicle(v.id, 'down')} disabled={idx === vehicles.length - 1} className="h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-primary disabled:opacity-20"><ChevronDown className="h-4 w-4" /></button>
+                    </div>
+                    <button onClick={() => handleEditVehicle(v)} className="h-8 w-8 text-muted-foreground flex items-center justify-center hover:bg-primary/10 hover:text-primary rounded-lg transition-colors">
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => handleDeleteVehicle(v.id)} className="h-8 w-8 text-destructive flex items-center justify-center hover:bg-destructive/10 rounded-lg transition-colors">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-2 pt-3 border-t border-border/10">
@@ -148,17 +223,12 @@ export function VehicleTracker() {
                     <p className="text-sm font-black text-primary">{avgEco.toFixed(1)} <span className="text-[10px] font-medium opacity-60">km/l</span></p>
                   </div>
                   <div className="p-2 rounded-xl bg-muted/20">
-                    <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Latest Trend</p>
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Insurance</p>
                     <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-black">{latestLog?.economy?.toFixed(1) || '0.0'} <span className="text-[10px] font-medium opacity-60">km/l</span></p>
-                      {latestLog?.economyTrend !== undefined && (
-                        <div className={cn(
-                          "flex items-center",
-                          latestLog.economyTrend >= 0 ? "text-success" : "text-destructive"
-                        )}>
-                          {latestLog.economyTrend >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingUp className="h-3 w-3 rotate-180" />}
-                        </div>
-                      )}
+                      <p className={cn("text-xs font-bold", insuranceSoon ? "text-destructive" : "")}>
+                        {v.insuranceExpiry ? format(new Date(v.insuranceExpiry), 'dd MMM yy') : 'N/A'}
+                      </p>
+                      {insuranceSoon && <ShieldAlert className="h-3 w-3 text-destructive animate-pulse" />}
                     </div>
                   </div>
                 </div>
@@ -167,43 +237,102 @@ export function VehicleTracker() {
           })}
         </div>
 
-        <div className="p-5 rounded-2xl border border-border/40 bg-card/40 space-y-4 mt-6">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Add New Vehicle</p>
-          <div className="grid grid-cols-2 gap-2">
-            <input 
-              placeholder="Vehicle Name" value={newVehName} onChange={e => setNewVehName(e.target.value)}
-              className="h-12 px-4 rounded-xl bg-muted/30 border border-border/40 text-sm focus:border-primary/40"
-            />
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+        <div className="p-5 rounded-2xl border border-border/40 bg-card/40 space-y-4 mt-6 border-dashed">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{editingVehId ? 'Edit Vehicle' : 'Add New Vehicle'}</p>
+            {editingVehId && <button onClick={() => { setEditingVehId(null); setNewVehName(''); }} className="text-[9px] font-bold text-primary uppercase tracking-wider">Cancel Edit</button>}
+          </div>
+          
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <p className="text-[8px] font-black text-muted-foreground uppercase px-1">Nickname</p>
+                <input 
+                  placeholder="e.g. My Pulsar" value={newVehName} onChange={e => setNewVehName(e.target.value)}
+                  className="h-11 px-4 rounded-xl bg-muted/30 border border-border/40 text-sm w-full focus:border-primary/40 transition-all"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-[8px] font-black text-muted-foreground uppercase px-1">Plate Number</p>
+                <input 
+                  placeholder="MH 12 AB 1234" value={licensePlate} onChange={e => setLicensePlate(e.target.value)}
+                  className="h-11 px-4 rounded-xl bg-muted/30 border border-border/40 text-sm w-full focus:border-primary/40 uppercase font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <p className="text-[8px] font-black text-muted-foreground uppercase px-1">Default Fuel Price</p>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-bold">₹</span>
+                  <input 
+                    type="number" placeholder="104.5" value={newPrice} onChange={e => setNewPrice(e.target.value)}
+                    className="h-11 pl-7 pr-3 rounded-xl bg-muted/30 border border-border/40 text-sm w-full focus:border-primary/40"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-[8px] font-black text-muted-foreground uppercase px-1">Service Every (km)</p>
+                <div className="relative">
+                  <input 
+                    type="number" placeholder="5000" value={serviceInterval} onChange={e => setServiceInterval(e.target.value)}
+                    className="h-11 px-4 rounded-xl bg-muted/30 border border-border/40 text-sm w-full focus:border-primary/40"
+                  />
+                  <Wrench className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <p className="text-[8px] font-black text-muted-foreground uppercase px-1">Insurance Expiry</p>
               <input 
-                type="number" placeholder="Fuel Price" value={newPrice} onChange={e => setNewPrice(e.target.value)}
-                className="h-12 pl-7 pr-3 rounded-xl bg-muted/30 border border-border/40 text-sm w-full focus:border-primary/40"
+                type="date" value={insuranceExpiry} onChange={e => setInsuranceExpiry(e.target.value)}
+                className="h-11 px-4 rounded-xl bg-muted/30 border border-border/40 text-sm w-full focus:border-primary/40"
               />
             </div>
+
+            <div className="space-y-1.5">
+              <p className="text-[8px] font-black text-muted-foreground uppercase px-1">Fuel Type</p>
+              <div className="flex gap-1">
+                {['petrol', 'diesel', 'cng', 'electric'].map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setNewFuelType(f as any)}
+                    className={cn(
+                      "flex-1 h-9 rounded-lg border text-[9px] font-black uppercase transition-all",
+                      newFuelType === f ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-border/30 bg-muted/10 text-muted-foreground'
+                    )}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button 
+                onClick={() => setNewVehIcon('car')}
+                className={cn("flex-1 h-11 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all", newVehIcon === 'car' ? 'border-primary text-primary bg-primary/10 shadow-sm' : 'border-border/40 text-muted-foreground bg-muted/10')}
+              >
+                <Car className="h-4 w-4" /> Car
+              </button>
+              <button 
+                onClick={() => setNewVehIcon('bike')}
+                className={cn("flex-1 h-11 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all", newVehIcon === 'bike' ? 'border-primary text-primary bg-primary/10 shadow-sm' : 'border-border/40 text-muted-foreground bg-muted/10')}
+              >
+                <Bike className="h-4 w-4" /> Bike
+              </button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button 
-              onClick={() => setNewVehIcon('car')}
-              className={cn("flex-1 h-12 rounded-xl border flex items-center justify-center gap-2 text-sm font-bold transition-all", newVehIcon === 'car' ? 'border-primary text-primary bg-primary/10 shadow-sm' : 'border-border/40 text-muted-foreground bg-muted/10')}
-            >
-              <Car className="h-4 w-4" /> Car
-            </button>
-            <button 
-              onClick={() => setNewVehIcon('bike')}
-              className={cn("flex-1 h-12 rounded-xl border flex items-center justify-center gap-2 text-sm font-bold transition-all", newVehIcon === 'bike' ? 'border-primary text-primary bg-primary/10 shadow-sm' : 'border-border/40 text-muted-foreground bg-muted/10')}
-            >
-              <Bike className="h-4 w-4" /> Bike
-            </button>
-          </div>
-          <button onClick={handleSaveVehicle} className="w-full h-12 rounded-xl bg-gradient-primary text-white text-sm font-bold mt-2 shadow-glow active:scale-95 transition-all">
-            Save to Garage
+
+          <button onClick={handleSaveVehicle} className="w-full h-12 rounded-xl bg-gradient-primary text-white text-sm font-black mt-2 shadow-glow active:scale-95 transition-all">
+            {editingVehId ? 'Update Vehicle' : 'Save to Garage'}
           </button>
         </div>
       </motion.div>
     );
   }
-
   // DASHBOARD MODE
   return (
     <motion.div 
@@ -321,6 +450,34 @@ export function VehicleTracker() {
               <p className="text-2xl font-black font-mono tracking-tight text-foreground">₹{stats.costPerKm.toFixed(2)}</p>
             </motion.div>
           </div>
+
+          {/* Maintenance & Compliance Alerts */}
+          {activeVeh && (activeVeh.serviceInterval || activeVeh.insuranceExpiry) && (
+             <div className="grid grid-cols-2 gap-3">
+                {activeVeh.serviceInterval && (
+                  <div className="p-3 rounded-2xl border border-border/40 bg-card/40 flex items-center gap-3">
+                    <div className={cn("h-9 w-9 rounded-xl flex items-center justify-center", (activeLogs[0]?.odometer || 0) % activeVeh.serviceInterval < 500 ? "bg-warning/20 text-warning animate-pulse" : "bg-muted text-muted-foreground")}>
+                      <Wrench className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-[8px] font-black uppercase text-muted-foreground">Service Status</p>
+                      <p className="text-xs font-bold">{(activeLogs[0]?.odometer || 0) % activeVeh.serviceInterval < 500 ? "Due Soon" : "Healthy"}</p>
+                    </div>
+                  </div>
+                )}
+                {activeVeh.insuranceExpiry && (
+                  <div className="p-3 rounded-2xl border border-border/40 bg-card/40 flex items-center gap-3">
+                    <div className={cn("h-9 w-9 rounded-xl flex items-center justify-center", (new Date(activeVeh.insuranceExpiry).getTime() - new Date().getTime() < 30 * 24 * 60 * 60 * 1000) ? "bg-destructive/20 text-destructive animate-pulse" : "bg-muted text-muted-foreground")}>
+                      <ShieldAlert className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-[8px] font-black uppercase text-muted-foreground">Insurance</p>
+                      <p className="text-xs font-bold">{(new Date(activeVeh.insuranceExpiry).getTime() - new Date().getTime() < 30 * 24 * 60 * 60 * 1000) ? "Renew Now" : "Active"}</p>
+                    </div>
+                  </div>
+                )}
+             </div>
+          )}
 
           {/* Economy Chart */}
           {stats.chartData.length > 1 && (
