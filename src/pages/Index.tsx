@@ -41,6 +41,7 @@ import { metaService } from '@/lib/recurring';
 import { BiometricLock } from '@/components/biometric-lock';
 import { SMSExpenseNudge } from '@/components/sms-expense-nudge';
 import { PermissionGuard } from '@/components/permission-guard';
+import { FloatingAddMenu } from '@/components/floating-add-menu';
 
 type Tab = 'dashboard' | 'expenses' | 'reimbursements' | 'vehicle' | 'analytics' | 'settings';
 
@@ -59,6 +60,8 @@ const MORE_NAV  = NAV_ITEMS.slice(4);      // Charts, Settings
 
 const Index = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [logs, setLogs] = useState(() => fuelService.getLogs());
+  const [vehicles, setVehicles] = useState(() => mileageService.getVehicles());
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [expenseSubTab, setExpenseSubTab] = useState<'all' | 'wallet'>('all');
@@ -165,7 +168,7 @@ const Index = () => {
         costPerKm: totalDist > 0 ? totalCost / totalDist : 0
       };
     }).sort((a, b) => b.totalDist - a.totalDist);
-  }, [expenses]); 
+  }, [expenses, logs, vehicles]); 
 
   const vehicleStats = useMemo(() => {
     const fLogs = fuelService.getLogs();
@@ -627,7 +630,14 @@ const Index = () => {
                   </h1>
                   <p className="text-xs text-muted-foreground mt-1">Mileage logs and fuel efficiency analysis</p>
                 </div>
-                <VehicleTracker />
+                <VehicleTracker 
+                  vehicles={vehicles}
+                  logs={logs}
+                  onRefresh={() => {
+                    setLogs(fuelService.getLogs());
+                    setVehicles(mileageService.getVehicles());
+                  }}
+                />
               </div>
             )}
 
@@ -707,11 +717,11 @@ const Index = () => {
 
         {/* ── High-Density Pro Navigation (mobile) ── */}
         <nav className="sm:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-40 w-[94vw] max-w-md h-20">
-          <div className="relative h-full w-full bg-card/80 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-2xl overflow-hidden flex items-center">
+          <div className="relative h-full w-full bg-card/80 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-2xl flex items-center overflow-visible">
             
             <div 
               ref={navRef}
-              className="w-full flex items-center justify-between px-4 overflow-x-auto no-scrollbar snap-x snap-mandatory"
+              className="w-full h-full flex items-center justify-between px-4 no-scrollbar snap-x snap-mandatory"
             >
               {[
                 ...LEFT_NAV,
@@ -724,17 +734,10 @@ const Index = () => {
                 
                 if ('isFab' in item) {
                   return (
-                    <div key="fab-item" className="flex-shrink-0 w-16 flex justify-center snap-center mx-1">
-                      <ExpenseForm
-                        onSubmit={handleAddExpense}
-                        trigger={
-                          <motion.button
-                            whileTap={{ scale: 0.9 }}
-                            className="h-14 w-14 rounded-full bg-gradient-primary shadow-glow flex items-center justify-center border-4 border-background"
-                          >
-                            <Plus className="h-7 w-7 text-white" strokeWidth={3} />
-                          </motion.button>
-                        }
+                    <div key="fab-item" className="flex-shrink-0 w-16 flex justify-center snap-center mx-1 relative overflow-visible">
+                      <FloatingAddMenu 
+                        onAddExpense={handleAddExpense} 
+                        onFuelSuccess={() => setLogs(fuelService.getLogs())}
                       />
                     </div>
                   );

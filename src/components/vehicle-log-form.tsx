@@ -19,8 +19,10 @@ interface VehicleLogFormProps {
   editLog?: FuelLog;
 }
 
-export function VehicleLogForm({ onSuccess, trigger, editLog }: VehicleLogFormProps) {
-  const [open, setOpen] = useState(false);
+export function VehicleLogForm({ onSuccess, trigger, editLog, open: externalOpen, onOpenChange }: VehicleLogFormProps & { open?: boolean; onOpenChange?: (open: boolean) => void }) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
   const isMobile = useIsMobile();
   
   const [vehicles] = useState<VehicleRate[]>(() => mileageService.getVehicles());

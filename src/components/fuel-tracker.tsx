@@ -12,10 +12,15 @@ import {
   Tooltip, ResponsiveContainer, AreaChart, Area 
 } from 'recharts';
 import { VehicleLogForm } from './vehicle-log-form';
+import { VehicleForm } from './vehicle-form';
 
-export function VehicleTracker() {
-  const [vehicles, setVehicles] = useState<VehicleRate[]>(() => mileageService.getVehicles());
-  const [logs, setLogs] = useState<FuelLog[]>(() => fuelService.getLogs());
+interface VehicleTrackerProps {
+  vehicles: VehicleRate[];
+  logs: FuelLog[];
+  onRefresh: () => void;
+}
+
+export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProps) {
   const [mode, setMode] = useState<'dashboard' | 'add' | 'vehicles'>('dashboard');
   
   const [activeVehId, setActiveVehId] = useState<string>(vehicles[0]?.id || '');
@@ -26,13 +31,12 @@ export function VehicleTracker() {
     if (needsMigration) {
       console.log('[FuelTracker] Migrating legacy logs to new metric system...');
       fuelService.saveAll(logs);
-      setLogs(fuelService.getLogs());
+      onRefresh(); // Trigger parent to update state
     }
   }, []);
 
   const reload = () => {
-    setVehicles(mileageService.getVehicles());
-    setLogs(fuelService.getLogs());
+    onRefresh();
   };
 
   const fleetStats = useMemo(() => {
@@ -87,6 +91,9 @@ export function VehicleTracker() {
   const [serviceInterval, setServiceInterval] = useState('');
   
   const [editingVehId, setEditingVehId] = useState<string | null>(null);
+  const [showVehicleForm, setShowVehicleForm] = useState(false);
+
+  const activeEditingVeh = useMemo(() => vehicles.find(v => v.id === editingVehId), [vehicles, editingVehId]);
 
   const handleSaveVehicle = () => {
     if (!newVehName) return;
@@ -124,14 +131,7 @@ export function VehicleTracker() {
 
   const handleEditVehicle = (v: VehicleRate) => {
     setEditingVehId(v.id);
-    setNewVehName(v.name);
-    setNewVehIcon(v.icon);
-    setNewVehRate(v.ratePerKm?.toString() || '');
-    setNewPrice(v.defaultFuelPrice?.toString() || '');
-    setNewFuelType(v.fuelType || 'petrol');
-    setLicensePlate(v.licensePlate || '');
-    setInsuranceExpiry(v.insuranceExpiry || '');
-    setServiceInterval(v.serviceInterval?.toString() || '');
+    setShowVehicleForm(true);
   };
 
   const handleMoveVehicle = (id: string, direction: 'up' | 'down') => {
@@ -237,99 +237,23 @@ export function VehicleTracker() {
           })}
         </div>
 
-        <div className="p-5 rounded-2xl border border-border/40 bg-card/40 space-y-4 mt-6 border-dashed">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{editingVehId ? 'Edit Vehicle' : 'Add New Vehicle'}</p>
-            {editingVehId && <button onClick={() => { setEditingVehId(null); setNewVehName(''); }} className="text-[9px] font-bold text-primary uppercase tracking-wider">Cancel Edit</button>}
-          </div>
-          
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1.5">
-                <p className="text-[8px] font-black text-muted-foreground uppercase px-1">Nickname</p>
-                <input 
-                  placeholder="e.g. My Pulsar" value={newVehName} onChange={e => setNewVehName(e.target.value)}
-                  className="h-11 px-4 rounded-xl bg-muted/30 border border-border/40 text-sm w-full focus:border-primary/40 transition-all"
-                />
+        <VehicleForm
+          open={showVehicleForm}
+          onOpenChange={(open) => {
+            setShowVehicleForm(open);
+            if (!open) setEditingVehId(null);
+          }}
+          editVehicle={activeEditingVeh}
+          onSuccess={reload}
+          trigger={
+            <button className="w-full h-16 rounded-2xl border border-dashed border-border/60 bg-card/40 flex items-center justify-center gap-3 group hover:border-primary/40 transition-all">
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                <Plus className="h-5 w-5" />
               </div>
-              <div className="space-y-1.5">
-                <p className="text-[8px] font-black text-muted-foreground uppercase px-1">Plate Number</p>
-                <input 
-                  placeholder="MH 12 AB 1234" value={licensePlate} onChange={e => setLicensePlate(e.target.value)}
-                  className="h-11 px-4 rounded-xl bg-muted/30 border border-border/40 text-sm w-full focus:border-primary/40 uppercase font-mono"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1.5">
-                <p className="text-[8px] font-black text-muted-foreground uppercase px-1">Default Fuel Price</p>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-bold">₹</span>
-                  <input 
-                    type="number" placeholder="104.5" value={newPrice} onChange={e => setNewPrice(e.target.value)}
-                    className="h-11 pl-7 pr-3 rounded-xl bg-muted/30 border border-border/40 text-sm w-full focus:border-primary/40"
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-[8px] font-black text-muted-foreground uppercase px-1">Service Every (km)</p>
-                <div className="relative">
-                  <input 
-                    type="number" placeholder="5000" value={serviceInterval} onChange={e => setServiceInterval(e.target.value)}
-                    className="h-11 px-4 rounded-xl bg-muted/30 border border-border/40 text-sm w-full focus:border-primary/40"
-                  />
-                  <Wrench className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <p className="text-[8px] font-black text-muted-foreground uppercase px-1">Insurance Expiry</p>
-              <input 
-                type="date" value={insuranceExpiry} onChange={e => setInsuranceExpiry(e.target.value)}
-                className="h-11 px-4 rounded-xl bg-muted/30 border border-border/40 text-sm w-full focus:border-primary/40"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <p className="text-[8px] font-black text-muted-foreground uppercase px-1">Fuel Type</p>
-              <div className="flex gap-1">
-                {['petrol', 'diesel', 'cng', 'electric'].map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setNewFuelType(f as any)}
-                    className={cn(
-                      "flex-1 h-9 rounded-lg border text-[9px] font-black uppercase transition-all",
-                      newFuelType === f ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-border/30 bg-muted/10 text-muted-foreground'
-                    )}
-                  >
-                    {f}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button 
-                onClick={() => setNewVehIcon('car')}
-                className={cn("flex-1 h-11 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all", newVehIcon === 'car' ? 'border-primary text-primary bg-primary/10 shadow-sm' : 'border-border/40 text-muted-foreground bg-muted/10')}
-              >
-                <Car className="h-4 w-4" /> Car
-              </button>
-              <button 
-                onClick={() => setNewVehIcon('bike')}
-                className={cn("flex-1 h-11 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all", newVehIcon === 'bike' ? 'border-primary text-primary bg-primary/10 shadow-sm' : 'border-border/40 text-muted-foreground bg-muted/10')}
-              >
-                <Bike className="h-4 w-4" /> Bike
-              </button>
-            </div>
-          </div>
-
-          <button onClick={handleSaveVehicle} className="w-full h-12 rounded-xl bg-gradient-primary text-white text-sm font-black mt-2 shadow-glow active:scale-95 transition-all">
-            {editingVehId ? 'Update Vehicle' : 'Save to Garage'}
-          </button>
-        </div>
+              <span className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">Add New Vehicle</span>
+            </button>
+          }
+        />
       </motion.div>
     );
   }
