@@ -48,22 +48,22 @@ export const dataMigrationService = {
       }
 
       // Helper to set data if it exists in the import
-      const syncKey = (key: string, value: any) => {
+      const syncKey = async (key: string, value: any) => {
         // If value is an array, we import it (even if empty)
         // If value is an object, we import it (even if empty)
         if (value !== undefined && value !== null) {
           console.log(`[Data Migration] Syncing ${key}...`);
-          storageEngine.set(key, JSON.stringify(value));
+          await storageEngine.set(key, JSON.stringify(value));
         }
       };
 
-      syncKey('reimburse_expenses_v2', data.expenses);
-      syncKey('reimburse_settings_v2', data.settings);
-      syncKey('reimburse_categories_v1', data.categories);
-      syncKey('reimburse_vehicles_v1', data.vehicles);
-      syncKey('reimburse_mileage_v1', data.mileage);
-      syncKey('reimburse_fuel_v1', data.fuel);
-      syncKey('reimburse_wallet_v1', data.wallet);
+      await syncKey('reimburse_expenses_v2', data.expenses);
+      await syncKey('reimburse_settings_v2', data.settings);
+      await syncKey('reimburse_categories_v1', data.categories);
+      await syncKey('reimburse_vehicles_v1', data.vehicles);
+      await syncKey('reimburse_mileage_v1', data.mileage);
+      await syncKey('reimburse_fuel_v1', data.fuel);
+      await syncKey('reimburse_wallet_v1', data.wallet);
 
       console.log('[Data Migration] Import successful');
       return true;

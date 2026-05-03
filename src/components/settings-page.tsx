@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AppSettings, BudgetGoal, ExpenseCategory } from '@/types/expense';
 import { settingsService } from '@/lib/settings';
 import { categoryService, CategoryDefinition, iconMap } from '@/lib/category-service';
+import { storageEngine } from '@/lib/storage-engine';
 import { formatCurrency, cn } from '@/lib/utils';
 
 import { createPortal } from 'react-dom';
@@ -643,7 +644,7 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
       });
 
       const deletedCount = data.length - filtered.length;
-      localStorage.setItem(key, JSON.stringify(filtered));
+      storageEngine.set(key, JSON.stringify(filtered));
       toast.success(`${deletedCount} records deleted`);
       setAdvDeleteType(null);
     } catch (e) {
@@ -817,7 +818,7 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
                               wallet: ['reimburse_wallet_v1'],
                               mileage: ['reimburse_mileage_v1', 'reimburse_vehicles_v1']
                             };
-                            keys[item.type].forEach(k => localStorage.removeItem(k));
+                            keys[item.type].forEach(k => storageEngine.remove(k));
                             toast.success(`${item.label} wiped clean`);
                             window.location.reload();
                           }
@@ -851,8 +852,8 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
                   title: 'ULTIMATE FACTORY RESET?',
                   description: 'This is the point of no return. Every single preference, expense, vehicle, and setting will be obliterated. Are you absolutely certain?',
                   variant: 'destructive',
-                  onConfirm: () => {
-                    localStorage.clear();
+                  onConfirm: async () => {
+                    await storageEngine.clearAll();
                     window.location.reload();
                   }
                 });

@@ -28,11 +28,13 @@ export const storageEngine = {
    * Replaces localStorage.setItem.
    * Writes to memory immediately for fast UI, then writes asynchronously to native storage.
    */
-  set(key: string, value: string): void {
+  async set(key: string, value: string): Promise<void> {
     localStorage.setItem(key, value);
-    Preferences.set({ key, value }).catch(e => 
-      console.error(`[Storage Engine] Failed to persist key ${key}:`, e)
-    );
+    try {
+      await Preferences.set({ key, value });
+    } catch (e) {
+      console.error(`[Storage Engine] Failed to persist key ${key}:`, e);
+    }
   },
 
   /**
@@ -43,5 +45,13 @@ export const storageEngine = {
     Preferences.remove({ key }).catch(e => 
       console.error(`[Storage Engine] Failed to remove key ${key}:`, e)
     );
+  },
+
+  /**
+   * Completely wipes all application data.
+   */
+  async clearAll(): Promise<void> {
+    localStorage.clear();
+    await Preferences.clear();
   }
 };
