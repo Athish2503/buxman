@@ -183,7 +183,7 @@ function FormBody({
         date:         data.date,
         category:     data.category as ExpenseCategory,
         description:  data.description || '',
-        status:       data.status as ExpenseStatus,
+        status:       data.isReimbursement ? (data.status as ExpenseStatus) : 'approved',
         currency:     'INR',
         receiptImage: receiptPreview || initialData?.receiptImage,
         isReimbursement: data.isReimbursement,
@@ -342,28 +342,30 @@ function FormBody({
       </div>
 
       {/* ── Status ── */}
-      <div className="mb-5">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2.5">Status</p>
-        <div className="grid grid-cols-2 gap-2">
-          {STATUS_OPTIONS.map(s => (
-            <button
-              key={s.value}
-              type="button"
-              onClick={() => setValue('status', s.value, { shouldValidate: true })}
-              className={cn(
-                'flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all duration-200 active:scale-95',
-                status === s.value
-                  ? s.active
-                  : 'border-border/40 bg-muted/30 text-muted-foreground hover:bg-muted/50'
-              )}
-            >
-              <span className="text-sm leading-none">{s.emoji}</span>
-              {s.label}
-              {status === s.value && <Check className="h-3 w-3 ml-auto" />}
-            </button>
-          ))}
+      {watch('isReimbursement') && (
+        <div className="mb-5">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2.5">Status</p>
+          <div className="grid grid-cols-2 gap-2">
+            {STATUS_OPTIONS.map(s => (
+              <button
+                key={s.value}
+                type="button"
+                onClick={() => setValue('status', s.value, { shouldValidate: true })}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all duration-200 active:scale-95',
+                  status === s.value
+                    ? s.active
+                    : 'border-border/40 bg-muted/30 text-muted-foreground hover:bg-muted/50'
+                )}
+              >
+                <span className="text-sm leading-none">{s.emoji}</span>
+                {s.label}
+                {status === s.value && <Check className="h-3 w-3 ml-auto" />}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Notes ── */}
       <div className="mb-5">

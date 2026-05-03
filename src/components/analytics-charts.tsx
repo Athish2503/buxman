@@ -55,42 +55,76 @@ export function SpendingTrendChart({ expenses }: ChartsProps) {
   const delta = prevTotal ? ((currentTotal - prevTotal) / prevTotal) * 100 : 0;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-end justify-between">
+    <div className="space-y-6">
+      <div className="flex items-end justify-between px-1">
         <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">This Month</p>
-          <p className="text-3xl font-bold number-lg mt-0.5">{formatCompactCurrency(currentTotal)}</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/60 mb-1">Total Spending</p>
+          <p className="text-4xl font-black tracking-tighter number-lg">{formatCompactCurrency(currentTotal)}</p>
         </div>
         {prevTotal > 0 && (
           <div className={cn(
-            "flex items-center gap-1 text-sm font-semibold px-2.5 py-1 rounded-full",
-            delta > 0 ? "bg-destructive/10 text-destructive" : delta < 0 ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
+            "flex items-center gap-1 text-[10px] font-black px-3 py-1.5 rounded-xl border shadow-inner",
+            delta > 0 ? "bg-destructive/10 text-destructive border-destructive/20" : "bg-success/10 text-success border-success/20"
           )}>
-            {delta > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : delta < 0 ? <TrendingDown className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
+            {delta > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
             {Math.abs(delta).toFixed(1)}%
           </div>
         )}
       </div>
-      <ResponsiveContainer width="100%" height={200}>
-        <AreaChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-          <defs>
-            <linearGradient id="totalGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="hsl(262 85% 65%)" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="hsl(262 85% 65%)" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="pendingGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="hsl(38 95% 58%)" stopOpacity={0.2} />
-              <stop offset="95%" stopColor="hsl(38 95% 58%)" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border) / 0.4)" />
-          <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCompactCurrency(v)} />
-          <Tooltip content={<CustomTooltip />} />
-          <Area type="monotone" dataKey="total" name="Total" stroke="hsl(262 85% 65%)" strokeWidth={2} fill="url(#totalGrad)" dot={false} activeDot={{ r: 4, fill: 'hsl(262 85% 65%)' }} />
-          <Area type="monotone" dataKey="pending" name="Pending" stroke="hsl(38 95% 58%)" strokeWidth={2} fill="url(#pendingGrad)" dot={false} activeDot={{ r: 4, fill: 'hsl(38 95% 58%)' }} />
-        </AreaChart>
-      </ResponsiveContainer>
+      
+      <div className="h-[240px] w-full mt-4">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <defs>
+              <linearGradient id="totalGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="pendingGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(38 95% 58%)" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="hsl(38 95% 58%)" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border) / 0.3)" />
+            <XAxis 
+              dataKey="month" 
+              tick={{ fontSize: 10, fontWeight: 900, fill: 'hsl(var(--muted-foreground) / 0.5)' }} 
+              axisLine={false} 
+              tickLine={false} 
+              dy={10}
+            />
+            <YAxis 
+              tick={{ fontSize: 10, fontWeight: 900, fill: 'hsl(var(--muted-foreground) / 0.5)' }} 
+              axisLine={false} 
+              tickLine={false} 
+              tickFormatter={(v) => formatCompactCurrency(v)} 
+            />
+            <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '4 4' }} />
+            <Area 
+              type="monotone" 
+              dataKey="total" 
+              name="Total" 
+              stroke="hsl(var(--primary))" 
+              strokeWidth={4} 
+              fill="url(#totalGrad)" 
+              dot={false} 
+              activeDot={{ r: 6, fill: 'hsl(var(--primary))', stroke: '#fff', strokeWidth: 3 }} 
+              animationDuration={1500}
+            />
+            <Area 
+              type="monotone" 
+              dataKey="pending" 
+              name="Pending" 
+              stroke="hsl(38 95% 58%)" 
+              strokeWidth={3} 
+              fill="url(#pendingGrad)" 
+              dot={false} 
+              activeDot={{ r: 5, fill: 'hsl(38 95% 58%)', stroke: '#fff', strokeWidth: 2 }} 
+              animationDuration={2000}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

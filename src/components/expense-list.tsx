@@ -4,7 +4,8 @@ import {
   Edit, Trash2, Eye, Filter, Download, Search,
   Receipt, ChevronDown, CheckSquare, Square, X,
   SlidersHorizontal, FileText, FileSpreadsheet, Briefcase,
-  MoreVertical, ArrowUpDown, Tag, Share2, ZoomIn, RefreshCw
+  MoreVertical, ArrowUpDown, Tag, Share2, ZoomIn, RefreshCw,
+  Camera, Calendar
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -79,7 +80,6 @@ export function ExpenseList({
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
 
-  // Sync filter when changed from parent (dashboard buttons)
   useEffect(() => {
     setFilterType(initialFilterType);
   }, [initialFilterType]);
@@ -90,9 +90,7 @@ export function ExpenseList({
       const statusOk = filterStatus === 'all' || e.status === filterStatus;
       const q = search.toLowerCase();
       const searchOk = !q || e.vendor.toLowerCase().includes(q) ||
-        e.description.toLowerCase().includes(q) ||
-        (e.tags || []).some(t => t.includes(q)) ||
-        (e.projectCode || '').toLowerCase().includes(q);
+        e.description.toLowerCase().includes(q);
       const typeOk = filterType === 'all' || 
         (filterType === 'personal' && !e.isReimbursement) || 
         (filterType === 'reimbursable' && e.isReimbursement);
@@ -109,7 +107,7 @@ export function ExpenseList({
     });
 
     return list;
-  }, [expenses, filterCategory, filterStatus, search, sortKey, sortDir]);
+  }, [expenses, filterCategory, filterStatus, search, sortKey, sortDir, filterType]);
 
   const summary: ExpenseSummary = useMemo(() => ({
     total: filteredExpenses.reduce((s, e) => s + e.amount, 0),
@@ -188,28 +186,6 @@ export function ExpenseList({
     }
   };
 
-  const handleExportCSV = async () => {
-    const dataToExport = selected.size > 0 
-      ? filteredExpenses.filter(e => selected.has(e.id))
-      : filteredExpenses;
-    
-    if (dataToExport.length === 0) {
-      toast.error('No expenses to export');
-      return;
-    }
-
-    const toastId = toast.loading('Exporting CSV...');
-    try {
-      await exportCSV(dataToExport);
-      toast.success('CSV exported successfully', { id: toastId });
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to export CSV', { id: toastId });
-    }
-  };
-
-  const activeFilters = [filterCategory !== 'all', filterStatus !== 'all'].filter(Boolean).length;
-
   const FilterPanel = () => (
     <div className="space-y-4 p-1">
       <div>
@@ -246,28 +222,6 @@ export function ExpenseList({
         </div>
       </div>
       <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Type</p>
-        <div className="grid grid-cols-3 gap-2">
-          {(['all', 'personal', 'reimbursable'] as const).map(t => (
-            <button
-              key={t}
-              onClick={() => {
-                haptics.selection();
-                setFilterType(t);
-              }}
-              className={cn(
-                "py-1.5 px-3 rounded-lg text-xs font-medium border capitalize transition-all",
-                filterType === t
-                  ? "border-primary bg-primary/15 text-primary"
-                  : "border-border text-muted-foreground hover:border-border/80"
-              )}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Sort By</p>
         <div className="grid grid-cols-2 gap-2">
           {(['date', 'amount', 'vendor', 'status'] as SortKey[]).map(k => (
@@ -291,6 +245,17 @@ export function ExpenseList({
       </div>
     </div>
   );
+
+  const groupedExpenses = useMemo(() => {
+    const groups: Record<string, { expenses: Expense[], total: number }> = {};
+    filteredExpenses.forEach(e => {
+      const date = e.date;
+      if (!groups[date]) groups[date] = { expenses: [], total: 0 };
+      groups[date].expenses.push(e);
+      groups[date].total += e.amount;
+    });
+    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [filteredExpenses]);
 
   return (
     <div className="space-y-4">
@@ -320,7 +285,6 @@ export function ExpenseList({
         </div>
       )}
 
-      {/* Module Title */}
       {title && (
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-xl font-bold tracking-tight">{title}</h2>
@@ -330,9 +294,8 @@ export function ExpenseList({
         </div>
       )}
 
-      {/* Top Level Type Tabs */}
       {showTypeTabs && (
-        <div className="flex bg-muted/40 p-1 rounded-2xl w-full">
+        <div className="flex bg-muted/40 p-1 rounded-2xl w-full border border-white/5">
         {(['all', 'personal', 'reimbursable'] as const).map(t => {
           const active = filterType === t;
           const count = expenses.filter(e => {
@@ -349,18 +312,21 @@ export function ExpenseList({
                 setFilterType(t);
               }}
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all duration-300",
+                "flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-xl transition-all duration-300",
                 active 
-                  ? "bg-background text-foreground shadow-lg scale-[1.02] border border-border/50" 
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-card text-primary shadow-xl scale-[1.02] border border-white/5" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/5"
               )}
             >
-              <span className="capitalize">{t}</span>
+              <div className="flex items-center gap-1.5">
+                {t === 'personal' ? <Tag className="h-3 w-3" /> : t === 'reimbursable' ? <Briefcase className="h-3 w-3" /> : <SlidersHorizontal className="h-3 w-3" />}
+                <span className="capitalize text-[10px] font-black uppercase tracking-widest">{t}</span>
+              </div>
               <span className={cn(
-                "px-1.5 py-0.5 rounded-md text-[9px]",
-                active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground/60"
+                "text-[9px] font-medium opacity-60",
+                active ? "text-primary" : "text-muted-foreground"
               )}>
-                {count}
+                {count} items
               </span>
             </button>
           );
@@ -370,71 +336,98 @@ export function ExpenseList({
 
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-muted/50 h-10" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+          <Input placeholder="Search vendors, notes..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-card/40 border-white/5 h-10 rounded-xl focus:ring-primary/20" />
         </div>
-        <div className="flex bg-muted/40 p-1 rounded-xl border">
-          <button onClick={() => setViewMode('cards')} className={cn("h-8 px-2.5 rounded-lg transition-all", viewMode === 'cards' ? "bg-background shadow-sm" : "text-muted-foreground")}><MoreVertical className="h-3.5 w-3.5 rotate-90" /></button>
-          <button onClick={() => setViewMode('table')} className={cn("h-8 px-2.5 rounded-lg transition-all", viewMode === 'table' ? "bg-background shadow-sm" : "text-muted-foreground")}><ArrowUpDown className="h-3.5 w-3.5" /></button>
+        <div className="flex bg-muted/40 p-1 rounded-xl border border-white/5 shadow-inner">
+          <button onClick={() => { setViewMode('cards'); haptics.selection(); }} className={cn("h-8 w-8 flex items-center justify-center rounded-lg transition-all", viewMode === 'cards' ? "bg-card shadow-sm text-primary" : "text-muted-foreground")}><MoreVertical className="h-3.5 w-3.5 rotate-90" /></button>
+          <button onClick={() => { setViewMode('table'); haptics.selection(); }} className={cn("h-8 w-8 flex items-center justify-center rounded-lg transition-all", viewMode === 'table' ? "bg-card shadow-sm text-primary" : "text-muted-foreground")}><ArrowUpDown className="h-3.5 w-3.5" /></button>
         </div>
         <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
           <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="h-10 w-10 shrink-0"><SlidersHorizontal className="h-4 w-4" /></Button>
+            <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 rounded-xl bg-card/40 border-white/5"><SlidersHorizontal className="h-4 w-4" /></Button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="glass rounded-t-2xl"><FilterPanel /></SheetContent>
+          <SheetContent side="bottom" className="glass rounded-t-[2.5rem] border-t-white/10 pb-12"><FilterPanel /></SheetContent>
         </Sheet>
       </div>
 
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
         {viewMode === 'cards' ? (
           <PullToRefresh onRefresh={handleRefresh}>
-            <div className="space-y-1 py-2">
-              {filteredExpenses.map(expense => (
-                <ExpenseItem
-                  key={expense.id}
-                  expense={expense}
-                  isSelected={selected.has(expense.id)}
-                  onToggleSelect={toggleSelect}
-                  onView={setSelectedExpense}
-                  onEdit={setEditingExpense}
-                  onDelete={onDeleteExpense}
-                  onStatusChange={handleStatusChange}
-                />
+            <div className="space-y-8 py-2">
+              {groupedExpenses.length === 0 ? (
+                 <div className="py-20 text-center">
+                    <div className="h-16 w-16 rounded-full bg-muted/20 flex items-center justify-center mx-auto mb-4 border border-dashed border-border">
+                      <Receipt className="h-8 w-8 text-muted-foreground/30" />
+                    </div>
+                    <p className="font-bold text-muted-foreground">No matches found</p>
+                    <p className="text-xs text-muted-foreground/60 mt-1">Try adjusting your filters or search terms</p>
+                 </div>
+              ) : groupedExpenses.map(([date, { expenses: groupExpenses, total }]) => (
+                <div key={date} className="space-y-3">
+                   <div className="flex items-center justify-between px-1">
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50">
+                        {format(new Date(date), 'EEEE, do MMM')}
+                      </h4>
+                      <p className="text-[11px] font-bold text-muted-foreground">
+                        Total: <span className="text-foreground">{formatCurrency(total)}</span>
+                      </p>
+                   </div>
+                   <div className="space-y-3">
+                    {groupExpenses.map(expense => (
+                      <ExpenseItem
+                        key={expense.id}
+                        expense={expense}
+                        isSelected={selected.has(expense.id)}
+                        onToggleSelect={toggleSelect}
+                        onView={setSelectedExpense}
+                        onEdit={setEditingExpense}
+                        onDelete={onDeleteExpense}
+                        onStatusChange={handleStatusChange}
+                      />
+                    ))}
+                   </div>
+                </div>
               ))}
             </div>
           </PullToRefresh>
         ) : (
-          <div className="rounded-xl border border-border/60 bg-card/40 overflow-hidden overflow-x-auto">
+          <div className="rounded-2xl border border-white/5 bg-card/40 overflow-hidden overflow-x-auto shadow-xl">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-muted/30 border-b">
-                  <th className="p-3 w-10"><Checkbox checked={selected.size === filteredExpenses.length} onCheckedChange={toggleSelectAll} /></th>
-                  <th className="p-3 text-[10px] font-bold uppercase text-muted-foreground">Vendor</th>
-                  <th className="p-3 text-[10px] font-bold uppercase text-muted-foreground text-right">Amount</th>
-                  <th className="p-3 text-[10px] font-bold uppercase text-muted-foreground">Status</th>
-                  <th className="p-3 w-10"></th>
+                <tr className="bg-white/5 border-b border-white/5">
+                  <th className="p-4 w-10"><Checkbox checked={selected.size === filteredExpenses.length && filteredExpenses.length > 0} onCheckedChange={toggleSelectAll} /></th>
+                  <th className="p-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Vendor</th>
+                  <th className="p-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 text-right">Amount</th>
+                  <th className="p-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Status</th>
+                  <th className="p-4 w-10"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-white/5">
                 {filteredExpenses.map(expense => (
-                  <tr key={expense.id} className={cn("hover:bg-muted/20", selected.has(expense.id) ? "bg-primary/5" : "")} onClick={() => toggleSelect(expense.id)}>
-                    <td className="p-3" onClick={e => e.stopPropagation()}><Checkbox checked={selected.has(expense.id)} onCheckedChange={() => toggleSelect(expense.id)} /></td>
-                    <td className="p-3">
+                  <tr key={expense.id} className={cn("hover:bg-white/5 transition-colors", selected.has(expense.id) ? "bg-primary/5" : "")} onClick={() => toggleSelect(expense.id)}>
+                    <td className="p-4" onClick={e => e.stopPropagation()}><Checkbox checked={selected.has(expense.id)} onCheckedChange={() => toggleSelect(expense.id)} /></td>
+                    <td className="p-4">
                       <div className="flex items-center gap-1.5">
                         <p className="text-xs font-bold">{expense.vendor}</p>
                         {expense.isReimbursement && <Briefcase className="h-2.5 w-2.5 text-primary" />}
                       </div>
-                      <p className="text-[10px] text-muted-foreground">{format(new Date(expense.date), 'dd/MM/yy')}</p>
+                      <p className="text-[10px] text-muted-foreground/60 mt-0.5">{format(new Date(expense.date), 'dd/MM/yy')}</p>
                     </td>
-                    <td className="p-3 text-right text-xs font-mono font-bold">{formatCurrency(expense.amount)}</td>
-                    <td className="p-3"><Badge className={cn("text-[9px] uppercase", STATUS_COLORS[expense.status])}>{expense.status}</Badge></td>
-                    <td className="p-3" onClick={e => e.stopPropagation()}>
+                    <td className="p-4 text-right text-xs font-mono font-black">{formatCurrency(expense.amount)}</td>
+                    <td className="p-4">
+                      {expense.isReimbursement && (
+                        <Badge className={cn("text-[9px] font-black uppercase tracking-tighter", STATUS_COLORS[expense.status])}>{expense.status}</Badge>
+                      )}
+                    </td>
+                    <td className="p-4" onClick={e => e.stopPropagation()}>
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><MoreVertical className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="glass">
-                          <DropdownMenuItem onClick={() => setSelectedExpense(expense)}>View</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setEditingExpense(expense)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => onDeleteExpense(expense.id)}>Delete</DropdownMenuItem>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="glass border-white/10 rounded-xl min-w-[120px]">
+                          <DropdownMenuItem onClick={() => setSelectedExpense(expense)} className="gap-2 text-xs font-medium"><Eye className="h-3.5 w-3.5" /> View</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setEditingExpense(expense)} className="gap-2 text-xs font-medium"><Edit className="h-3.5 w-3.5" /> Edit</DropdownMenuItem>
+                          <DropdownMenuSeparator className="bg-white/5" />
+                          <DropdownMenuItem className="text-destructive gap-2 text-xs font-medium" onClick={() => onDeleteExpense(expense.id)}><Trash2 className="h-3.5 w-3.5" /> Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
@@ -447,15 +440,103 @@ export function ExpenseList({
       </div>
 
       <Dialog open={!!selectedExpense} onOpenChange={open => !open && setSelectedExpense(null)}>
-        <DialogContent className="glass max-w-sm mx-4">
-          <DialogHeader><DialogTitle>{selectedExpense?.vendor}</DialogTitle></DialogHeader>
+        <DialogContent className="glass max-w-sm mx-4 p-0 overflow-hidden border-white/10 rounded-[2.5rem] shadow-2xl">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Expense Details</DialogTitle>
+          </DialogHeader>
           {selectedExpense && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-muted/40 p-3 rounded-xl"><p className="text-[10px] uppercase text-muted-foreground">Amount</p><p className="font-bold">{formatCurrency(selectedExpense.amount)}</p></div>
-                <div className="bg-muted/40 p-3 rounded-xl"><p className="text-[10px] uppercase text-muted-foreground">Status</p><Badge className={STATUS_COLORS[selectedExpense.status]}>{selectedExpense.status}</Badge></div>
+            <div className="flex flex-col">
+              <div className="p-8 pb-6 text-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none" />
+                <div className={cn(
+                  "h-16 w-16 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 shadow-xl border border-white/10",
+                  getCategoryConfig(selectedExpense.category).bgColor
+                )}>
+                  {(() => {
+                    const Icon = getCategoryConfig(selectedExpense.category).icon;
+                    return <Icon className={cn("h-8 w-8", getCategoryConfig(selectedExpense.category).color)} />;
+                  })()}
+                </div>
+                <h2 className="text-xl font-black tracking-tight mb-1">{selectedExpense.vendor}</h2>
+                <p className="text-3xl font-black font-mono tracking-tighter text-primary">
+                  {formatCurrency(selectedExpense.amount)}
+                </p>
+                {selectedExpense.isReimbursement && (
+                  <Badge className={cn(
+                    "mt-4 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full",
+                    STATUS_COLORS[selectedExpense.status]
+                  )}>
+                    {selectedExpense.status}
+                  </Badge>
+                )}
               </div>
-              {selectedExpense.receiptImage && <img src={selectedExpense.receiptImage} className="w-full rounded-xl" />}
+
+              <div className="px-6 py-6 space-y-4 bg-black/10">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40 mb-1 flex items-center gap-1.5">
+                      <Calendar className="h-3 w-3" /> Date
+                    </p>
+                    <p className="text-xs font-bold">{format(new Date(selectedExpense.date), 'EEEE, do MMM yyyy')}</p>
+                  </div>
+                  <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40 mb-1 flex items-center gap-1.5">
+                      <Tag className="h-3 w-3" /> Category
+                    </p>
+                    <p className="text-xs font-bold">{getCategoryConfig(selectedExpense.category).label}</p>
+                  </div>
+                </div>
+
+                {selectedExpense.description && (
+                  <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40 mb-1 flex items-center gap-1.5">
+                      <FileText className="h-3 w-3" /> Note
+                    </p>
+                    <p className="text-xs font-medium leading-relaxed">{selectedExpense.description}</p>
+                  </div>
+                )}
+
+                {selectedExpense.receiptImage && (
+                  <div className="space-y-2">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40 flex items-center gap-1.5 px-1">
+                      <Camera className="h-3 w-3" /> Receipt
+                    </p>
+                    <div 
+                      className="relative rounded-2xl overflow-hidden border border-white/10 group cursor-pointer"
+                      onClick={() => setViewingReceipt(selectedExpense.receiptImage!)}
+                    >
+                      <img src={selectedExpense.receiptImage} className="w-full aspect-[4/3] object-cover transition-transform group-hover:scale-105" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <ZoomIn className="h-8 w-8 text-white" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 bg-card/60 backdrop-blur-xl border-t border-white/5 flex gap-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-1 h-11 rounded-xl font-black uppercase tracking-widest text-[10px] border-white/5"
+                  onClick={() => {
+                    setEditingExpense(selectedExpense);
+                    setSelectedExpense(null);
+                  }}
+                >
+                  <Edit className="h-3.5 w-3.5 mr-2" /> Edit
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="h-11 w-11 rounded-xl border-destructive/10 text-destructive hover:bg-destructive/10"
+                  onClick={() => {
+                    onDeleteExpense(selectedExpense.id);
+                    setSelectedExpense(null);
+                    haptics.heavy();
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
@@ -464,6 +545,9 @@ export function ExpenseList({
       <ImageViewer src={viewingReceipt || ''} isOpen={!!viewingReceipt} onClose={() => setViewingReceipt(null)} title="Receipt" />
       <Dialog open={!!editingExpense} onOpenChange={open => !open && setEditingExpense(null)}>
         <DialogContent className="glass max-w-xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Edit Expense</DialogTitle>
+          </DialogHeader>
           {editingExpense && <ExpenseForm onSubmit={exp => { onUpdateExpense(exp); setEditingExpense(null); }} initialData={editingExpense} isEdit onClose={() => setEditingExpense(null)} />}
         </DialogContent>
       </Dialog>

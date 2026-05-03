@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Receipt, BarChart3, Settings,
   Wallet, TrendingUp, Clock, CheckCircle2, Moon, Sun,
   Zap, ArrowRight, ChevronRight, Plus, Car, Bike, Fuel, RefreshCw, Briefcase,
-  GaugeCircle, IndianRupee
+  GaugeCircle, IndianRupee, Tag, SlidersHorizontal
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, startOfMonth, subMonths, isSameMonth } from 'date-fns';
@@ -665,18 +665,43 @@ const Index = () => {
                 ) : (
                   <>
                     {/* Summary row */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      {[
-                        { label: 'Personal', value: personalAmount, color: 'text-indigo-500' },
-                        { label: 'Reimbursable', value: reimbursableAmount, color: 'text-primary' },
-                        { label: 'Pending', value: pendingAmount, color: 'text-warning' },
-                        { label: 'Settled', value: reimbursedAmount, color: 'text-success' },
-                      ].map(s => (
-                        <div key={s.label} className="rounded-xl border border-border/60 bg-card/80 p-3">
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">{s.label}</p>
-                          <p className={cn("text-xl font-bold number-lg mt-1", s.color)}>{formatCompactCurrency(s.value)}</p>
-                        </div>
-                      ))}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      <StatCard
+                        label="Personal"
+                        value={formatCompactCurrency(personalAmount)}
+                        icon={Tag}
+                        gradient="bg-indigo-500/20"
+                        iconColor="text-indigo-400"
+                        glowColor="bg-indigo-400"
+                        delay={0}
+                      />
+                      <StatCard
+                        label="Reimbursable"
+                        value={formatCompactCurrency(reimbursableAmount)}
+                        icon={Briefcase}
+                        gradient="bg-primary/20"
+                        iconColor="text-primary"
+                        glowColor="bg-primary"
+                        delay={100}
+                      />
+                      <StatCard
+                        label="Pending"
+                        value={formatCompactCurrency(pendingAmount)}
+                        icon={TrendingUp}
+                        gradient="bg-warning/20"
+                        iconColor="text-warning"
+                        glowColor="bg-warning"
+                        delay={200}
+                      />
+                      <StatCard
+                        label="Settled"
+                        value={formatCompactCurrency(reimbursedAmount)}
+                        icon={CheckCircle2}
+                        gradient="bg-success/20"
+                        iconColor="text-success"
+                        glowColor="bg-success"
+                        delay={300}
+                      />
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
@@ -717,7 +742,7 @@ const Index = () => {
         </div>
 
         {/* ── High-Density Pro Navigation (mobile) ── */}
-        <nav className="sm:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-[94vw] max-w-md h-20">
+        <nav className="sm:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-40 w-[94vw] max-w-md h-20">
           <div className="relative h-full w-full bg-card/80 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-2xl flex items-center overflow-visible">
             
             {/* Scrollable Items Container */}
