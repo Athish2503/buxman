@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Receipt, BarChart3, Settings,
   Wallet, TrendingUp, Clock, CheckCircle2, Moon, Sun,
   Zap, ArrowRight, ChevronRight, Plus, Car, Bike, Fuel, RefreshCw, Briefcase,
-  GaugeCircle, IndianRupee, Tag, SlidersHorizontal
+  GaugeCircle, IndianRupee, Tag, SlidersHorizontal, Utensils
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, startOfMonth, subMonths, isSameMonth } from 'date-fns';
@@ -42,12 +42,14 @@ import { BiometricLock } from '@/components/biometric-lock';
 import { SMSExpenseNudge } from '@/components/sms-expense-nudge';
 import { PermissionGuard } from '@/components/permission-guard';
 import { FloatingAddMenu } from '@/components/floating-add-menu';
+import { DiningDashboard } from '@/components/food/DiningDashboard';
 
-type Tab = 'dashboard' | 'expenses' | 'reimbursements' | 'vehicle' | 'analytics' | 'settings';
+type Tab = 'dashboard' | 'expenses' | 'food' | 'reimbursements' | 'vehicle' | 'analytics' | 'settings';
 
 const NAV_ITEMS: { id: Tab; label: string; icon: any }[] = [
   { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
   { id: 'expenses', label: 'Expenses', icon: Receipt },
+  { id: 'food', label: 'Dining', icon: Utensils },
   { id: 'reimbursements', label: 'Reimburse', icon: Briefcase },
   { id: 'vehicle', label: 'Vehicle', icon: Car },
   { id: 'analytics', label: 'Charts', icon: BarChart3 },
@@ -55,8 +57,8 @@ const NAV_ITEMS: { id: Tab; label: string; icon: any }[] = [
 ];
 
 const LEFT_NAV  = NAV_ITEMS.slice(0, 2);   // Home, Expenses
-const RIGHT_NAV = NAV_ITEMS.slice(2, 4);   // Reimburse, Vehicle
-const MORE_NAV  = NAV_ITEMS.slice(4);      // Charts, Settings
+const RIGHT_NAV = NAV_ITEMS.slice(2, 4);   // Dining, Reimburse
+const MORE_NAV  = NAV_ITEMS.slice(4);      // Vehicle, Analytics, Settings
 
 const Index = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -639,6 +641,13 @@ const Index = () => {
                     setVehicles(mileageService.getVehicles());
                   }}
                 />
+              </div>
+            )}
+
+            {/* ── FOOD TAB ── */}
+            {activeTab === 'food' && (
+              <div className="animate-fade-in space-y-5">
+                <DiningDashboard />
               </div>
             )}
 

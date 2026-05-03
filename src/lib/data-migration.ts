@@ -13,6 +13,7 @@ export interface FullExportData {
   mileage: any[];
   fuel: any[];
   wallet: any[];
+  dining: any[];
 }
 
 export const dataMigrationService = {
@@ -30,6 +31,7 @@ export const dataMigrationService = {
       mileage: JSON.parse(localStorage.getItem('reimburse_mileage_v1') || '[]'),
       fuel: JSON.parse(localStorage.getItem('reimburse_fuel_v1') || '[]'),
       wallet: JSON.parse(localStorage.getItem('reimburse_wallet_v1') || '[]'),
+      dining: JSON.parse(localStorage.getItem('reimburse_food_v1') || '[]'),
     };
     return data;
   },
@@ -64,6 +66,7 @@ export const dataMigrationService = {
       await syncKey('reimburse_mileage_v1', data.mileage);
       await syncKey('reimburse_fuel_v1', data.fuel);
       await syncKey('reimburse_wallet_v1', data.wallet);
+      await syncKey('reimburse_food_v1', data.dining);
 
       console.log('[Data Migration] Import successful');
       return true;

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
-import { Plus, Receipt, Camera, Wallet, X } from 'lucide-react';
+import { Plus, Receipt, Camera, Wallet, X, Utensils } from 'lucide-react';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { toast } from 'sonner';
 
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { ExpenseForm } from './expense-form';
 import { VehicleLogForm } from './vehicle-log-form';
 import { Fuel } from 'lucide-react';
+import { DiningEntryForm } from './food/DiningEntryForm';
 
 interface FloatingAddMenuProps {
   onAddExpense: (expense: Expense) => void;
@@ -23,6 +24,7 @@ export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange }: F
   const [isOpen, setIsOpen] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showFuelForm, setShowFuelForm] = useState(false);
+  const [showDiningForm, setShowDiningForm] = useState(false);
   const [fabRect, setFabRect] = useState<DOMRect | null>(null);
   const fabRef = useRef<HTMLDivElement>(null);
 
@@ -42,6 +44,7 @@ export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange }: F
 
   const toggleMenu = () => {
     haptics.selection();
+    updateRect(); // Capture latest position before opening
     const next = !isOpen;
     setIsOpen(next);
     onOpenChange?.(next);
@@ -88,6 +91,12 @@ export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange }: F
     setShowFuelForm(true);
   };
 
+  const handleLogDining = () => {
+    setIsOpen(false);
+    onOpenChange?.(false);
+    setShowDiningForm(true);
+  };
+
   const portalContent = (
     <AnimatePresence>
       {isOpen && fabRect && (
@@ -110,7 +119,7 @@ export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange }: F
             {/* Wallet/Snap Button */}
             <motion.button
               initial={{ opacity: 0, scale: 0.5, x: 0, y: 0, rotate: -90 }}
-              animate={{ opacity: 1, scale: 1, x: -80, y: -65, rotate: 0 }}
+              animate={{ opacity: 1, scale: 1, x: -100, y: -40, rotate: 0 }}
               exit={{ opacity: 0, scale: 0, x: 0, y: 0, rotate: -90 }}
               transition={{ type: "spring", damping: 18, stiffness: 300, delay: 0.05 }}
               whileTap={{ scale: 0.9 }}
@@ -126,7 +135,7 @@ export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange }: F
             {/* Fuel Button */}
             <motion.button
               initial={{ opacity: 0, scale: 0.5, x: 0, y: 0, rotate: 0 }}
-              animate={{ opacity: 1, scale: 1, x: 0, y: -115, rotate: 0 }}
+              animate={{ opacity: 1, scale: 1, x: -45, y: -110, rotate: 0 }}
               exit={{ opacity: 0, scale: 0, x: 0, y: 0, rotate: 0 }}
               transition={{ type: "spring", damping: 18, stiffness: 300, delay: 0.1 }}
               whileTap={{ scale: 0.9 }}
@@ -142,7 +151,7 @@ export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange }: F
             {/* Expense Button */}
             <motion.button
               initial={{ opacity: 0, scale: 0.5, x: 0, y: 0, rotate: 90 }}
-              animate={{ opacity: 1, scale: 1, x: 80, y: -65, rotate: 0 }}
+              animate={{ opacity: 1, scale: 1, x: 45, y: -110, rotate: 0 }}
               exit={{ opacity: 0, scale: 0, x: 0, y: 0, rotate: 90 }}
               transition={{ type: "spring", damping: 18, stiffness: 300, delay: 0.15 }}
               whileTap={{ scale: 0.9 }}
@@ -153,6 +162,22 @@ export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange }: F
                 <Receipt className="h-7 w-7" />
               </div>
               <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">Expense</span>
+            </motion.button>
+
+            {/* Dining Button */}
+            <motion.button
+              initial={{ opacity: 0, scale: 0.5, x: 0, y: 0, rotate: 120 }}
+              animate={{ opacity: 1, scale: 1, x: 100, y: -40, rotate: 0 }}
+              exit={{ opacity: 0, scale: 0, x: 0, y: 0, rotate: 120 }}
+              transition={{ type: "spring", damping: 18, stiffness: 300, delay: 0.2 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleLogDining}
+              className="absolute -translate-x-1/2 -translate-y-1/2 h-20 w-20 rounded-full bg-card/90 backdrop-blur-xl shadow-2xl border border-white/10 flex flex-col items-center justify-center group"
+            >
+              <div className="text-rose-400 group-active:scale-90 transition-all mb-1">
+                <Utensils className="h-7 w-7" />
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-rose-400">Dining</span>
             </motion.button>
           </div>
         </div>
@@ -193,6 +218,17 @@ export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange }: F
         onSuccess={() => {
           onFuelSuccess?.();
           setShowFuelForm(false);
+        }}
+        trigger={<div className="hidden" />}
+      />
+
+      <DiningEntryForm
+        open={showDiningForm}
+        onOpenChange={setShowDiningForm}
+        onSubmit={() => {
+          setShowDiningForm(false);
+          // Trigger a global refresh if needed
+          window.dispatchEvent(new CustomEvent('dining-updated'));
         }}
         trigger={<div className="hidden" />}
       />

@@ -1,0 +1,381 @@
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { format } from 'date-fns';
+import { 
+  X, Plus, Utensils, MapPin, CalendarDays, 
+  IndianRupee, Sparkles, Tag, ChevronDown, ChevronUp
+} from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { SwipeToAdd } from '@/components/ui/swipe-to-add';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { DiningExperience, Dish, PriceRange } from '@/types/food';
+import { foodService } from '@/lib/food-service';
+import { DishEditor } from './DishEditor';
+import { cn } from '@/lib/utils';
+import { haptics } from '@/lib/haptics';
+import { toast } from 'sonner';
+
+const experienceSchema = z.object({
+  restaurantName: z.string().min(1, 'Restaurant name is required'),
+  visitDate: z.string().min(1, 'Date is required'),
+  cuisine: z.string().optional(),
+  priceRange: z.enum(['budget', 'mid', 'premium', 'luxury']).optional(),
+  address: z.string().optional(),
+});
+
+type FormData = z.infer<typeof experienceSchema>;
+
+export interface DiningEntryFormProps {
+  onSubmit?: (experience: DiningExperience) => void;
+  initialData?: DiningExperience;
+  isEdit?: boolean;
+  onClose?: () => void;
+  trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+const PRICE_RANGES: { value: PriceRange; label: string; icon: string }[] = [
+  { value: 'budget', label: 'Budget', icon: '₹' },
+  { value: 'mid', label: 'Mid-Range', icon: '₹₹' },
+  { value: 'premium', label: 'Premium', icon: '₹₹₹' },
+  { value: 'luxury', label: 'Luxury', icon: '₹₹₹₹' },
+];
+
+function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: DiningEntryFormProps & { onDone?: () => void }) {
+  const [dishes, setDishes] = useState<Dish[]>(initialData?.dishes || []);
+  const [expandedDishId, setExpandedDishId] = useState<string | null>(
+    initialData?.dishes && initialData.dishes.length > 0 ? initialData.dishes[0].id : null
+  );
+  const [success, setSuccess] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting }, reset } = useForm<FormData>({
+    resolver: zodResolver(experienceSchema),
+    defaultValues: initialData ? {
+      restaurantName: initialData.restaurantName,
+      visitDate: format(new Date(initialData.visitDate), 'yyyy-MM-dd'),
+      cuisine: initialData.cuisine || '',
+      priceRange: initialData.priceRange || 'mid',
+      address: initialData.location?.address || '',
+    } : { 
+      visitDate: format(new Date(), 'yyyy-MM-dd'),
+      priceRange: 'mid'
+    },
+  });
+
+  const selectedPriceRange = watch('priceRange');
+
+  const addDish = () => {
+    const newDish: Dish = {
+      id: crypto.randomUUID(),
+      name: '',
+      status: 'neutral',
+      notes: '',
+      images: [],
+    };
+    setDishes([...dishes, newDish]);
+    setExpandedDishId(newDish.id);
+    haptics.medium();
+  };
+
+  const updateDish = (index: number, updatedDish: Dish) => {
+    const newDishes = [...dishes];
+    newDishes[index] = updatedDish;
+    setDishes(newDishes);
+  };
+
+  const removeDish = (index: number) => {
+    const newDishes = [...dishes];
+    newDishes.splice(index, 1);
+    setDishes(newDishes);
+    haptics.medium();
+  };
+
+  const onFormSubmit = async (data: FormData) => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+
+    try {
+      const experience: DiningExperience = {
+        id: initialData?.id || crypto.randomUUID(),
+        restaurantName: data.restaurantName,
+        visitDate: data.visitDate,
+        cuisine: data.cuisine,
+        priceRange: data.priceRange,
+        location: {
+          address: data.address || '',
+        },
+        dishes,
+        createdAt: initialData?.createdAt || new Date().toISOString(),
+      };
+
+      if (isEdit) {
+        foodService.updateExperience(experience);
+        toast.success('Experience updated');
+      } else {
+        foodService.addExperience(experience);
+        toast.success('Experience logged! Check your dashboard.');
+      }
+
+      setSuccess(true);
+      await new Promise(r => setTimeout(r, 800));
+
+      if (onSubmit) onSubmit(experience);
+      if (onDone) onDone();
+      onClose?.();
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <form className="flex flex-col pb-20 sm:pb-0">
+      <div className="relative rounded-3xl mb-6 p-6 overflow-hidden bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10">
+        <div className="absolute top-0 right-0 p-6 opacity-10">
+          <Utensils className="h-20 w-20 rotate-12" />
+        </div>
+        
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/60 mb-3">
+          {isEdit ? 'Refine Experience' : 'New Culinary Log'}
+        </p>
+
+        <div className="space-y-4 relative z-10">
+          <div className="space-y-1.5">
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Restaurant Name</Label>
+            <Input
+              {...register('restaurantName')}
+              placeholder="e.g. The Glass House"
+              className="h-12 bg-background/50 border-white/10 text-lg font-bold placeholder:text-muted-foreground/30 focus:border-primary/50 transition-all rounded-2xl"
+            />
+            {errors.restaurantName && <p className="text-xs text-destructive">{errors.restaurantName.message}</p>}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Cuisine</Label>
+              <Input
+                {...register('cuisine')}
+                placeholder="e.g. Italian"
+                className="h-11 bg-background/50 border-white/10 text-sm font-medium rounded-2xl"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Date</Label>
+              <div className="relative">
+                <Input
+                  type="date"
+                  {...register('visitDate')}
+                  className="h-11 bg-background/50 border-white/10 text-sm font-medium rounded-2xl pr-10"
+                />
+                <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Location / Address</Label>
+            <div className="relative">
+              <Input
+                {...register('address')}
+                placeholder="City or Full Address"
+                className="h-11 bg-background/50 border-white/10 text-sm font-medium rounded-2xl pl-10"
+              />
+              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-8">
+        <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-4 block ml-1">Price Range</Label>
+        <div className="grid grid-cols-4 gap-2">
+          {PRICE_RANGES.map((range) => (
+            <button
+              key={range.value}
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                setValue('priceRange', range.value);
+              }}
+              className={cn(
+                "flex flex-col items-center justify-center gap-1.5 py-3 rounded-2xl border transition-all duration-300",
+                selectedPriceRange === range.value
+                  ? "bg-primary text-white border-transparent shadow-lg scale-105"
+                  : "bg-muted/30 border-border/40 text-muted-foreground hover:bg-muted/50"
+              )}
+            >
+              <span className="text-sm font-black">{range.icon}</span>
+              <span className="text-[9px] font-bold uppercase tracking-tighter">{range.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-6 mb-10">
+        <div className="flex items-center justify-between px-1">
+          <div>
+            <h3 className="text-sm font-black uppercase tracking-widest">Dishes & Drinks</h3>
+            <p className="text-[10px] text-muted-foreground">Log individual items you tried</p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addDish}
+            className="rounded-full border-primary/30 text-primary hover:bg-primary/10 gap-1.5 font-bold h-9 px-4"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Item
+          </Button>
+        </div>
+
+        <div className="space-y-4">
+          <AnimatePresence initial={false}>
+            {dishes.map((dish, index) => (
+              <motion.div
+                key={dish.id}
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+              >
+                <DishEditor
+                  dish={dish}
+                  isExpanded={expandedDishId === dish.id}
+                  onToggle={() => setExpandedDishId(expandedDishId === dish.id ? null : dish.id)}
+                  onChange={(updated) => updateDish(index, updated)}
+                  onRemove={() => removeDish(index)}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+
+          {dishes.length === 0 && (
+            <div 
+              onClick={addDish}
+              className="py-12 border-2 border-dashed border-border/40 rounded-[2rem] flex flex-col items-center justify-center gap-3 text-muted-foreground hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer group"
+            >
+              <div className="h-12 w-12 rounded-2xl bg-muted/50 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                <Utensils className="h-6 w-6 opacity-40 group-hover:opacity-100 group-hover:text-primary transition-all" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-bold">No dishes logged yet</p>
+                <p className="text-[10px] font-medium opacity-60">Tap to add your first dish or drink</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <SwipeToAdd
+        onConfirm={() => handleSubmit(onFormSubmit)()}
+        isSubmitting={isSubmitting || isProcessing}
+        success={success}
+        label={isEdit ? 'Swipe to Update' : 'Swipe to Log Experience'}
+      />
+    </form>
+  );
+}
+
+export function DiningEntryForm({ 
+  onSubmit, 
+  initialData, 
+  isEdit = false, 
+  onClose, 
+  trigger,
+  open: externalOpen,
+  onOpenChange
+}: DiningEntryFormProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
+  const isMobile = useIsMobile();
+
+  useEffect(() => {
+    if (open) document.body.style.overflow = 'hidden';
+    else document.body.style.overflow = '';
+    return () => { document.body.style.overflow = ''; };
+  }, [open]);
+
+
+
+  const overlay = (
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-[9998] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-md"
+            onClick={() => setOpen(false)}
+          />
+
+          <motion.div
+            initial={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.95, y: 20 }}
+            animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1, y: 0 }}
+            exit={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className={cn(
+              "relative w-full z-[9999] overflow-hidden bg-background",
+              isMobile ? "rounded-t-[3rem] h-[95dvh]" : "max-w-2xl rounded-[2.5rem] border border-white/10 shadow-2xl h-[90vh]"
+            )}
+            style={{ display: 'flex', flexDirection: 'column' }}
+          >
+            {isMobile && (
+              <div className="flex justify-center pt-4 pb-2 shrink-0">
+                <div className="h-1.5 w-12 rounded-full bg-muted-foreground/20" />
+              </div>
+            )}
+            
+            <div className="flex items-center justify-between px-8 py-5 border-b border-white/5 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-2xl bg-gradient-primary flex items-center justify-center shadow-glow">
+                  <Sparkles className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black tracking-tight leading-none">Dining Entry</h2>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Capture the moment</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setOpen(false)}
+                className="h-10 w-10 rounded-2xl bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground active:scale-90 transition-all"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 px-8 py-6 no-scrollbar" style={{ overscrollBehavior: 'contain' }}>
+              <FormBody 
+                onSubmit={(exp) => {
+                  onSubmit?.(exp);
+                  setOpen(false);
+                }} 
+                onDone={() => setOpen(false)} 
+                initialData={initialData}
+                isEdit={isEdit}
+              />
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+
+  return (
+    <>
+      <div onClick={() => setOpen(true)} className="contents">
+        {trigger}
+      </div>
+      {createPortal(overlay, document.body)}
+    </>
+  );
+}
