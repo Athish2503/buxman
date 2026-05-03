@@ -129,10 +129,56 @@ public class MainActivity extends BridgeActivity {
         }
 
         @JavascriptInterface
+        public void pickFile() {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("application/json");
+            startActivityForResult(intent, 103);
+        }
+
+        @JavascriptInterface
         public String getPendingTransaction() {
             String temp = pendingTransaction;
             pendingTransaction = null; // Clear after read
             return temp;
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 103 && resultCode == RESULT_OK && data != null) {
+            android.net.Uri uri = data.getData();
+            if (uri != null) {
+                try {
+                    java.io.InputStream inputStream = getContentResolver().openInputStream(uri);
+                    java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(inputStream));
+                    StringBuilder stringBuilder = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        stringBuilder.append(line);
+                    }
+                    inputStream.close();
+                    final String content = stringBuilder.toString();
+                    
+                    // Send content back to JS
+                    bridge.getWebView().post(() -> {
+                        String encoded = "";
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                            encoded = java.util.Base64.getEncoder().encodeToString(content.getBytes());
+                        } else {
+                            encoded = android.util.Base64.encodeToString(content.getBytes(), android.util.Base64.NO_WRAP);
+                        }
+                        final String finalEncoded = encoded;
+                        bridge.getWebView().evaluateJavascript(
+                            "window.dispatchEvent(new CustomEvent('file-picked', { detail: { content: atob('" + finalEncoded + "') } }));",
+                            null
+                        );
+                    });
+                } catch (Exception e) {
+                    Log.e("MainActivity", "File read error", e);
+                }
+            }
         }
     }
 

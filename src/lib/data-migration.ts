@@ -127,6 +127,36 @@ export const dataMigrationService = {
       console.error('[Data Migration] Web export failed:', e);
       return false;
     }
+  },
+
+  /**
+   * Triggers native file picker and imports the selected data
+   */
+  async pickAndImportData(): Promise<boolean> {
+    if (!Capacitor.isNativePlatform() || !(window as any).NativeBridge) {
+      return false;
+    }
+
+    return new Promise((resolve) => {
+      const handler = async (event: any) => {
+        window.removeEventListener('file-picked', handler);
+        if (event.detail && event.detail.content) {
+          const success = await this.importData(event.detail.content);
+          resolve(success);
+        } else {
+          resolve(false);
+        }
+      };
+
+      window.addEventListener('file-picked', handler);
+      (window as any).NativeBridge.pickFile();
+      
+      // Safety timeout
+      setTimeout(() => {
+        window.removeEventListener('file-picked', handler);
+        resolve(false);
+      }, 60000); // 1 minute timeout for user to pick file
+    });
   }
 };
 

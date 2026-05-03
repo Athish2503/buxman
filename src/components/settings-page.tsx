@@ -761,7 +761,29 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
                   <Button 
                     variant="outline"
                     className="h-20 w-full flex-col rounded-3xl border border-dashed border-border/60 hover:border-primary/40 hover:bg-muted/50 flex items-center justify-center gap-1 transition-all group"
-                    onClick={() => document.getElementById('import-data-input')?.click()}
+                    onClick={async () => {
+                      const { Capacitor } = await import('@capacitor/core');
+                      if (Capacitor.isNativePlatform()) {
+                        toast.info('Opening file picker...');
+                        const m = await import('@/lib/data-migration');
+                        const success = await m.dataMigrationService.pickAndImportData();
+                        if (success) {
+                          setShowConfirm({
+                            title: 'Restore Complete!',
+                            description: 'Your data has been successfully imported. The application needs to reload to apply changes.',
+                            variant: 'info',
+                            onConfirm: () => {
+                              toast.info('Reloading app...');
+                              setTimeout(() => window.location.reload(), 500);
+                            }
+                          });
+                        } else {
+                          toast.error('Import cancelled or failed');
+                        }
+                      } else {
+                        document.getElementById('import-data-input')?.click();
+                      }
+                    }}
                   >
                     <ChevronRight className="h-5 w-5 -rotate-90 group-hover:-translate-y-1 transition-transform" />
                     <span className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">Import Data</span>
