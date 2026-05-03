@@ -62,6 +62,7 @@ const Index = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [logs, setLogs] = useState(() => fuelService.getLogs());
   const [vehicles, setVehicles] = useState(() => mileageService.getVehicles());
+  const [isFabOpen, setIsFabOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [expenseSubTab, setExpenseSubTab] = useState<'all' | 'wallet'>('all');
@@ -716,39 +717,44 @@ const Index = () => {
         </div>
 
         {/* ── High-Density Pro Navigation (mobile) ── */}
-        <nav className="sm:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-40 w-[94vw] max-w-md h-20">
+        <nav className="sm:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-[94vw] max-w-md h-20">
           <div className="relative h-full w-full bg-card/80 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-2xl flex items-center overflow-visible">
             
+            {/* Scrollable Items Container */}
             <div 
               ref={navRef}
-              className="w-full h-full flex items-center justify-between px-4 no-scrollbar snap-x snap-mandatory"
+              className={cn(
+                "absolute inset-0 flex items-center overflow-x-auto no-scrollbar snap-x snap-mandatory transition-all duration-500 overflow-y-visible",
+                isFabOpen ? "blur-md opacity-40 scale-[0.98] pointer-events-none" : "blur-0 opacity-100 scale-100"
+              )}
             >
               {[
                 ...LEFT_NAV,
-                { id: 'add', label: 'Add', icon: Plus, isFab: true },
+                { id: 'add', isFab: true },
                 ...RIGHT_NAV,
                 ...MORE_NAV
               ].map((item, idx) => {
-                const Icon = item.icon;
-                const active = activeTab === item.id;
-                
                 if ('isFab' in item) {
                   return (
-                    <div key="fab-item" className="flex-shrink-0 w-16 flex justify-center snap-center mx-1 relative overflow-visible">
+                    <div key="fab-item" className="flex-shrink-0 w-[20%] flex justify-center items-center snap-center relative overflow-visible">
                       <FloatingAddMenu 
                         onAddExpense={handleAddExpense} 
                         onFuelSuccess={() => setLogs(fuelService.getLogs())}
+                        onOpenChange={setIsFabOpen}
                       />
                     </div>
                   );
                 }
 
+                const Icon = item.icon;
+                const active = activeTab === item.id;
+                
                 return (
                   <button
                     key={item.id}
                     onClick={() => setActiveTab(item.id as Tab)}
                     className={cn(
-                      "flex-shrink-0 w-14 flex flex-col items-center justify-center gap-1 transition-all duration-300 snap-center mx-0.5",
+                      "flex-shrink-0 w-[20%] flex flex-col items-center justify-center gap-1 transition-all duration-300 snap-center",
                       active ? "text-primary" : "text-muted-foreground/50"
                     )}
                   >
