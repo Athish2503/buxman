@@ -133,7 +133,9 @@ public class MainActivity extends BridgeActivity {
         public void pickFile() {
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
-            intent.setType("application/json");
+            intent.setType("*/*");
+            String[] mimeTypes = {"application/json", "text/csv", "text/comma-separated-values"};
+            intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
             startActivityForResult(intent, 103);
         }
 
@@ -157,7 +159,7 @@ public class MainActivity extends BridgeActivity {
                     StringBuilder stringBuilder = new StringBuilder();
                     String line;
                     while ((line = reader.readLine()) != null) {
-                        stringBuilder.append(line);
+                        stringBuilder.append(line).append("\n");
                     }
                     inputStream.close();
                     final String content = stringBuilder.toString();

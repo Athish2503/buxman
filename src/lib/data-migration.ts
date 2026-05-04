@@ -37,12 +37,161 @@ export const dataMigrationService = {
   },
 
   /**
+   * Converts the full app data to a flattened CSV string
+   */
+  convertToCSV(data: FullExportData): string {
+    const lines: string[] = [];
+    
+    // Metadata Header
+    lines.push(`METADATA,version,${data.version},timestamp,${data.timestamp}`);
+    lines.push(''); // Spacer
+
+    // Helper to add entity rows
+    const addEntities = (type: string, items: any[]) => {
+      if (!items || items.length === 0) return;
+      
+      // Get all unique keys for headers
+      const keys = Array.from(new Set(items.flatMap(item => Object.keys(item))));
+      lines.push(`HEADER,${type},${keys.join(',')}`);
+      
+      items.forEach(item => {
+        const values = keys.map(key => {
+          const val = item[key];
+          if (val === null || val === undefined) return '';
+          if (typeof val === 'object') return `"${JSON.stringify(val).replace(/"/g, '""')}"`;
+          return `"${String(val).replace(/"/g, '""')}"`;
+        });
+        lines.push(`DATA,${type},${values.join(',')}`);
+      });
+      lines.push(''); // Spacer
+    };
+
+    addEntities('SETTINGS', [data.settings]);
+    addEntities('CATEGORIES', data.categories);
+    addEntities('EXPENSES', data.expenses);
+    addEntities('VEHICLES', data.vehicles);
+    addEntities('MILEAGE', data.mileage);
+    addEntities('FUEL', data.fuel);
+    addEntities('WALLET', data.wallet);
+    addEntities('DINING', data.dining);
+
+    return lines.join('\n');
+  },
+
+  /**
+   * Parses the flattened CSV back into FullExportData
+   */
+  parseCSV(csv: string): FullExportData {
+    const lines = csv.split('\n');
+    const data: FullExportData = {
+      version: DATA_VERSION,
+      timestamp: new Date().toISOString(),
+      expenses: [],
+      settings: {},
+      categories: [],
+      vehicles: [],
+      mileage: [],
+      fuel: [],
+      wallet: [],
+      dining: []
+    };
+
+    let currentHeaders: string[] = [];
+    let currentType = '';
+
+    lines.forEach(line => {
+      const parts = line.split(',');
+      if (parts.length < 2) return;
+
+      const rowType = parts[0];
+      const entityType = parts[1];
+
+      if (rowType === 'METADATA') {
+        data.version = parts[2] || DATA_VERSION;
+        data.timestamp = parts[4] || new Date().toISOString();
+      } else if (rowType === 'HEADER') {
+        currentType = entityType;
+        currentHeaders = parts.slice(2);
+      } else if (rowType === 'DATA' && currentType === entityType) {
+        // Simple CSV parser for quoted values
+        const rowData: any = {};
+        
+        // Re-join the values because split(',') breaks on quoted commas
+        // This is a naive parser but works for our internal format
+        const valuesLine = parts.slice(2).join(',');
+        const values: string[] = [];
+        let currentVal = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < valuesLine.length; i++) {
+          const char = valuesLine[i];
+          if (char === '"') {
+            if (inQuotes && valuesLine[i+1] === '"') {
+              currentVal += '"';
+              i++;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (char === ',' && !inQuotes) {
+            values.push(currentVal);
+            currentVal = '';
+          } else {
+            currentVal += char;
+          }
+        }
+        values.push(currentVal);
+
+        currentHeaders.forEach((header, index) => {
+          let val = values[index];
+          if (val === undefined || val === '') {
+            rowData[header] = null;
+          } else {
+            try {
+              // Try to parse as JSON if it looks like an object/array
+              if (val.startsWith('{') || val.startsWith('[')) {
+                rowData[header] = JSON.parse(val);
+              } else if (!isNaN(Number(val)) && val.trim() !== '') {
+                rowData[header] = Number(val);
+              } else if (val === 'true') {
+                rowData[header] = true;
+              } else if (val === 'false') {
+                rowData[header] = false;
+              } else {
+                rowData[header] = val;
+              }
+            } catch (e) {
+              rowData[header] = val;
+            }
+          }
+        });
+
+        if (currentType === 'SETTINGS') data.settings = rowData;
+        else if (currentType === 'CATEGORIES') data.categories.push(rowData);
+        else if (currentType === 'EXPENSES') data.expenses.push(rowData);
+        else if (currentType === 'VEHICLES') data.vehicles.push(rowData);
+        else if (currentType === 'MILEAGE') data.mileage.push(rowData);
+        else if (currentType === 'FUEL') data.fuel.push(rowData);
+        else if (currentType === 'WALLET') data.wallet.push(rowData);
+        else if (currentType === 'DINING') data.dining.push(rowData);
+      }
+    });
+
+    return data;
+  },
+
+  /**
    * Imports full application data and persists it
    */
-  async importData(jsonString: string): Promise<boolean> {
+  async importData(content: string, format: 'json' | 'csv' = 'json'): Promise<boolean> {
     try {
-      console.log('[Data Migration] Starting import...');
-      const data = JSON.parse(jsonString) as FullExportData;
+      console.log(`[Data Migration] Starting ${format} import...`);
+      let data: FullExportData;
+      
+      if (format === 'json') {
+        data = JSON.parse(content) as FullExportData;
+      } else {
+        data = this.parseCSV(content);
+      }
       
       // Basic validation
       if (!data.version) {
@@ -51,8 +200,6 @@ export const dataMigrationService = {
 
       // Helper to set data if it exists in the import
       const syncKey = async (key: string, value: any) => {
-        // If value is an array, we import it (even if empty)
-        // If value is an object, we import it (even if empty)
         if (value !== undefined && value !== null) {
           console.log(`[Data Migration] Syncing ${key}...`);
           await storageEngine.set(key, JSON.stringify(value));
@@ -77,13 +224,17 @@ export const dataMigrationService = {
   },
 
   /**
-   * Downloads the data as a JSON file (Web) or shares it (Mobile)
+   * Downloads the data as a JSON/CSV file (Web) or shares it (Mobile)
    */
-  async downloadBackup() {
+  async downloadBackup(format: 'json' | 'csv' = 'json') {
     const data = this.exportAllData();
-    const json = JSON.stringify(data, null, 2);
+    const content = format === 'json' 
+      ? JSON.stringify(data, null, 2) 
+      : this.convertToCSV(data);
+      
     const date = new Date().toISOString().split('T')[0];
-    const fileName = `pixel-reimburse-backup-${date}.json`;
+    const fileName = `buxman-backup-${date}.${format}`;
+    const mimeType = format === 'json' ? 'application/json' : 'text/csv';
 
     // Handle Mobile Native Platform
     if (Capacitor.isNativePlatform()) {
@@ -94,15 +245,15 @@ export const dataMigrationService = {
         // 1. Write file to temporary storage
         const result = await Filesystem.writeFile({
           path: fileName,
-          data: json,
+          data: content,
           directory: Directory.Cache,
           encoding: Encoding.UTF8,
         });
 
         // 2. Open Native Share sheet
         await Share.share({
-          title: 'Pixel Reimburse Backup',
-          text: 'Backup of your financial data',
+          title: 'Buxman Backup',
+          text: `Full app backup in ${format.toUpperCase()} format`,
           url: result.uri,
           dialogTitle: 'Save or Share Backup',
         });
@@ -116,7 +267,7 @@ export const dataMigrationService = {
 
     // Handle Web Platform
     try {
-      const blob = new Blob([json], { type: 'application/json' });
+      const blob = new Blob([content], { type: mimeType });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -144,7 +295,10 @@ export const dataMigrationService = {
       const handler = async (event: any) => {
         window.removeEventListener('file-picked', handler);
         if (event.detail && event.detail.content) {
-          const success = await this.importData(event.detail.content);
+          // Detect format from content
+          const content = event.detail.content;
+          const format = content.trim().startsWith('{') ? 'json' : 'csv';
+          const success = await this.importData(content, format);
           resolve(success);
         } else {
           resolve(false);
@@ -162,4 +316,5 @@ export const dataMigrationService = {
     });
   }
 };
+
 

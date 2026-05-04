@@ -750,12 +750,20 @@ const Index = () => {
             >
               {[
                 ...LEFT_NAV,
-                { id: 'spacer', isSpacer: true },
+                { id: 'add', isFab: true },
                 ...RIGHT_NAV,
                 ...MORE_NAV
               ].map((item, idx) => {
-                if ('isSpacer' in item) {
-                  return <div key="spacer" className="flex-shrink-0 w-[20%]" />;
+                if ('isFab' in item) {
+                  return (
+                    <div key="fab-item" className="flex-shrink-0 w-[20%] flex justify-center items-center snap-center relative overflow-visible">
+                      <FloatingAddMenu 
+                        onAddExpense={handleAddExpense} 
+                        onFuelSuccess={() => setLogs(fuelService.getLogs())}
+                        onOpenChange={setIsFabOpen}
+                      />
+                    </div>
+                  );
                 }
 
                 const Icon = item.icon;
@@ -784,15 +792,6 @@ const Index = () => {
                   </button>
                 );
               })}
-            </div>
-
-            {/* Fixed Central FAB */}
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[60%] z-50 pointer-events-auto">
-              <FloatingAddMenu 
-                onAddExpense={handleAddExpense} 
-                onFuelSuccess={() => setLogs(fuelService.getLogs())}
-                onOpenChange={setIsFabOpen}
-              />
             </div>
           </div>
         </nav>

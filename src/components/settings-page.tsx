@@ -51,7 +51,7 @@ const ModuleCard = ({ icon: Icon, title, description, onClick, color = 'bg-prima
 }) => (
   <button 
     onClick={onClick}
-    className="w-full flex items-center gap-4 p-4 rounded-3xl border border-border/40 bg-card/40 backdrop-blur-md hover:border-primary/40 hover:bg-muted/10 transition-all text-left group"
+    className="w-full flex items-center gap-4 p-4 rounded-3xl border border-border/40 bg-card/40 dark:bg-card/40 backdrop-blur-md hover:border-primary/40 hover:bg-muted/10 transition-all text-left group shadow-sm dark:shadow-none"
   >
     <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform", color)}>
       <Icon className="h-6 w-6 text-white" />
@@ -86,6 +86,9 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
   const [categories, setCategories] = useState<CategoryDefinition[]>(categoryService.getAll());
   const [newBudget, setNewBudget] = useState<Partial<BudgetGoal>>({ period: 'monthly' });
   const [bioAvailable, setBioAvailable] = useState(false);
+
+  const [showExportOptions, setShowExportOptions] = useState(false);
+  const [showImportOptions, setShowImportOptions] = useState(false);
 
   // Category Editor State
   const [editingCategory, setEditingCategory] = useState<CategoryDefinition | null>(null);
@@ -188,7 +191,7 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
       <SubModuleHeader title="Organization Details" onBack={() => setActiveTab('overview')} />
       
       <div className="space-y-6">
-        <div className="p-6 rounded-3xl bg-card/30 border border-border/40 space-y-4">
+        <div className="p-6 rounded-3xl bg-white dark:bg-card/30 border border-border/50 dark:border-border/40 space-y-4 shadow-sm dark:shadow-none">
           <p className="text-[11px] font-black uppercase tracking-widest text-primary">Billed To (Company)</p>
           <Field
             id="bt-name" label="Company Name"
@@ -210,7 +213,7 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
           />
         </div>
 
-        <div className="p-6 rounded-3xl bg-card/30 border border-border/40 space-y-4">
+        <div className="p-6 rounded-3xl bg-white dark:bg-card/30 border border-border/50 dark:border-border/40 space-y-4 shadow-sm dark:shadow-none">
           <p className="text-[11px] font-black uppercase tracking-widest text-indigo-400">From (Employee)</p>
           <Field
             id="bf-name" label="Your Name"
@@ -381,7 +384,7 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
           {categories.map(cat => {
             const Icon = iconMap[cat.iconName] || MoreHorizontal;
             return (
-              <div key={cat.id} className="flex items-center gap-3 p-3 rounded-2xl bg-card/30 border border-border/40 group hover:border-primary/40 transition-all">
+              <div key={cat.id} className="flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-card/30 border border-border/50 dark:border-border/40 group hover:border-primary/40 transition-all shadow-sm dark:shadow-none">
                 <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm", cat.bgColor)}>
                   <Icon className={cn("h-5 w-5", cat.color)} />
                 </div>
@@ -446,7 +449,7 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
       
       <div className="space-y-4">
         {bioAvailable && (
-          <div className="flex items-center justify-between p-5 rounded-3xl bg-card/30 border border-border/40">
+          <div className="flex items-center justify-between p-5 rounded-3xl bg-white dark:bg-card/30 border border-border/50 dark:border-border/40 shadow-sm dark:shadow-none">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
                 <Shield className="h-5 w-5 text-emerald-500" />
@@ -482,7 +485,7 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
           </div>
         )}
 
-        <div className="flex items-center justify-between p-5 rounded-3xl bg-card/30 border border-border/40">
+        <div className="flex items-center justify-between p-5 rounded-3xl bg-white dark:bg-card/30 border border-border/50 dark:border-border/40 shadow-sm dark:shadow-none">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
               {theme === 'dark' ? <Moon className="h-5 w-5 text-indigo-400" /> : <Sun className="h-5 w-5 text-indigo-600" />}
@@ -516,7 +519,7 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
       <SubModuleHeader title="Budget Controls" onBack={() => setActiveTab('overview')} />
       
       <div className="space-y-6">
-        <div className="p-5 rounded-3xl bg-card/30 border border-border/40 space-y-4">
+        <div className="p-5 rounded-3xl bg-white dark:bg-card/30 border border-border/50 dark:border-border/40 space-y-4 shadow-sm dark:shadow-none">
            <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-1">New Spending Goal</p>
            <div className="grid grid-cols-1 gap-3">
               <Select value={newBudget.category} onValueChange={v => setNewBudget(p => ({ ...p, category: v as ExpenseCategory }))}>
@@ -585,7 +588,7 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
             const cat = categoryService.getById(b.category);
             const Icon = iconMap[cat.iconName] || MoreHorizontal;
             return (
-              <div key={b.category} className="flex items-center gap-3 p-4 rounded-3xl bg-card/30 border border-border/40">
+              <div key={b.category} className="flex items-center gap-3 p-4 rounded-3xl bg-white dark:bg-card/30 border border-border/50 dark:border-border/40 shadow-sm dark:shadow-none">
                 <div className={cn("h-10 w-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm", cat.bgColor)}>
                   <Icon className={cn("h-5 w-5", cat.color)} />
                 </div>
@@ -668,8 +671,8 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
           </div>
           <ShieldAlert className="h-6 w-6 text-amber-500 shrink-0 relative z-10" />
           <div className="relative z-10">
-            <h4 className="text-sm font-bold text-amber-500">Local-Only Storage</h4>
-            <p className="text-[11px] text-amber-200/70 leading-relaxed mt-1">
+            <h4 className="text-sm font-bold text-amber-600 dark:text-amber-500">Local-Only Storage</h4>
+            <p className="text-[11px] text-amber-700 dark:text-amber-200/70 leading-relaxed mt-1">
               Your data never leaves this device. This means erasing it is permanent. 
               Always backup (export) your data before doing a reset.
             </p>
@@ -677,7 +680,7 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
         </div>
         
         <div className="grid grid-cols-1 gap-2">
-           <div className="p-6 rounded-[2.5rem] bg-card/30 border border-border/40 space-y-6 relative overflow-hidden">
+           <div className="p-6 rounded-[2.5rem] bg-white dark:bg-card/30 border border-border/50 dark:border-border/40 space-y-6 relative overflow-hidden shadow-sm dark:shadow-none">
              <div className="flex items-center gap-4">
                <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center shadow-inner">
                  <Database className="h-6 w-6 text-primary" />
@@ -692,21 +695,7 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
                <Button 
                  variant="outline" 
                  className="h-20 flex-col rounded-3xl border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary gap-1 font-bold transition-all group"
-                 onClick={async () => {
-                   toast.info('Generating backup...');
-                   try {
-                     const m = await import('@/lib/data-migration');
-                     const success = await m.dataMigrationService.downloadBackup();
-                     if (success) {
-                       toast.success('Backup ready for sharing');
-                     } else {
-                       toast.error('Could not generate backup');
-                     }
-                   } catch (err) {
-                     console.error('Export error:', err);
-                     toast.error('Export failed');
-                   }
-                 }}
+                 onClick={() => setShowExportOptions(true)}
                >
                  <ChevronRight className="h-5 w-5 rotate-90 group-hover:translate-y-1 transition-transform" />
                  <span className="text-[10px] uppercase tracking-widest">Export All</span>
@@ -716,13 +705,14 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
                   <input 
                     id="import-data-input"
                     type="file" 
-                    accept=".json"
+                    accept=".json,.csv"
                     className="hidden"
                     onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
                       
-                      toast.info('Processing backup file...');
+                      const format = file.name.endsWith('.csv') ? 'csv' : 'json';
+                      toast.info(`Processing ${format.toUpperCase()} backup file...`);
                       const reader = new FileReader();
                       
                       reader.onload = async (event) => {
@@ -731,7 +721,7 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
                           if (!content) throw new Error('File is empty');
                           
                           const m = await import('@/lib/data-migration');
-                          const success = await m.dataMigrationService.importData(content);
+                          const success = await m.dataMigrationService.importData(content, format);
                           
                           // Reset input value so it can be triggered again even if same file
                           e.target.value = '';
@@ -810,7 +800,7 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
                  <div key={item.type} className="group flex items-center gap-2">
                     <Button 
                       variant="outline" 
-                      className="flex-1 justify-between h-14 px-5 rounded-3xl border-border/40 bg-card/20 hover:bg-destructive/5 hover:text-destructive hover:border-destructive/20 transition-all"
+                      className="flex-1 justify-between h-14 px-5 rounded-3xl border-border/50 dark:border-border/40 bg-white dark:bg-card/20 hover:bg-destructive/5 hover:text-destructive hover:border-destructive/20 transition-all shadow-sm dark:shadow-none"
                       onClick={() => {
                         setShowConfirm({
                           title: `Delete all ${item.label}?`,
@@ -840,7 +830,7 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
                       variant="ghost" 
                       size="icon" 
                       onClick={() => setAdvDeleteType(item.type)}
-                      className="h-14 w-14 rounded-3xl bg-muted/20 hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all shrink-0"
+                      className="h-14 w-14 rounded-3xl bg-muted/40 dark:bg-muted/20 hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all shrink-0"
                     >
                       <MoreHorizontal className="h-5 w-5" />
                     </Button>
@@ -1202,6 +1192,75 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
                       <Button variant="outline" onClick={() => setEditingCategory(null)} className="flex-1 h-12 rounded-2xl">Cancel</Button>
                       <Button onClick={() => handleSaveCategory(editingCategory)} className="flex-1 h-12 rounded-2xl bg-gradient-primary text-white">Save Category</Button>
                     </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+          {showExportOptions && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-background/80 backdrop-blur-md"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                className="w-full max-w-sm bg-card border border-border shadow-2xl rounded-[2.5rem] overflow-hidden"
+              >
+                <div className="p-8 text-center space-y-6">
+                  <div className="h-20 w-20 rounded-[2rem] mx-auto flex items-center justify-center bg-primary/10 text-primary shadow-lg shadow-primary/10">
+                    <Database className="h-10 w-10" />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-black tracking-tight">Export Format</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">Choose how you want to save your data backup</p>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <Button 
+                      className="h-16 rounded-2xl font-bold bg-primary text-white shadow-lg shadow-primary/20 flex justify-between px-6 group"
+                      onClick={async () => {
+                        setShowExportOptions(false);
+                        toast.info('Generating JSON backup...');
+                        const m = await import('@/lib/data-migration');
+                        await m.dataMigrationService.downloadBackup('json');
+                      }}
+                    >
+                      <span className="flex flex-col items-start">
+                        <span>JSON Data</span>
+                        <span className="text-[10px] opacity-70 font-normal uppercase tracking-widest">Full System Restore</span>
+                      </span>
+                      <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                    </Button>
+                    
+                    <Button 
+                      variant="outline"
+                      className="h-16 rounded-2xl font-bold border-border hover:bg-muted transition-all flex justify-between px-6 group"
+                      onClick={async () => {
+                        setShowExportOptions(false);
+                        toast.info('Generating CSV backup...');
+                        const m = await import('@/lib/data-migration');
+                        await m.dataMigrationService.downloadBackup('csv');
+                      }}
+                    >
+                      <span className="flex flex-col items-start">
+                        <span>CSV Spreadsheet</span>
+                        <span className="text-[10px] text-muted-foreground font-normal uppercase tracking-widest">Excel / Sheets compatible</span>
+                      </span>
+                      <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                    </Button>
+
+                    <Button 
+                      variant="ghost" 
+                      className="h-12 rounded-xl font-bold text-muted-foreground"
+                      onClick={() => setShowExportOptions(false)}
+                    >
+                      Cancel
+                    </Button>
                   </div>
                 </div>
               </motion.div>
