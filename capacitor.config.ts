@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.pixel.reimburse',
-  appName: 'Reimburse',
+  appName: 'Buxman',
   webDir: 'dist',
   plugins: {
     SplashScreen: {

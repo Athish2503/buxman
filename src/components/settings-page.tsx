@@ -175,6 +175,11 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
         icon={Database} title="Data Management" description="Backup, restore & erase application data" 
         onClick={() => setActiveTab('data')} color="bg-rose-500"
       />
+      
+      <div className="mt-8 mb-4 text-center">
+        <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground/30 uppercase">Buxman v1.1.0</p>
+        <p className="text-[9px] text-muted-foreground/20 mt-1 uppercase tracking-tighter">Native Code Revision: 2</p>
+      </div>
     </div>
   );
 

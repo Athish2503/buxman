@@ -9,21 +9,37 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { storageEngine } from "./lib/storage-engine";
 
+import { SplashScreen } from "./components/splash-screen";
+
 const queryClient = new QueryClient();
 
 const App = () => {
   const [isReady, setIsReady] = useState(false);
+  const [showSplash, setShowSplash] = useState(() => {
+    // Only show splash if it hasn't been shown in this session
+    if (typeof window !== 'undefined') {
+      return !sessionStorage.getItem('splashShown');
+    }
+    return true;
+  });
 
   useEffect(() => {
     storageEngine.init().then(() => setIsReady(true));
   }, []);
 
-  if (!isReady) {
+  if (showSplash) {
     return (
-      <div className="min-h-screen bg-background bg-aurora flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <SplashScreen 
+        onComplete={() => {
+          sessionStorage.setItem('splashShown', 'true');
+          setShowSplash(false);
+        }} 
+      />
     );
+  }
+
+  if (!isReady) {
+    return null; // Storage not ready but splash handled the initial view
   }
 
   return (

@@ -65,7 +65,11 @@ export function BiometricLock({ children, enabled }: BiometricLockProps) {
   // Handle re-auth when isLocked becomes true
   useEffect(() => {
     if (enabled && isLocked && !isAuthenticatingRef.current) {
-      handleAuth();
+      // Add a small delay for the initial load to prevent collision with splash screen exit animations
+      const timer = setTimeout(() => {
+        handleAuth();
+      }, 500);
+      return () => clearTimeout(timer);
     }
   }, [isLocked, enabled]);
 
@@ -117,7 +121,7 @@ export function BiometricLock({ children, enabled }: BiometricLockProps) {
         <div className="space-y-2">
           <h2 className="text-2xl font-bold tracking-tight">App Locked</h2>
           <p className="text-muted-foreground text-sm">
-            Please authenticate to access Pixel Reimburse
+            Please authenticate to access Buxman
           </p>
         </div>
 

@@ -50,7 +50,7 @@ const NAV_ITEMS: { id: Tab; label: string; icon: any }[] = [
   { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
   { id: 'expenses', label: 'Expenses', icon: Receipt },
   { id: 'food', label: 'Dining', icon: Utensils },
-  { id: 'reimbursements', label: 'Reimburse', icon: Briefcase },
+  { id: 'reimbursements', label: 'Claims', icon: Briefcase },
   { id: 'vehicle', label: 'Vehicle', icon: Car },
   { id: 'analytics', label: 'Charts', icon: BarChart3 },
   { id: 'settings', label: 'Settings', icon: Settings },
@@ -61,11 +61,10 @@ const RIGHT_NAV = NAV_ITEMS.slice(2, 4);   // Dining, Reimburse
 const MORE_NAV  = NAV_ITEMS.slice(4);      // Vehicle, Analytics, Settings
 
 const Index = () => {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenses, setExpenses] = useState(() => storageService.getExpenses());
   const [logs, setLogs] = useState(() => fuelService.getLogs());
   const [vehicles, setVehicles] = useState(() => mileageService.getVehicles());
   const [isFabOpen, setIsFabOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [expenseSubTab, setExpenseSubTab] = useState<'all' | 'wallet'>('all');
   const [dashboardTab, setDashboardTab] = useState<'expenses' | 'vehicle'>('expenses');
@@ -81,9 +80,7 @@ const Index = () => {
   }, []);
 
   useEffect(() => {
-    const data = storageService.getExpenses();
-    setExpenses(data);
-    setIsLoading(false);
+    // Initial data is already set via lazy state initializer
   }, []);
 
   const handleAddExpense = (expense: Expense) => {
@@ -188,18 +185,7 @@ const Index = () => {
   }, [vehicleSummaries]);
   const settings = settingsService.get();
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background bg-aurora flex items-center justify-center">
-        <div className="text-center animate-fade-in">
-          <div className="h-12 w-12 rounded-2xl bg-gradient-primary flex items-center justify-center mx-auto mb-4 animate-pulse-glow">
-            <Receipt className="h-6 w-6 text-white" />
-          </div>
-          <p className="text-sm text-muted-foreground">Loading your expenses...</p>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <BiometricLock enabled={!!settings.biometricLock}>
@@ -212,11 +198,11 @@ const Index = () => {
           {/* Logo */}
           <div className="p-5 border-b border-border/30">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow shrink-0">
-                <Receipt className="h-4.5 w-4.5 text-white" />
+              <div className="h-9 w-9 rounded-xl bg-card border border-border/40 flex items-center justify-center shadow-glow shrink-0 overflow-hidden">
+                <img src="/logo.png" alt="Buxman" className="h-6 w-6 object-contain" />
               </div>
               <div>
-                <h1 className="text-sm font-bold tracking-tight">Reimburse</h1>
+                <h1 className="text-sm font-bold tracking-tight">Buxman</h1>
                 <p className="text-[10px] text-muted-foreground">Expense Tracker</p>
               </div>
             </div>
@@ -746,38 +732,30 @@ const Index = () => {
 
           {/* Footer (desktop only) */}
           <footer className="hidden sm:block border-t border-border/30 px-6 py-4 text-center text-xs text-muted-foreground">
-            Reimburse · Data stored locally on your device · Built with ♥
+            Buxman · Data stored locally on your device · Built with ♥
           </footer>
         </div>
 
         {/* ── High-Density Pro Navigation (mobile) ── */}
-        <nav className="sm:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-40 w-[94vw] max-w-md h-20">
+        <nav className="sm:hidden fixed bottom-[max(2rem,env(safe-area-inset-bottom,2rem))] left-1/2 -translate-x-1/2 z-40 w-[94vw] max-w-md h-20">
           <div className="relative h-full w-full bg-card/80 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-2xl flex items-center overflow-visible">
             
             {/* Scrollable Items Container */}
             <div 
               ref={navRef}
               className={cn(
-                "absolute inset-0 flex items-center overflow-x-auto no-scrollbar snap-x snap-mandatory transition-all duration-500 overflow-y-visible",
+                "absolute inset-0 flex items-center overflow-x-auto no-scrollbar snap-x snap-mandatory transition-all duration-500 overflow-y-visible px-4",
                 isFabOpen ? "blur-md opacity-40 scale-[0.98] pointer-events-none" : "blur-0 opacity-100 scale-100"
               )}
             >
               {[
                 ...LEFT_NAV,
-                { id: 'add', isFab: true },
+                { id: 'spacer', isSpacer: true },
                 ...RIGHT_NAV,
                 ...MORE_NAV
               ].map((item, idx) => {
-                if ('isFab' in item) {
-                  return (
-                    <div key="fab-item" className="flex-shrink-0 w-[20%] flex justify-center items-center snap-center relative overflow-visible">
-                      <FloatingAddMenu 
-                        onAddExpense={handleAddExpense} 
-                        onFuelSuccess={() => setLogs(fuelService.getLogs())}
-                        onOpenChange={setIsFabOpen}
-                      />
-                    </div>
-                  );
+                if ('isSpacer' in item) {
+                  return <div key="spacer" className="flex-shrink-0 w-[20%]" />;
                 }
 
                 const Icon = item.icon;
@@ -806,6 +784,15 @@ const Index = () => {
                   </button>
                 );
               })}
+            </div>
+
+            {/* Fixed Central FAB */}
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[60%] z-50 pointer-events-auto">
+              <FloatingAddMenu 
+                onAddExpense={handleAddExpense} 
+                onFuelSuccess={() => setLogs(fuelService.getLogs())}
+                onOpenChange={setIsFabOpen}
+              />
             </div>
           </div>
         </nav>
