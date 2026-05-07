@@ -61,7 +61,7 @@ const RIGHT_NAV = NAV_ITEMS.slice(2, 4);   // Dining, Reimburse
 const MORE_NAV  = NAV_ITEMS.slice(4);      // Vehicle, Analytics, Settings
 
 const Index = () => {
-  const [expenses, setExpenses] = useState(() => storageService.getExpenses());
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [logs, setLogs] = useState(() => fuelService.getLogs());
   const [vehicles, setVehicles] = useState(() => mileageService.getVehicles());
   const [isFabOpen, setIsFabOpen] = useState(false);
@@ -77,49 +77,48 @@ const Index = () => {
     setOnboarded(metaService.get().onboardingDone);
     audio.unlock();
     permissions.requestAll();
+    
+    // Load initial expenses
+    storageService.getExpenses().then(setExpenses);
   }, []);
 
-  useEffect(() => {
-    // Initial data is already set via lazy state initializer
-  }, []);
-
-  const handleAddExpense = (expense: Expense) => {
-    const updated = storageService.addExpense(expense);
+  const handleAddExpense = async (expense: Expense) => {
+    const updated = await storageService.addExpense(expense);
     setExpenses(updated);
     toast.success('Expense added successfully');
     haptics.success();
   };
 
-  const handleUpdateExpense = (expense: Expense) => {
-    const updated = storageService.updateExpense(expense);
+  const handleUpdateExpense = async (expense: Expense) => {
+    const updated = await storageService.updateExpense(expense);
     setExpenses(updated);
     toast.success('Expense updated');
     haptics.success();
   };
 
-  const handleDeleteExpense = (id: string) => {
-    const updated = storageService.deleteExpense(id);
+  const handleDeleteExpense = async (id: string) => {
+    const updated = await storageService.deleteExpense(id);
     setExpenses(updated);
     toast.success('Expense deleted');
     haptics.medium();
   };
 
-  const handleDeleteAll = () => {
-    storageService.saveExpenses([]);
+  const handleDeleteAll = async () => {
+    await storageService.saveExpenses([]);
     setExpenses([]);
     toast.success('All expenses cleared');
     haptics.medium();
   };
 
-  const handleBatchDelete = (ids: string[]) => {
-    const updated = storageService.batchDeleteExpenses(ids);
+  const handleBatchDelete = async (ids: string[]) => {
+    const updated = await storageService.batchDeleteExpenses(ids);
     setExpenses(updated);
     toast.success(`${ids.length} expenses deleted`);
     haptics.medium();
   };
 
-  const handleBatchStatus = (ids: string[], status: ExpenseStatus) => {
-    const updated = storageService.batchUpdateStatus(ids, status);
+  const handleBatchStatus = async (ids: string[], status: ExpenseStatus) => {
+    const updated = await storageService.batchUpdateStatus(ids, status);
     setExpenses(updated);
     toast.success(`${ids.length} expenses marked as ${status}`);
     haptics.success();

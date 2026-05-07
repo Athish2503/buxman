@@ -140,12 +140,19 @@ function FormBody({
     }
   };
 
-  const vendors = useMemo(() => {
-    try { 
-      const list = vendorService.getFromExpenses(storageService.getExpenses()); 
-      return list.sort();
-    }
-    catch { return []; }
+  const [vendors, setVendors] = useState<string[]>([]);
+
+  useEffect(() => {
+    const loadVendors = async () => {
+      try {
+        const expenses = await storageService.getExpenses();
+        const list = vendorService.getFromExpenses(expenses);
+        setVendors(list.sort());
+      } catch (err) {
+        console.error('Error loading vendors:', err);
+      }
+    };
+    loadVendors();
   }, []);
 
   const filteredVendors = useMemo(() => {

@@ -19,6 +19,7 @@ import { settingsService } from '@/lib/settings';
 import { categoryService, CategoryDefinition, iconMap } from '@/lib/category-service';
 import { storageEngine } from '@/lib/storage-engine';
 import { formatCurrency, cn } from '@/lib/utils';
+import { MigrationManager } from '@/db/MigrationManager';
 
 import { createPortal } from 'react-dom';
 
@@ -89,6 +90,7 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
 
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [showImportOptions, setShowImportOptions] = useState(false);
+  const [migrationStatus, setMigrationStatus] = useState<'not_started' | 'completed' | 'failed'>('not_started');
 
   // Category Editor State
   const [editingCategory, setEditingCategory] = useState<CategoryDefinition | null>(null);
@@ -111,6 +113,7 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
 
   useEffect(() => {
     biometrics.isAvailable().then(setBioAvailable);
+    MigrationManager.getMigrationStatus().then(setMigrationStatus);
     
     const handleUpdate = () => setCategories(categoryService.getAll());
     window.addEventListener('categories-updated', handleUpdate);
@@ -690,6 +693,46 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
                  <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-0.5">Backup & Recovery Hub</p>
                </div>
              </div>
+
+             {migrationStatus !== 'completed' && (
+               <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 space-y-3">
+                 <div className="flex items-center gap-3">
+                   <Database className="h-5 w-5 text-indigo-500" />
+                   <div>
+                     <h5 className="text-xs font-bold text-indigo-600 dark:text-indigo-400">Upgrade to SQLite Architecture</h5>
+                     <p className="text-[10px] text-muted-foreground leading-tight">Move data from legacy storage to production-grade SQLite engine.</p>
+                   </div>
+                 </div>
+                 <Button 
+                   className="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold gap-2 shadow-lg shadow-indigo-600/20"
+                   onClick={() => {
+                     setShowConfirm({
+                       title: 'Migrate to SQLite?',
+                       description: 'This will move all your data to a new high-performance database. Legacy storage will be wiped after successful migration.',
+                       variant: 'info',
+                       onConfirm: async () => {
+                         toast.info('Starting migration...');
+                         try {
+                           await MigrationManager.backupBeforeMigration();
+                           await MigrationManager.migrateAll();
+                           await MigrationManager.clearLegacyData();
+                           setMigrationStatus('completed');
+                           toast.success('Migration successful!', {
+                             description: 'Application will reload to apply changes.'
+                           });
+                           setTimeout(() => window.location.reload(), 2000);
+                         } catch (e) {
+                           console.error('Migration failed:', e);
+                           toast.error('Migration failed. Check console for details.');
+                         }
+                       }
+                     });
+                   }}
+                 >
+                   <Zap className="h-4 w-4" /> Start Migration
+                 </Button>
+               </div>
+             )}
  
              <div className="grid grid-cols-2 gap-3">
                <Button 

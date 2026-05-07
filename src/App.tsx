@@ -8,6 +8,9 @@ import { Loader2 } from "lucide-react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { storageEngine } from "./lib/storage-engine";
+import { useDatabase } from "./db/hooks";
+import { MigrationManager } from "./db/MigrationManager";
+import DbTestPage from "./pages/DbTestPage";
 
 import { SplashScreen } from "./components/splash-screen";
 
@@ -23,8 +26,16 @@ const App = () => {
     return true;
   });
 
+  const { isLoading: dbLoading } = useDatabase();
+
   useEffect(() => {
-    storageEngine.init().then(() => setIsReady(true));
+    const initApp = async () => {
+      // 1. Init legacy storage engine (for backward compatibility)
+      await storageEngine.init();
+      setIsReady(true);
+    };
+
+    initApp();
   }, []);
 
   if (showSplash) {
@@ -59,6 +70,7 @@ const App = () => {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/db-test" element={<DbTestPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
