@@ -31,14 +31,19 @@
         </provider>
 
         <service
-            android:name=".TransactionNotificationListener"
-            android:label="Reimburse Transaction Monitor"
+            android:name=".NotificationListener"
+            android:label="Buxman Transaction Monitor"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <service
+            android:name=".OverlayService"
+            android:enabled="true"
+            android:exported="false" />
 
         <receiver android:name=".SMSReceiver" android:exported="true">
             <intent-filter android:priority="999">

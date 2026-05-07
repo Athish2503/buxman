@@ -1,4 +1,5 @@
 import { Toaster } from "@/components/ui/toaster";
+import { Capacitor } from "@capacitor/core";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -10,6 +11,9 @@ import NotFound from "./pages/NotFound";
 import { storageEngine } from "./lib/storage-engine";
 
 import { SplashScreen } from "./components/splash-screen";
+import { useTransactionListener } from "./hooks/useTransactionListener";
+import { FinancialPermissionGuidance } from "./components/financial-permission-guidance";
+import { permissions } from "./lib/permissions";
 
 const queryClient = new QueryClient();
 
@@ -23,8 +27,21 @@ const App = () => {
     return true;
   });
 
+  useTransactionListener();
+
+  const [permissionsNeeded, setPermissionsNeeded] = useState(false);
+
   useEffect(() => {
-    storageEngine.init().then(() => setIsReady(true));
+    storageEngine.init().then(async () => {
+      setIsReady(true);
+      // Check for financial permissions on startup (mobile only)
+      if (Capacitor.isNativePlatform()) {
+        const status = await permissions.checkStatus();
+        if (!status.financialNotifications || !status.overlay) {
+          setPermissionsNeeded(true);
+        }
+      }
+    });
   }, []);
 
   if (showSplash) {
@@ -40,6 +57,10 @@ const App = () => {
 
   if (!isReady) {
     return null; // Storage not ready but splash handled the initial view
+  }
+
+  if (permissionsNeeded) {
+    return <FinancialPermissionGuidance onComplete={() => setPermissionsNeeded(false)} />;
   }
 
   return (

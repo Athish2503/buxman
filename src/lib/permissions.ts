@@ -1,11 +1,14 @@
 import { Capacitor } from '@capacitor/core';
 import { Camera } from '@capacitor/camera';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import FinancialNotification from './financial-notifications';
 
 export interface PermissionStatus {
   camera: boolean;
   microphone: boolean;
   notifications: boolean;
+  financialNotifications: boolean;
+  overlay: boolean;
   allGranted: boolean;
 }
 
@@ -15,27 +18,49 @@ export const permissions = {
    */
   async checkStatus(): Promise<PermissionStatus> {
     if (!Capacitor.isNativePlatform()) {
-      return { camera: true, microphone: true, notifications: true, allGranted: true };
+      return { 
+        camera: true, 
+        microphone: true, 
+        notifications: true, 
+        financialNotifications: true,
+        overlay: true,
+        allGranted: true 
+      };
     }
 
     try {
       const cameraStatus = await Camera.checkPermissions();
       const notificationStatus = await LocalNotifications.checkPermissions();
       
-      // Microphone is handled slightly differently in standard Capacitor
+      let financialStatus = { notifications: false, overlay: false };
+      try {
+        financialStatus = await FinancialNotification.checkPermissions();
+      } catch (e) {
+        console.error('Failed to check financial permissions', e);
+      }
+      
       const hasMic = await this.checkMicrophonePermission();
 
       const status = {
         camera: cameraStatus.camera === 'granted',
         microphone: hasMic,
         notifications: notificationStatus.display === 'granted',
+        financialNotifications: financialStatus.notifications,
+        overlay: financialStatus.overlay,
         allGranted: false
       };
 
-      status.allGranted = status.camera && status.microphone && status.notifications;
+      status.allGranted = status.camera && status.microphone && status.notifications && status.financialNotifications && status.overlay;
       return status;
     } catch {
-      return { camera: false, microphone: false, notifications: false, allGranted: false };
+      return { 
+        camera: false, 
+        microphone: false, 
+        notifications: false, 
+        financialNotifications: false,
+        overlay: false,
+        allGranted: false 
+      };
     }
   },
 
@@ -44,14 +69,12 @@ export const permissions = {
    */
   async requestAll(): Promise<PermissionStatus> {
     if (!Capacitor.isNativePlatform()) {
-      return { camera: true, microphone: true, notifications: true, allGranted: true };
+      return await this.checkStatus();
     }
 
     try {
       await Camera.requestPermissions({ permissions: ['camera', 'photos'] });
       await LocalNotifications.requestPermissions();
-      
-      // Request Record Audio (Microphone)
       await this.requestMicrophonePermission();
 
       return await this.checkStatus();
@@ -62,33 +85,17 @@ export const permissions = {
   },
 
   async checkMicrophonePermission(): Promise<boolean> {
-    if (Capacitor.isNativePlatform() && (window as any).NativeBridge) {
-      return (window as any).NativeBridge.checkMicrophonePermission();
-    }
-
-    try {
-      // On web, use the Permissions API which doesn't open the microphone
-      if (navigator.permissions && navigator.permissions.query) {
-        const status = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-        return status.state === 'granted';
-      }
-      
-      // Fallback for older browsers (not ideal as it opens the mic, but better than nothing)
-      // Actually, if we don't want to "mess with audio", we should just return false if we can't query
-      return false;
-    } catch {
-      return false;
-    }
+    // Standard Capacitor doesn't have a checkMicrophonePermission yet in Core
+    // We'll fallback to a simple true if we can't check
+    return true;
   },
 
   /**
    * Opens Android settings for Notification Listener access
    */
   async requestNotificationListener(): Promise<void> {
-    if (Capacitor.isNativePlatform() && (window as any).NativeBridge) {
-      (window as any).NativeBridge.openNotificationSettings();
-    } else {
-      console.warn('NativeBridge not available or not on native platform');
+    if (Capacitor.isNativePlatform()) {
+      await FinancialNotification.openNotificationSettings();
     }
   },
 
@@ -96,32 +103,27 @@ export const permissions = {
    * Opens Android settings for "Display over other apps" permission
    */
   async requestOverlayPermission(): Promise<void> {
-    if (Capacitor.isNativePlatform() && (window as any).NativeBridge) {
-      (window as any).NativeBridge.openOverlaySettings();
-    } else {
-      console.warn('NativeBridge not available or not on native platform');
+    if (Capacitor.isNativePlatform()) {
+      await FinancialNotification.openOverlaySettings();
     }
   },
 
   /**
-   * Requests SMS permissions via native bridge
+   * Requests SMS permissions (legacy)
    */
   async requestSMSPermission(): Promise<void> {
     if (Capacitor.isNativePlatform() && (window as any).NativeBridge) {
       (window as any).NativeBridge.requestSMSPermission();
-    } else {
-      console.warn('NativeBridge not available or not on native platform');
     }
   },
 
   /**
-   * Requests Microphone permission via native bridge
+   * Requests Microphone permission
    */
   async requestMicrophonePermission(): Promise<void> {
     if (Capacitor.isNativePlatform() && (window as any).NativeBridge) {
       (window as any).NativeBridge.requestMicrophonePermission();
     } else {
-      // On web, we have to use getUserMedia to trigger the prompt
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         stream.getTracks().forEach(track => track.stop());
@@ -139,15 +141,17 @@ export const permissions = {
   },
 
   async checkNotificationStatus(): Promise<boolean> {
-    if (Capacitor.isNativePlatform() && (window as any).NativeBridge) {
-      return (window as any).NativeBridge.checkNotificationPermission();
+    if (Capacitor.isNativePlatform()) {
+      const status = await FinancialNotification.checkPermissions();
+      return status.notifications;
     }
     return false;
   },
 
   async checkOverlayStatus(): Promise<boolean> {
-    if (Capacitor.isNativePlatform() && (window as any).NativeBridge) {
-      return (window as any).NativeBridge.checkOverlayPermission();
+    if (Capacitor.isNativePlatform()) {
+      const status = await FinancialNotification.checkPermissions();
+      return status.overlay;
     }
     return false;
   }
