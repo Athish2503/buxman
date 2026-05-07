@@ -1,5 +1,10 @@
 import { Capacitor } from '@capacitor/core';
 import { storageEngine } from './storage-engine';
+import { transactionRepo } from '@/db/repositories/TransactionRepository';
+import { categoryRepo } from '@/db/repositories/CategoryRepository';
+import { budgetRepo } from '@/db/repositories/BudgetRepository';
+import { Preferences } from '@capacitor/preferences';
+import { dbService } from '@/db/DatabaseService';
 
 const DATA_VERSION = '1.0';
 
@@ -14,13 +19,52 @@ export interface FullExportData {
   fuel: any[];
   wallet: any[];
   dining: any[];
+  budgets?: any[];
 }
 
 export const dataMigrationService = {
+  async isSqliteActive(): Promise<boolean> {
+    const { value } = await Preferences.get({ key: 'reimburse_sqlite_migration_status' });
+    return value === 'completed';
+  },
+
   /**
    * Exports all application data into a single JSON object
    */
-  exportAllData(): FullExportData {
+  async exportAllData(): Promise<FullExportData> {
+    if (await this.isSqliteActive()) {
+      const [txs, cats, buds] = await Promise.all([
+        transactionRepo.findAll(),
+        categoryRepo.findAll(),
+        budgetRepo.findAll()
+      ]);
+
+      return {
+        version: DATA_VERSION,
+        timestamp: new Date().toISOString(),
+        expenses: txs.map(tx => ({
+          id: tx.id,
+          amount: tx.amount,
+          merchant: tx.merchant,
+          categoryId: tx.category_id,
+          accountId: tx.account_id,
+          date: tx.timestamp,
+          notes: tx.notes || '',
+          status: tx.status,
+          isReimbursement: tx.type === 'expense',
+          type: tx.type
+        })),
+        settings: JSON.parse(localStorage.getItem('reimburse_settings_v2') || '{}'),
+        categories: cats,
+        budgets: buds,
+        vehicles: JSON.parse(localStorage.getItem('reimburse_vehicles_v1') || '[]'),
+        mileage: JSON.parse(localStorage.getItem('reimburse_mileage_v1') || '[]'),
+        fuel: JSON.parse(localStorage.getItem('reimburse_fuel_v1') || '[]'),
+        wallet: JSON.parse(localStorage.getItem('reimburse_wallet_v1') || '[]'),
+        dining: JSON.parse(localStorage.getItem('reimburse_food_v1') || '[]'),
+      } as any;
+    }
+
     const data: FullExportData = {
       version: DATA_VERSION,
       timestamp: new Date().toISOString(),
@@ -198,22 +242,54 @@ export const dataMigrationService = {
         throw new Error('Missing version in backup file');
       }
 
+      const sqliteActive = await this.isSqliteActive();
+
       // Helper to set data if it exists in the import
-      const syncKey = async (key: string, value: any) => {
+      const syncKey = async (key: string, value: any, entityType: string) => {
         if (value !== undefined && value !== null) {
           console.log(`[Data Migration] Syncing ${key}...`);
+          
+          if (sqliteActive) {
+            if (entityType === 'expenses') {
+              for (const exp of value) {
+                await transactionRepo.create({
+                  id: exp.id,
+                  amount: exp.amount,
+                  merchant: exp.merchant,
+                  category_id: exp.categoryId || exp.category_id,
+                  account_id: exp.accountId || exp.account_id || 'default',
+                  type: exp.type || 'expense',
+                  is_reimbursement: exp.isReimbursement ? 1 : 0,
+                  timestamp: exp.date || exp.timestamp,
+                  notes: exp.notes,
+                  status: exp.status || 'completed'
+                }).catch(() => {}); // Skip duplicates
+              }
+            } else if (entityType === 'categories') {
+              for (const cat of value) {
+                await categoryRepo.create(cat).catch(() => {});
+              }
+            } else if (entityType === 'budgets') {
+              for (const bud of value) {
+                await budgetRepo.create(bud).catch(() => {});
+              }
+            }
+          }
+          
+          // Always keep a legacy copy for safety or if sqlite is not active
           await storageEngine.set(key, JSON.stringify(value));
         }
       };
 
-      await syncKey('reimburse_expenses_v2', data.expenses);
-      await syncKey('reimburse_settings_v2', data.settings);
-      await syncKey('reimburse_categories_v1', data.categories);
-      await syncKey('reimburse_vehicles_v1', data.vehicles);
-      await syncKey('reimburse_mileage_v1', data.mileage);
-      await syncKey('reimburse_fuel_v1', data.fuel);
-      await syncKey('reimburse_wallet_v1', data.wallet);
-      await syncKey('reimburse_food_v1', data.dining);
+      await syncKey('reimburse_expenses_v2', data.expenses, 'expenses');
+      await syncKey('reimburse_settings_v2', data.settings, 'settings');
+      await syncKey('reimburse_categories_v1', data.categories, 'categories');
+      await syncKey('reimburse_budgets_v1', data.budgets, 'budgets');
+      await syncKey('reimburse_vehicles_v1', data.vehicles, 'vehicles');
+      await syncKey('reimburse_mileage_v1', data.mileage, 'mileage');
+      await syncKey('reimburse_fuel_v1', data.fuel, 'fuel');
+      await syncKey('reimburse_wallet_v1', data.wallet, 'wallet');
+      await syncKey('reimburse_food_v1', data.dining, 'dining');
 
       console.log('[Data Migration] Import successful');
       return true;
@@ -227,7 +303,7 @@ export const dataMigrationService = {
    * Downloads the data as a JSON/CSV file (Web) or shares it (Mobile)
    */
   async downloadBackup(format: 'json' | 'csv' = 'json') {
-    const data = this.exportAllData();
+    const data = await this.exportAllData();
     const content = format === 'json' 
       ? JSON.stringify(data, null, 2) 
       : this.convertToCSV(data);

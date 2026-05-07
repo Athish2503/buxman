@@ -53,5 +53,16 @@ export const storageEngine = {
   async clearAll(): Promise<void> {
     localStorage.clear();
     await Preferences.clear();
+    
+    // Also try to wipe SQLite if possible
+    try {
+      const { CapacitorSQLite } = await import('@capacitor-community/sqlite');
+      const { SQLiteConnection } = await import('@capacitor-community/sqlite');
+      const sqlite = new SQLiteConnection(CapacitorSQLite);
+      // This is a bit aggressive, but for a factory reset it's appropriate
+      await sqlite.deleteConnection('pixel_reimburse_db', false);
+    } catch (e) {
+      console.warn('[Storage Engine] SQLite cleanup skipped or failed:', e);
+    }
   }
 };

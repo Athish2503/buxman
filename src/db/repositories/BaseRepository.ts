@@ -26,4 +26,19 @@ export abstract class BaseRepository<T> {
     const result = await dbService.query(`SELECT COUNT(*) as count FROM ${this.tableName}`);
     return result.values ? result.values[0].count : 0;
   }
+
+  async create(data: any): Promise<void> {
+    const keys = Object.keys(data);
+    const placeholders = keys.map(() => '?').join(', ');
+    const sql = `INSERT INTO ${this.tableName} (${keys.join(', ')}) VALUES (${placeholders})`;
+    await dbService.run(sql, Object.values(data));
+  }
+
+  async update(data: any & { id: string }): Promise<void> {
+    const { id, ...updates } = data;
+    const keys = Object.keys(updates);
+    const setClause = keys.map(k => `${k} = ?`).join(', ');
+    const sql = `UPDATE ${this.tableName} SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+    await dbService.run(sql, [...Object.values(updates), id]);
+  }
 }

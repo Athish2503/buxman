@@ -26,7 +26,7 @@ export const storageService = {
         date: tx.timestamp,
         notes: tx.notes || '',
         status: tx.status as any,
-        isReimbursement: tx.type === 'expense', // Simplified mapping
+        isReimbursement: tx.is_reimbursement === 1,
         type: tx.type as any
       })) as any[];
     }
@@ -65,6 +65,7 @@ export const storageService = {
         category_id: expense.categoryId,
         account_id: expense.accountId || 'default',
         type: expense.type || 'expense',
+        is_reimbursement: expense.isReimbursement ? 1 : 0,
         timestamp: expense.date,
         notes: expense.notes,
         status: expense.status || 'completed'
@@ -87,6 +88,7 @@ export const storageService = {
         category_id: expense.categoryId,
         account_id: expense.accountId || 'default',
         type: expense.type || 'expense',
+        is_reimbursement: expense.isReimbursement ? 1 : 0,
         timestamp: expense.date,
         notes: expense.notes,
         status: expense.status || 'completed'

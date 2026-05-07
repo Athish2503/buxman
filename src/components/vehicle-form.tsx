@@ -83,7 +83,7 @@ export function VehicleForm({ onSuccess, trigger, editVehicle, open: externalOpe
       serviceInterval: Number(serviceInterval) || undefined,
     };
 
-    const vehicles = mileageService.getVehicles();
+    const vehicles = await mileageService.getVehicles();
     let updated: VehicleRate[];
     if (editVehicle) {
       updated = vehicles.map(v => v.id === editVehicle.id ? vehicle : v);
@@ -91,7 +91,7 @@ export function VehicleForm({ onSuccess, trigger, editVehicle, open: externalOpe
       updated = [...vehicles, vehicle];
     }
 
-    mileageService.saveVehicles(updated);
+    await mileageService.saveVehicles(updated);
     
     setSuccess(true);
     haptics.success();

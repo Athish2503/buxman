@@ -1,5 +1,6 @@
 import { BaseRepository } from './BaseRepository';
 import { Transaction } from '../types';
+import { dbService } from '../DatabaseService';
 
 export class TransactionRepository extends BaseRepository<Transaction> {
   constructor() {
@@ -8,8 +9,8 @@ export class TransactionRepository extends BaseRepository<Transaction> {
 
   async create(transaction: Transaction): Promise<void> {
     const sql = `
-      INSERT INTO transactions (id, amount, merchant, category_id, account_id, type, timestamp, notes, source, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO transactions (id, amount, merchant, category_id, account_id, type, is_reimbursement, timestamp, notes, source, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const params = [
       transaction.id,
@@ -18,6 +19,7 @@ export class TransactionRepository extends BaseRepository<Transaction> {
       transaction.category_id,
       transaction.account_id,
       transaction.type,
+      transaction.is_reimbursement || 0,
       transaction.timestamp,
       transaction.notes,
       transaction.source,
@@ -29,7 +31,7 @@ export class TransactionRepository extends BaseRepository<Transaction> {
   async update(transaction: Transaction): Promise<void> {
     const sql = `
       UPDATE transactions 
-      SET amount = ?, merchant = ?, category_id = ?, account_id = ?, type = ?, timestamp = ?, notes = ?, source = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+      SET amount = ?, merchant = ?, category_id = ?, account_id = ?, type = ?, is_reimbursement = ?, timestamp = ?, notes = ?, source = ?, status = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `;
     const params = [
@@ -38,6 +40,7 @@ export class TransactionRepository extends BaseRepository<Transaction> {
       transaction.category_id,
       transaction.account_id,
       transaction.type,
+      transaction.is_reimbursement,
       transaction.timestamp,
       transaction.notes,
       transaction.source,

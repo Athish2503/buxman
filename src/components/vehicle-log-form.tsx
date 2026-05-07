@@ -25,7 +25,11 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, open: externalOpen
   const setOpen = onOpenChange || setInternalOpen;
   const isMobile = useIsMobile();
   
-  const [vehicles] = useState<VehicleRate[]>(() => mileageService.getVehicles());
+  const [vehicles, setVehicles] = useState<VehicleRate[]>([]);
+
+  useEffect(() => {
+    mileageService.getVehicles().then(setVehicles);
+  }, []);
   const [activeVehId, setActiveVehId] = useState(editLog?.vehicleId || vehicles[0]?.id || '');
   
   const [odometer, setOdometer] = useState(editLog?.odometer.toString() || '');
@@ -84,9 +88,9 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, open: externalOpen
     };
 
     if (editLog) {
-      fuelService.updateLog(log);
+      await fuelService.updateLog(log);
     } else {
-      fuelService.addLog(log);
+      await fuelService.addLog(log);
     }
 
     setSuccess(true);

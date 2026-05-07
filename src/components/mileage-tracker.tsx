@@ -13,8 +13,13 @@ interface MileageTrackerProps {
 }
 
 export function MileageTracker({ onAddExpense }: MileageTrackerProps) {
-  const [vehicles, setVehicles] = useState<VehicleRate[]>(() => mileageService.getVehicles());
-  const [logs, setLogs] = useState<MileageLog[]>(() => mileageService.getLogs());
+  const [vehicles, setVehicles] = useState<VehicleRate[]>([]);
+  const [logs, setLogs] = useState<MileageLog[]>([]);
+
+  useEffect(() => {
+    mileageService.getVehicles().then(setVehicles);
+    mileageService.getLogs().then(setLogs);
+  }, []);
   
   const [mode, setMode] = useState<'list' | 'add' | 'settings'>('list');
   
@@ -29,9 +34,11 @@ export function MileageTracker({ onAddExpense }: MileageTrackerProps) {
   const [newVehRate, setNewVehRate] = useState('');
   const [newVehIcon, setNewVehIcon] = useState<'car' | 'bike'>('car');
 
-  const reload = () => {
-    setVehicles(mileageService.getVehicles());
-    setLogs(mileageService.getLogs());
+  const reload = async () => {
+    const v = await mileageService.getVehicles();
+    const l = await mileageService.getLogs();
+    setVehicles(v);
+    setLogs(l);
   };
 
   const handleSaveVehicle = () => {
@@ -74,12 +81,12 @@ export function MileageTracker({ onAddExpense }: MileageTrackerProps) {
       createdAt: new Date().toISOString(),
     };
     
-    mileageService.addLog(log);
+    await mileageService.addLog(log);
+    await reload();
     setMode('list');
     setDistance('');
     setPurpose('');
     haptics.success();
-    reload();
     toast.success('Mileage logged');
   };
 

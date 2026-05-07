@@ -1,5 +1,6 @@
 import { BaseRepository } from './BaseRepository';
 import { Category } from '../types';
+import { dbService } from '../DatabaseService';
 
 export class CategoryRepository extends BaseRepository<Category> {
   constructor() {

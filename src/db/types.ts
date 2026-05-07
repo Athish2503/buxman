@@ -26,6 +26,7 @@ export interface Transaction {
   category_id?: string;
   account_id?: string;
   type: 'income' | 'expense' | 'transfer';
+  is_reimbursement: number;
   timestamp: string;
   notes?: string;
   source?: string;

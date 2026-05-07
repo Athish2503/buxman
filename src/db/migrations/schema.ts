@@ -27,6 +27,7 @@ export const INITIAL_SCHEMA = `
     category_id TEXT,
     account_id TEXT,
     type TEXT CHECK(type IN ('income', 'expense', 'transfer')) NOT NULL,
+    is_reimbursement INTEGER DEFAULT 0,
     timestamp DATETIME NOT NULL,
     notes TEXT,
     source TEXT,
@@ -101,5 +102,76 @@ export const MIGRATIONS = [
   {
     version: 1,
     statements: [INITIAL_SCHEMA]
+  },
+  {
+    version: 2,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS vehicles (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        rate_per_km REAL DEFAULT 0,
+        icon TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );`,
+      `CREATE TABLE IF NOT EXISTS mileage_logs (
+        id TEXT PRIMARY KEY,
+        vehicle_id TEXT NOT NULL,
+        start_km REAL DEFAULT 0,
+        end_km REAL DEFAULT 0,
+        total_km REAL DEFAULT 0,
+        purpose TEXT,
+        timestamp DATETIME NOT NULL,
+        is_billed INTEGER DEFAULT 0,
+        expense_id TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
+      );`,
+      `CREATE TABLE IF NOT EXISTS fuel_logs (
+        id TEXT PRIMARY KEY,
+        vehicle_id TEXT NOT NULL,
+        odometer REAL NOT NULL,
+        liters REAL NOT NULL,
+        price_per_liter REAL NOT NULL,
+        total_cost REAL NOT NULL,
+        station TEXT,
+        timestamp DATETIME NOT NULL,
+        distance_since_last REAL,
+        economy REAL,
+        economy_trend REAL,
+        is_full_tank INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
+      );`,
+      `CREATE TABLE IF NOT EXISTS receipts (
+        id TEXT PRIMARY KEY,
+        image_uri TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        processed_status TEXT DEFAULT 'pending',
+        amount REAL,
+        merchant TEXT,
+        date TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );`
+    ]
+  },
+  {
+    version: 3,
+    statements: [
+      `ALTER TABLE transactions ADD COLUMN is_reimbursement INTEGER DEFAULT 0;`
+    ]
+  },
+  {
+    version: 4,
+    statements: [
+      `ALTER TABLE vehicles ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP;`,
+      `ALTER TABLE mileage_logs ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP;`,
+      `ALTER TABLE mileage_logs ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP;`,
+      `ALTER TABLE fuel_logs ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP;`,
+      `ALTER TABLE fuel_logs ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP;`,
+      `ALTER TABLE receipts ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP;`
+    ]
   }
 ];

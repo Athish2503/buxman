@@ -20,7 +20,11 @@ interface ReceiptWalletProps {
 }
 
 export function ReceiptWallet({ expenses, onAddExpense }: ReceiptWalletProps) {
-  const [receipts, setReceipts] = useState<ReceiptDraft[]>(() => walletService.getReceipts());
+  const [receipts, setReceipts] = useState<ReceiptDraft[]>([]);
+
+  useEffect(() => {
+    walletService.getReceipts().then(setReceipts);
+  }, []);
   const [processingReceipt, setProcessingReceipt] = useState<ReceiptDraft | null>(null);
   const [longPressedId, setLongPressedId] = useState<string | null>(null);
   const [viewingReceipt, setViewingReceipt] = useState<ReceiptDraft | null>(null);
@@ -55,7 +59,7 @@ export function ReceiptWallet({ expenses, onAddExpense }: ReceiptWalletProps) {
     }
   }, []);
 
-  const reload = () => setReceipts(walletService.getReceipts());
+  const reload = async () => setReceipts(await walletService.getReceipts());
 
   const handleCapture = (source: CameraSource) => {
     setShowSourcePicker(false);
@@ -70,9 +74,9 @@ export function ReceiptWallet({ expenses, onAddExpense }: ReceiptWalletProps) {
 
         if (image.base64String) {
           const b64 = `data:image/${image.format};base64,${image.base64String}`;
-          walletService.addReceipt(b64);
+          await walletService.addReceipt(b64);
           haptics.success();
-          reload();
+          await reload();
           toast.success('Saved to Wallet');
         }
       } catch (error) {
@@ -81,13 +85,13 @@ export function ReceiptWallet({ expenses, onAddExpense }: ReceiptWalletProps) {
     }, 100);
   };
 
-  const handleFormSubmit = (expense: Expense) => {
+  const handleFormSubmit = async (expense: Expense) => {
     onAddExpense(expense);
     if (processingReceipt) {
-      walletService.removeReceipt(processingReceipt.id);
+      await walletService.removeReceipt(processingReceipt.id);
       setProcessingReceipt(null);
     }
-    reload();
+    await reload();
   };
 
   if (processingReceipt) {
@@ -220,9 +224,9 @@ export function ReceiptWallet({ expenses, onAddExpense }: ReceiptWalletProps) {
               <ReceiptItem 
                 receipt={r} 
                 onSelect={() => setProcessingReceipt(r)}
-                onDelete={(id) => {
-                  walletService.removeReceipt(id);
-                  reload();
+                onDelete={async (id) => {
+                  await walletService.removeReceipt(id);
+                  await reload();
                 }}
                 onView={(r) => setViewingReceipt(r)}
                 isLongPressed={longPressedId === r.id}

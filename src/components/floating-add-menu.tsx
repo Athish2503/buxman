@@ -61,7 +61,7 @@ export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange }: F
 
       if (image.base64String) {
         const b64 = `data:image/${image.format};base64,${image.base64String}`;
-        walletService.addReceipt(b64);
+        await walletService.addReceipt(b64);
         haptics.success();
         toast.success('Receipt snapped to Wallet', {
           description: 'You can process it later from the Wallet tab.',

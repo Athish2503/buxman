@@ -1,5 +1,6 @@
 import { BaseRepository } from './BaseRepository';
 import { Budget } from '../types';
+import { dbService } from '../DatabaseService';
 
 export class BudgetRepository extends BaseRepository<Budget> {
   constructor() {

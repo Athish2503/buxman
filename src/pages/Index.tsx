@@ -62,8 +62,8 @@ const MORE_NAV  = NAV_ITEMS.slice(4);      // Vehicle, Analytics, Settings
 
 const Index = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [logs, setLogs] = useState(() => fuelService.getLogs());
-  const [vehicles, setVehicles] = useState(() => mileageService.getVehicles());
+  const [logs, setLogs] = useState<FuelLog[]>([]);
+  const [vehicles, setVehicles] = useState<VehicleRate[]>([]);
   const [isFabOpen, setIsFabOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [expenseSubTab, setExpenseSubTab] = useState<'all' | 'wallet'>('all');
@@ -80,6 +80,8 @@ const Index = () => {
     
     // Load initial expenses
     storageService.getExpenses().then(setExpenses);
+    fuelService.getLogs().then(setLogs);
+    mileageService.getVehicles().then(setVehicles);
   }, []);
 
   const handleAddExpense = async (expense: Expense) => {
@@ -145,11 +147,8 @@ const Index = () => {
   }, [thisMonthTotal, lastMonthTotal]);
 
   const vehicleSummaries = useMemo(() => {
-    const vList = mileageService.getVehicles();
-    const fLogs = fuelService.getLogs();
-    
-    return vList.map(v => {
-      const vLogs = fLogs.filter(l => l.vehicleId === v.id);
+    return vehicles.map(v => {
+      const vLogs = logs.filter(l => l.vehicleId === v.id);
       const economies = vLogs.filter(l => l.economy).map(l => l.economy!);
       const avgEco = economies.length > 0 ? economies.reduce((s, e) => s + e, 0) / economies.length : 0;
       const latestLog = vLogs[0];
@@ -167,10 +166,9 @@ const Index = () => {
         costPerKm: totalDist > 0 ? totalCost / totalDist : 0
       };
     }).sort((a, b) => b.totalDist - a.totalDist);
-  }, [expenses, logs, vehicles]); 
+  }, [logs, vehicles]); 
 
   const vehicleStats = useMemo(() => {
-    const fLogs = fuelService.getLogs();
     const totalDist = vehicleSummaries.reduce((s, v) => s + v.totalDist, 0);
     const totalCost = vehicleSummaries.reduce((s, v) => s + v.totalCost, 0);
     const overallEco = vehicleSummaries.reduce((s, v) => s + v.avgEco, 0) / Math.max(1, vehicleSummaries.filter(v => v.avgEco > 0).length);
@@ -289,11 +287,11 @@ const Index = () => {
                   </div>
                   <div className="rounded-2xl border border-border/40 bg-card/60 p-3">
                     <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-1">Distance</p>
-                    <p className="text-xl font-bold number-lg">{mileageService.getLogs().reduce((sum, log) => sum + log.distance, 0).toFixed(0)} km</p>
+                    <p className="text-xl font-bold number-lg">{(logs.reduce((sum, log) => sum + (log.distanceSinceLast || 0), 0)).toFixed(0)} km</p>
                   </div>
                   <div className="rounded-2xl border border-border/40 bg-card/60 p-3">
                     <p className="text-[10px] font-black uppercase tracking-widest text-violet-500 mb-1">Fuel</p>
-                    <p className="text-xl font-bold number-lg">{fuelService.getLogs().reduce((s,l) => s + l.liters, 0).toFixed(0)} L</p>
+                    <p className="text-xl font-bold number-lg">{logs.reduce((s,l) => s + l.liters, 0).toFixed(0)} L</p>
                   </div>
                 </div>
 
@@ -342,7 +340,7 @@ const Index = () => {
                             <TrendingUp className="h-4 w-4" />
                           </div>
                         </div>
-                        <VehicleEfficiencyChart logs={fuelService.getLogs()} vehicles={mileageService.getVehicles()} />
+                        <VehicleEfficiencyChart logs={logs} vehicles={vehicles} />
                       </div>
 
                       <div className="rounded-2xl border border-border/60 bg-card/80 p-5">
@@ -354,16 +352,18 @@ const Index = () => {
                           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                             <IndianRupee className="h-4 w-4" />
                           </div>
+                          <FuelCostChart logs={logs} />
                         </div>
-                        <FuelCostChart logs={fuelService.getLogs()} />
-                        <div className="mt-6 pt-6 border-t border-border/30 space-y-3">
-                           <div className="flex items-center justify-between">
-                             <span className="text-xs text-muted-foreground">Most Efficient</span>
-                             <span className="text-xs font-bold text-success">{Math.max(...fuelService.getLogs().map(l => l.economy || 0), 0).toFixed(1)} km/l</span>
+                        <div className="mt-4 flex items-center justify-between">
+                           <div className="flex items-center gap-1.5">
+                               <div className="h-2 w-2 rounded-full bg-success" />
+                               <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Avg. Economy</span>
+                               <span className="text-xs font-bold text-success">{Math.max(...logs.map(l => l.economy || 0), 0).toFixed(1)} km/l</span>
                            </div>
-                           <div className="flex items-center justify-between">
-                             <span className="text-xs text-muted-foreground">Last Recorded</span>
-                             <span className="text-xs font-bold">₹ {fuelService.getLogs()[0]?.totalCost.toLocaleString() || '0'}</span>
+                           <div className="flex items-center gap-1.5">
+                               <div className="h-2 w-2 rounded-full bg-primary" />
+                               <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Last Fill</span>
+                               <span className="text-xs font-bold">₹ {logs[0]?.totalCost.toLocaleString() || '0'}</span>
                            </div>
                         </div>
                       </div>
@@ -621,9 +621,11 @@ const Index = () => {
                 <VehicleTracker 
                   vehicles={vehicles}
                   logs={logs}
-                  onRefresh={() => {
-                    setLogs(fuelService.getLogs());
-                    setVehicles(mileageService.getVehicles());
+                  onRefresh={async () => {
+                    const l = await fuelService.getLogs();
+                    const v = await mileageService.getVehicles();
+                    setLogs(l);
+                    setVehicles(v);
                   }}
                 />
               </div>
@@ -758,7 +760,10 @@ const Index = () => {
                     <div key="fab-item" className="flex-shrink-0 w-[20%] flex justify-center items-center snap-center relative overflow-visible">
                       <FloatingAddMenu 
                         onAddExpense={handleAddExpense} 
-                        onFuelSuccess={() => setLogs(fuelService.getLogs())}
+                        onFuelSuccess={async () => {
+                          const l = await fuelService.getLogs();
+                          setLogs(l);
+                        }}
                         onOpenChange={setIsFabOpen}
                       />
                     </div>

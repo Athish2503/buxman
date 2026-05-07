@@ -20,6 +20,8 @@ import { categoryService, CategoryDefinition, iconMap } from '@/lib/category-ser
 import { storageEngine } from '@/lib/storage-engine';
 import { formatCurrency, cn } from '@/lib/utils';
 import { MigrationManager } from '@/db/MigrationManager';
+import { dataMigrationService } from '@/lib/data-migration';
+import { dbService } from '@/db/DatabaseService';
 
 import { createPortal } from 'react-dom';
 
@@ -617,7 +619,43 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
     </div>
   );
 
-  const executeAdvancedDelete = (type: string) => {
+  const executeAdvancedDelete = async (type: string) => {
+    const sqliteActive = await dataMigrationService.isSqliteActive();
+    
+    if (sqliteActive) {
+      let table = '';
+      let dateField = 'timestamp';
+      
+      if (type === 'expenses') table = 'transactions';
+      else if (type === 'fuel') table = 'fuel_logs';
+      else if (type === 'mileage') table = 'mileage_logs';
+      else if (type === 'wallet') {
+        table = 'receipts';
+        dateField = 'created_at';
+      }
+      
+      if (table) {
+        let query = `DELETE FROM ${table}`;
+        let params: any[] = [];
+        
+        if (advDeleteDays && !advDeleteStart && !advDeleteEnd) {
+          query += ` WHERE ${dateField} < datetime("now", ?)`;
+          params = [`-${advDeleteDays} days`];
+        } else if (advDeleteStart || advDeleteEnd) {
+          const start = advDeleteStart || '0000-01-01';
+          const end = advDeleteEnd || '9999-12-31';
+          query += ` WHERE ${dateField} BETWEEN ? AND ?`;
+          params = [start, end];
+        }
+        
+        await dbService.run(query, params);
+        toast.success(`SQLite ${type} records filtered and deleted`);
+        setAdvDeleteType(null);
+        setTimeout(() => window.location.reload(), 1000);
+        return;
+      }
+    }
+
     const keys: Record<string, string> = {
       expenses: 'reimburse_expenses_v2',
       fuel: 'reimburse_fuel_v1',
@@ -849,7 +887,13 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
                           title: `Delete all ${item.label}?`,
                           description: `This will permanently erase every single ${item.label.toLowerCase()} record from your device storage.`,
                           variant: 'destructive',
-                          onConfirm: () => {
+                          onConfirm: async () => {
+                            const sqliteActive = await dataMigrationService.isSqliteActive();
+                            
+                            if (sqliteActive && item.type === 'expenses') {
+                              await dbService.run('DELETE FROM transactions');
+                            }
+                            
                             const keys: Record<string, string[]> = {
                               expenses: ['reimburse_expenses_v2'],
                               fuel: ['reimburse_fuel_v1'],
