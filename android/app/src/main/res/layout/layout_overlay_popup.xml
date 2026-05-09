@@ -17,6 +17,7 @@
         android:padding="20dp">
 
         <RelativeLayout
+            android:id="@+id/headerLayout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp">
@@ -66,7 +67,7 @@
             android:hint="Category">
 
             <AutoCompleteTextView
-                android:id="@+id/category_selector"
+                android:id="@+id/autoCompleteCategory"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="none" />

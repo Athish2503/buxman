@@ -4,6 +4,8 @@ import { Bell, Layout, ArrowRight, CheckCircle2, ShieldCheck, Wallet } from 'luc
 import { Button } from '@/components/ui/button';
 import { permissions } from '@/lib/permissions';
 import { haptics } from '@/lib/haptics';
+import { App } from '@capacitor/app';
+import { toast } from 'sonner';
 
 export function FinancialPermissionGuidance({ onComplete }: { onComplete: () => void }) {
   const [status, setStatus] = useState({ notifications: false, overlay: false });
@@ -24,19 +26,35 @@ export function FinancialPermissionGuidance({ onComplete }: { onComplete: () => 
 
   useEffect(() => {
     check();
-    // Re-check when app regains focus
-    window.addEventListener('focus', check);
-    return () => window.removeEventListener('focus', check);
+    
+    // Re-check when app resumes
+    const listener = App.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) {
+        check();
+      }
+    });
+
+    return () => {
+      listener.then(l => l.remove());
+    };
   }, []);
 
   const handleRequestNotifications = async () => {
-    haptics.medium();
-    await permissions.requestNotificationListener();
+    try {
+      haptics.medium();
+      await permissions.requestNotificationListener();
+    } catch (e) {
+      toast.error('Native Error', { description: (e as any).message });
+    }
   };
 
   const handleRequestOverlay = async () => {
-    haptics.medium();
-    await permissions.requestOverlayPermission();
+    try {
+      haptics.medium();
+      await permissions.requestOverlayPermission();
+    } catch (e) {
+      toast.error('Native Error', { description: (e as any).message });
+    }
   };
 
   if (loading) return null;
@@ -121,7 +139,7 @@ export function FinancialPermissionGuidance({ onComplete }: { onComplete: () => 
           </div>
 
           {/* Action */}
-          <div className="pt-4">
+          <div className="pt-4 space-y-4">
             {status.notifications && status.overlay ? (
               <Button
                 onClick={onComplete}
@@ -131,9 +149,17 @@ export function FinancialPermissionGuidance({ onComplete }: { onComplete: () => 
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             ) : (
-              <p className="text-[10px] text-muted-foreground animate-pulse">
-                Waiting for permissions...
-              </p>
+              <div className="space-y-4">
+                <p className="text-[10px] text-muted-foreground animate-pulse">
+                  Waiting for permissions...
+                </p>
+                <button 
+                  onClick={onComplete}
+                  className="text-[10px] text-muted-foreground/50 hover:text-primary underline transition-colors"
+                >
+                  Skip for now (Advanced)
+                </button>
+              </div>
             )}
           </div>
         </motion.div>

@@ -170,19 +170,28 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, open: externalOpen
       <div className="space-y-5">
         {/* Vehicle Selection */}
         <div>
-          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3 block">Select Vehicle</Label>
-          <div className="grid grid-cols-2 gap-2">
+          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3 block ml-1">Select Vehicle</Label>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar -mx-1 px-1">
             {vehicles.map(v => (
               <button
                 key={v.id}
-                onClick={() => setActiveVehId(v.id)}
+                onClick={() => { setActiveVehId(v.id); haptics.selection(); }}
                 className={cn(
-                  "p-3 rounded-xl border flex flex-col items-center gap-2 transition-all",
-                  activeVehId === v.id ? 'border-primary bg-primary/10 shadow-sm' : 'border-border/40 bg-muted/10 opacity-60'
+                  "relative flex flex-col items-center gap-2 px-6 py-3 rounded-2xl border transition-all duration-300 min-w-[100px]",
+                  activeVehId === v.id ? 'border-primary/30 text-primary' : 'border-border/40 bg-muted/10 text-muted-foreground opacity-60'
                 )}
               >
-                {v.icon === 'car' ? <Car className={cn("h-5 w-5", activeVehId === v.id ? 'text-primary' : 'text-muted-foreground')} /> : <Bike className={cn("h-5 w-5", activeVehId === v.id ? 'text-primary' : 'text-muted-foreground')} />}
-                <span className="text-xs font-bold">{v.name}</span>
+                {activeVehId === v.id && (
+                  <motion.div
+                    layoutId="active-veh-form-tab"
+                    className="absolute inset-0 bg-primary/10 rounded-2xl z-0"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+                <div className="relative z-10 flex flex-col items-center gap-2">
+                  {v.icon === 'car' ? <Car className="h-5 w-5" /> : <Bike className="h-5 w-5" />}
+                  <span className="text-[11px] font-bold truncate max-w-[80px]">{v.name}</span>
+                </div>
               </button>
             ))}
           </div>

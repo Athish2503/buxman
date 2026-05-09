@@ -15,6 +15,9 @@ export interface Expense {
   receiptImage?: string;
   tags?: string[];
   projectCode?: string;
+  paidBy?: string; // Contact ID, or undefined/null for current user
+  split?: import('./split').ExpenseSplit;
+  tripId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -48,6 +51,8 @@ export interface AppSettings {
   };
   currency: string;
   theme: 'dark' | 'light' | 'system';
+  accentColor?: string;
+  glassIntensity?: number;
   budgets: BudgetGoal[];
   biometricLock?: boolean;
 }

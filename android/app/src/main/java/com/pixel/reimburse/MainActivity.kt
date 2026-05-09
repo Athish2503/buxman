@@ -23,6 +23,7 @@ class MainActivity : BridgeActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        registerPlugin(FinancialNotificationPlugin::class.java)
 
         // Improved WebChromeClient for handling permissions specifically
         bridge.webView.webChromeClient = object : WebChromeClient() {
@@ -75,7 +76,7 @@ class MainActivity : BridgeActivity() {
     inner class NativeBridge {
         @JavascriptInterface
         fun openNotificationSettings() {
-            val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
+            val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
             startActivity(intent)
         }
 

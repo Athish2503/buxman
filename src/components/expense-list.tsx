@@ -5,7 +5,7 @@ import {
   Receipt, ChevronDown, CheckSquare, Square, X,
   SlidersHorizontal, FileText, FileSpreadsheet, Briefcase,
   MoreVertical, ArrowUpDown, Tag, Share2, ZoomIn, RefreshCw,
-  Camera, Calendar
+  Camera, Calendar, Users
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -27,6 +27,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Expense, ExpenseStatus, ExpenseSummary } from '@/types/expense';
 import { getCategoryConfig } from '@/lib/categories';
 import { categoryService } from '@/lib/category-service';
+import { contactService } from '@/lib/contact-service';
 import { generateExpensesPDF } from '@/lib/pdf-generator';
 import { exportCSV } from '@/lib/csv-exporter';
 import { settingsService } from '@/lib/settings';
@@ -127,6 +128,8 @@ export function ExpenseList({
     const exp = expenses.find(e => e.id === id);
     if (exp) onUpdateExpense({ ...exp, status });
   };
+
+  const contacts = contactService.getContacts();
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -487,6 +490,47 @@ export function ExpenseList({
                   </div>
                 </div>
 
+                {/* Split Details Section */}
+                {(selectedExpense.split || selectedExpense.paidBy) && (
+                  <div className="bg-white/5 p-4 rounded-3xl border border-white/10 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                        <Users className="h-3.5 w-3.5" /> Split Billing
+                      </p>
+                      {selectedExpense.paidBy && (
+                        <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest bg-primary/10 border-primary/20 text-primary">
+                          Paid by {selectedExpense.paidBy === 'user' ? 'You' : contacts.find(c => c.id === selectedExpense.paidBy)?.name || 'Unknown'}
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    {selectedExpense.split && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-widest text-muted-foreground/40 px-1">
+                          <span>Participant</span>
+                          <span>Share</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {selectedExpense.split.members.map(member => {
+                            const isUser = member.contactId === 'user';
+                            const contact = isUser ? { name: 'You (Owner)' } : contacts.find(c => c.id === member.contactId);
+                            return (
+                              <div key={member.contactId} className="flex items-center justify-between bg-white/5 p-2.5 rounded-xl border border-white/5">
+                                <span className="text-[11px] font-bold">{contact?.name || 'Unknown'}</span>
+                                <span className="text-xs font-mono font-black">₹{member.amount.toFixed(2)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="pt-2 flex items-center justify-between px-1">
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase">Split Type</span>
+                          <span className="text-[10px] font-black uppercase text-primary tracking-widest">{selectedExpense.split.splitType}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {selectedExpense.description && (
                   <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
                     <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40 mb-1 flex items-center gap-1.5">
@@ -544,7 +588,7 @@ export function ExpenseList({
 
       <ImageViewer src={viewingReceipt || ''} isOpen={!!viewingReceipt} onClose={() => setViewingReceipt(null)} title="Receipt" />
       <Dialog open={!!editingExpense} onOpenChange={open => !open && setEditingExpense(null)}>
-        <DialogContent className="glass max-w-xl max-h-[92vh] overflow-y-auto">
+        <DialogContent className="glass w-[95vw] sm:max-w-xl max-h-[92vh] overflow-y-auto overflow-x-hidden p-0 sm:p-6 rounded-[2.5rem] sm:rounded-3xl border-white/10 shadow-2xl">
           <DialogHeader className="sr-only">
             <DialogTitle>Edit Expense</DialogTitle>
           </DialogHeader>

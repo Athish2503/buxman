@@ -18,6 +18,10 @@ class OverlayService : Service() {
 
     companion object {
         var categories: List<String> = listOf("Meals", "Travel", "Shopping", "Health", "Other")
+        
+        fun updateCategories(list: List<String>) {
+            categories = list
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

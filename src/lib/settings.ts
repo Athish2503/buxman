@@ -17,6 +17,8 @@ const defaultSettings: AppSettings = {
   },
   currency: 'INR',
   theme: 'dark',
+  accentColor: '#3b82f6',
+  glassIntensity: 0.6,
   budgets: [],
 };
 
@@ -52,6 +54,7 @@ export const settingsService = {
 
   save(settings: AppSettings): void {
     storageEngine.set(SETTINGS_KEY, JSON.stringify(settings));
+    window.dispatchEvent(new CustomEvent('settings-updated'));
   },
 
   updateBudget(budget: BudgetGoal): void {

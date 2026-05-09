@@ -70,10 +70,11 @@ class FinancialNotificationPlugin : Plugin() {
 
     override fun load() {
         instance = this
+        Log.d("FinancialNotification", "Plugin loaded and instance set")
     }
 
     @PluginMethod
-    fun checkPermissions(call: PluginCall) {
+    override fun checkPermissions(call: PluginCall) {
         val result = JSObject().apply {
             put("notifications", isNotificationServiceEnabled())
             put("overlay", Settings.canDrawOverlays(context))
@@ -114,7 +115,7 @@ class FinancialNotificationPlugin : Plugin() {
 
     @PluginMethod
     fun openNotificationSettings(call: PluginCall) {
-        val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
+        val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
         call.resolve()
@@ -123,7 +124,7 @@ class FinancialNotificationPlugin : Plugin() {
     @PluginMethod
     fun openOverlaySettings(call: PluginCall) {
         val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-            android.net.Uri.parse("package:${context.packageName}"))
+            Uri.parse("package:${context.packageName}"))
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
         call.resolve()

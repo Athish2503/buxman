@@ -14,6 +14,7 @@ import { SplashScreen } from "./components/splash-screen";
 import { useTransactionListener } from "./hooks/useTransactionListener";
 import { FinancialPermissionGuidance } from "./components/financial-permission-guidance";
 import { permissions } from "./lib/permissions";
+import { ThemeEngine } from "./components/ThemeEngine";
 
 const queryClient = new QueryClient();
 
@@ -66,6 +67,7 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <ThemeEngine />
         <Toaster />
         <Sonner
           position="top-center"

@@ -165,134 +165,108 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
         exit={{ opacity: 0, x: -20 }}
         className="space-y-6"
       >
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-3">
-            <button onClick={() => { setMode('dashboard'); haptics.selection(); }} className="h-10 w-10 rounded-2xl bg-card border border-white/10 flex items-center justify-center shadow-lg active:scale-90 transition-all">
-              <ArrowRight className="h-5 w-5 rotate-180" />
-            </button>
-            <div>
-              <h2 className="font-black text-xl tracking-tight">Garage</h2>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{vehicles.length} Vehicles</p>
-            </div>
+        <div className="flex items-center gap-4 mb-6 px-1">
+          <button 
+            onClick={() => { setMode('dashboard'); haptics.selection(); }} 
+            className="h-10 w-10 rounded-full bg-muted/30 hover:bg-muted/50 flex items-center justify-center transition-all active:scale-90"
+          >
+            <ArrowRight className="h-5 w-5 rotate-180" />
+          </button>
+          <div>
+            <h2 className="text-xl font-bold tracking-tight">Garage</h2>
+            <p className="text-xs text-muted-foreground">{vehicles.length} Vehicles in your fleet</p>
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {vehicles.map((v, idx) => {
             const vLogs = logs.filter(l => l.vehicleId === v.id);
             const economies = vLogs.filter(l => l.economy).map(l => l.economy!);
             const avgEco = economies.length > 0 ? economies.reduce((s, e) => s + e, 0) / economies.length : 0;
             const latestLog = vLogs.sort((a,b) => b.odometer - a.odometer)[0];
             
-            // Service check
-            const needsService = v.serviceInterval && latestLog && latestLog.odometer % v.serviceInterval < 500;
+            const needsService = v.serviceInterval && latestLog && (latestLog.odometer % v.serviceInterval) > (v.serviceInterval - 500);
             const insuranceSoon = v.insuranceExpiry && new Date(v.insuranceExpiry).getTime() - new Date().getTime() < 30 * 24 * 60 * 60 * 1000;
 
             return (
-              <div key={v.id} className="flex flex-col p-6 rounded-[2.5rem] border border-white/5 bg-card/40 glass gap-6 relative overflow-hidden group shadow-xl">
-                {/* Visual accents */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none group-hover:bg-primary/10 transition-colors" />
-                
-                {needsService && (
-                  <div className="absolute top-4 right-4 h-10 w-10 bg-warning/20 backdrop-blur-md text-warning flex items-center justify-center rounded-2xl border border-warning/30 shadow-lg z-10 animate-pulse">
-                    <Wrench className="h-5 w-5" />
-                  </div>
-                )}
-                
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-5">
-                    <div className="h-16 w-16 rounded-[1.5rem] bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary shadow-xl border border-primary/20 group-hover:scale-105 transition-transform">
-                      {v.icon === 'car' ? <Car className="h-8 w-8" /> : <Bike className="h-8 w-8" />}
+              <div key={v.id} className="relative flex flex-col p-5 rounded-[2rem] border border-border/40 bg-card/40 glass group overflow-hidden shadow-xl hover:border-primary/30 transition-all duration-300">
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex items-center gap-4">
+                    <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-lg border border-primary/20 group-hover:scale-105 transition-transform">
+                      {v.icon === 'car' ? <Car className="h-7 w-7" /> : <Bike className="h-7 w-7" />}
                     </div>
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-black text-xl tracking-tight leading-none">{v.name}</h3>
-                        {v.fuelType && <Badge variant="secondary" className="h-5 px-1.5 text-[8px] bg-primary/10 text-primary border-primary/10 font-black uppercase tracking-widest">{v.fuelType}</Badge>}
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <h3 className="font-bold text-base tracking-tight">{v.name}</h3>
+                        {v.fuelType && <Badge variant="secondary" className="h-4.5 px-1.5 text-[8px] bg-primary/10 text-primary border-primary/10 font-bold uppercase tracking-widest">{v.fuelType}</Badge>}
                       </div>
-                      <p className="text-xs font-mono font-black text-muted-foreground/40 tracking-[0.2em]">{v.licensePlate || 'NO PLATE'}</p>
+                      <p className="text-[10px] font-mono font-bold text-muted-foreground tracking-widest">{v.licensePlate || 'NO PLATE'}</p>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-1.5 translate-x-2 -translate-y-1">
-                    <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity mr-2 scale-90">
-                      <button onClick={() => handleMoveVehicle(v.id, 'up')} disabled={idx === 0} className="h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-primary disabled:opacity-20 transition-colors"><ChevronUp className="h-5 w-5" /></button>
-                      <button onClick={() => handleMoveVehicle(v.id, 'down')} disabled={idx === vehicles.length - 1} className="h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-primary disabled:opacity-20 transition-colors"><ChevronDown className="h-5 w-5" /></button>
-                    </div>
-                    <button onClick={() => handleEditVehicle(v)} className="h-11 w-11 bg-white/5 border border-white/5 text-muted-foreground flex items-center justify-center hover:bg-white/10 hover:text-primary rounded-2xl transition-all active:scale-90">
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2">
+                    <button onClick={() => handleEditVehicle(v)} className="h-9 w-9 bg-muted/50 hover:bg-primary/20 hover:text-primary rounded-xl flex items-center justify-center transition-all active:scale-90">
                       <Pencil className="h-4 w-4" />
                     </button>
-                    <button onClick={() => handleDeleteVehicle(v.id)} className="h-11 w-11 bg-destructive/5 border border-destructive/10 text-destructive/40 flex items-center justify-center hover:bg-destructive/10 hover:text-destructive rounded-2xl transition-all active:scale-90">
+                    <button onClick={() => handleDeleteVehicle(v.id)} className="h-9 w-9 bg-destructive/10 text-destructive/60 hover:text-destructive hover:bg-destructive/20 rounded-xl flex items-center justify-center transition-all active:scale-90">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 rounded-[1.5rem] bg-white/5 border border-white/5 shadow-inner">
-                    <p className="text-[9px] text-muted-foreground uppercase font-black tracking-[0.2em] mb-2 opacity-50 flex items-center gap-1.5">
-                      <TrendingUp className="h-3 w-3" /> Efficiency
-                    </p>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="p-3.5 rounded-2xl bg-white/5 border border-white/5">
+                    <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest mb-1 opacity-60">Avg. Economy</p>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-xl font-black text-primary tracking-tighter">{avgEco.toFixed(1)}</span>
-                      <span className="text-[10px] font-black opacity-30 uppercase">km/l</span>
+                      <span className="text-lg font-black text-primary">{avgEco.toFixed(1)}</span>
+                      <span className="text-[9px] font-bold opacity-40 uppercase">km/l</span>
                     </div>
                   </div>
-                  
-                  <div className="p-4 rounded-[1.5rem] bg-white/5 border border-white/5 shadow-inner">
-                    <p className="text-[9px] text-muted-foreground uppercase font-black tracking-[0.2em] mb-2 opacity-50 flex items-center gap-1.5">
-                      <ShieldAlert className="h-3 w-3" /> Insurance
+                  <div className="p-3.5 rounded-2xl bg-white/5 border border-white/5">
+                    <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest mb-1 opacity-60">Insurance</p>
+                    <p className={cn("text-xs font-bold truncate", insuranceSoon ? "text-destructive" : "text-foreground/80")}>
+                      {v.insuranceExpiry ? format(new Date(v.insuranceExpiry), 'dd MMM yy') : 'N/A'}
                     </p>
-                    <div className="flex items-center gap-2">
-                      <span className={cn("text-xs font-black tracking-tight", insuranceSoon ? "text-destructive" : "text-foreground/80")}>
-                        {v.insuranceExpiry ? format(new Date(v.insuranceExpiry), 'dd MMM yyyy') : 'N/A'}
-                      </span>
-                      {insuranceSoon && <div className="h-1.5 w-1.5 rounded-full bg-destructive animate-pulse" />}
-                    </div>
                   </div>
                 </div>
 
-                {/* Progress Indicators */}
-                <div className="space-y-3 pt-2">
-                  {v.serviceInterval && latestLog && (
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 px-1">
-                        <span>Service Health</span>
-                        <span>{Math.round(((latestLog.odometer % v.serviceInterval) / v.serviceInterval) * 100)}%</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-black/20 rounded-full overflow-hidden p-0.5 border border-white/5">
-                        <div 
-                          className={cn(
-                            "h-full rounded-full transition-all duration-1000",
-                            needsService ? "bg-warning shadow-glow shadow-warning/20" : "bg-primary"
-                          )} 
-                          style={{ width: `${Math.min(((latestLog.odometer % v.serviceInterval) / v.serviceInterval) * 100, 100)}%` }} 
-                        />
-                      </div>
+                {v.serviceInterval && latestLog && (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-muted-foreground/60 px-1">
+                      <span className="flex items-center gap-1">{needsService ? <Wrench className="h-2.5 w-2.5 text-warning" /> : null} Service Health</span>
+                      <span>{Math.round(((latestLog.odometer % v.serviceInterval) / v.serviceInterval) * 100)}%</span>
                     </div>
-                  )}
-                </div>
+                    <div className="h-1.5 w-full bg-black/20 rounded-full overflow-hidden border border-white/5">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(((latestLog.odometer % v.serviceInterval) / v.serviceInterval) * 100, 100)}%` }}
+                        className={cn("h-full rounded-full transition-all duration-1000", needsService ? "bg-warning" : "bg-primary")} 
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
-        </div>
 
-        <VehicleForm
-          open={showVehicleForm}
-          onOpenChange={(open) => {
-            setShowVehicleForm(open);
-            if (!open) setEditingVehId(null);
-          }}
-          editVehicle={activeEditingVeh}
-          onSuccess={reload}
-          trigger={
-            <button className="w-full h-20 rounded-[2.5rem] border-2 border-dashed border-white/10 bg-card/20 flex items-center justify-center gap-4 group hover:border-primary/40 hover:bg-primary/5 transition-all">
-              <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform shadow-glow shadow-primary/10">
-                <Plus className="h-6 w-6" strokeWidth={3} />
-              </div>
-              <span className="text-base font-black text-muted-foreground group-hover:text-primary transition-colors tracking-tight">Add to Garage</span>
-            </button>
-          }
-        />
+          <VehicleForm
+            open={showVehicleForm}
+            onOpenChange={(open) => {
+              setShowVehicleForm(open);
+              if (!open) setEditingVehId(null);
+            }}
+            editVehicle={activeEditingVeh}
+            onSuccess={reload}
+            trigger={
+              <button className="w-full h-full min-h-[140px] rounded-[2rem] border-2 border-dashed border-border/40 bg-card/20 flex flex-col items-center justify-center gap-3 group hover:border-primary/40 hover:bg-primary/5 transition-all">
+                <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform shadow-glow shadow-primary/10">
+                  <Plus className="h-6 w-6" strokeWidth={3} />
+                </div>
+                <span className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors tracking-tight">Add New Vehicle</span>
+              </button>
+            }
+          />
+        </div>
       </motion.div>
     );
   }
@@ -304,20 +278,23 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
       className="space-y-8 pb-24"
     >
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between px-1">
         <div>
-          <h2 className="font-black text-3xl tracking-tight"> Garage</h2>
-          <p className="text-xs font-bold text-muted-foreground/60 uppercase tracking-widest mt-1">Maintenance & Efficiency</p>
+          <h2 className="font-bold text-2xl tracking-tight">Garage</h2>
+          <p className="text-xs text-muted-foreground mt-1">Maintenance & Efficiency</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => { setMode('vehicles'); haptics.selection(); }} className="h-12 w-12 rounded-2xl bg-card border border-white/5 flex items-center justify-center text-muted-foreground hover:text-foreground hover:shadow-xl transition-all active:scale-90 shadow-lg">
-            <Settings className="h-5.5 w-5.5" />
+          <button 
+            onClick={() => { setMode('vehicles'); haptics.selection(); }} 
+            className="h-10 w-10 rounded-full bg-muted/30 hover:bg-muted/50 flex items-center justify-center transition-all active:scale-90"
+          >
+            <Settings className="h-5 w-5 text-muted-foreground" />
           </button>
           <VehicleLogForm
             onSuccess={reload}
             trigger={
-              <button className="h-12 px-5 rounded-2xl bg-gradient-primary text-white text-sm font-black flex items-center gap-2 shadow-glow active:scale-95 transition-all tracking-tight">
-                <Fuel className="h-4.5 w-4.5" /> Log Fuel
+              <button className="h-10 px-4 rounded-full bg-gradient-primary text-white text-xs font-bold flex items-center gap-2 shadow-glow active:scale-95 transition-all tracking-tight">
+                <Fuel className="h-4 w-4" /> Log Fuel
               </button>
             }
           />
@@ -344,23 +321,32 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
 
       {/* Vehicle Selector Tabs */}
       {vehicles.length > 0 && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 shrink-0 mr-1">Vehicles</p>
-          {vehicles.map(v => (
-            <button
-              key={v.id}
-              onClick={() => { setActiveVehId(v.id); haptics.selection(); }}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-xl border whitespace-nowrap transition-all",
-                activeVehId === v.id 
-                  ? 'bg-primary/10 border-primary/30 text-primary shadow-sm scale-105 z-10' 
-                  : 'bg-card/50 border-border/40 text-muted-foreground'
-              )}
-            >
-              {v.icon === 'car' ? <Car className="h-4 w-4" /> : <Bike className="h-4 w-4" />}
-              <span className="text-sm font-bold">{v.name}</span>
-            </button>
-          ))}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar px-1">
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 shrink-0 mr-2">Your Fleet</p>
+          <div className="flex items-center gap-1.5 p-1 bg-muted/30 rounded-2xl border border-border/40">
+            {vehicles.map(v => (
+              <button
+                key={v.id}
+                onClick={() => { setActiveVehId(v.id); haptics.selection(); }}
+                className={cn(
+                  "relative flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300",
+                  activeVehId === v.id ? 'text-primary' : 'text-muted-foreground/60 hover:text-muted-foreground'
+                )}
+              >
+                {activeVehId === v.id && (
+                  <motion.div
+                    layoutId="active-vehicle-tab"
+                    className="absolute inset-0 bg-primary/15 border border-primary/20 rounded-xl z-0"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+                <div className="relative z-10 flex items-center gap-2">
+                  {v.icon === 'car' ? <Car className="h-4 w-4" /> : <Bike className="h-4 w-4" />}
+                  <span className="text-sm font-bold">{v.name}</span>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

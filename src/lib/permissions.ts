@@ -36,7 +36,13 @@ export const permissions = {
       try {
         financialStatus = await FinancialNotification.checkPermissions();
       } catch (e) {
-        console.error('Failed to check financial permissions', e);
+        console.warn('Plugin check failed, trying NativeBridge...', e);
+        if ((window as any).NativeBridge) {
+          financialStatus = {
+            notifications: (window as any).NativeBridge.checkNotificationPermission(),
+            overlay: (window as any).NativeBridge.checkOverlayPermission()
+          };
+        }
       }
       
       const hasMic = await this.checkMicrophonePermission();
@@ -94,8 +100,17 @@ export const permissions = {
    * Opens Android settings for Notification Listener access
    */
   async requestNotificationListener(): Promise<void> {
+    console.log('Requesting notification listener...');
     if (Capacitor.isNativePlatform()) {
-      await FinancialNotification.openNotificationSettings();
+      if ((window as any).NativeBridge?.openNotificationSettings) {
+        (window as any).NativeBridge.openNotificationSettings();
+      } else {
+        try {
+          await FinancialNotification.openNotificationSettings();
+        } catch (e) {
+          console.error('Failed to open notification settings', e);
+        }
+      }
     }
   },
 
@@ -103,8 +118,17 @@ export const permissions = {
    * Opens Android settings for "Display over other apps" permission
    */
   async requestOverlayPermission(): Promise<void> {
+    console.log('Requesting overlay permission...');
     if (Capacitor.isNativePlatform()) {
-      await FinancialNotification.openOverlaySettings();
+      if ((window as any).NativeBridge?.openOverlaySettings) {
+        (window as any).NativeBridge.openOverlaySettings();
+      } else {
+        try {
+          await FinancialNotification.openOverlaySettings();
+        } catch (e) {
+          console.error('Failed to open overlay settings', e);
+        }
+      }
     }
   },
 

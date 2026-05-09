@@ -29,7 +29,11 @@ import { storageService } from '@/lib/storage';
 import { vendorService } from '@/lib/recurring';
 import { haptics } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import { VoiceInput } from './voice-input';
+import { localIntelligence } from '@/lib/intelligence';
+import { ExpenseSplit } from '@/types/split';
+import { SplitBillSection } from './split/SplitBillSection';
 
 /* ─── schema ─────────────────────────────────────────────────────── */
 const expenseSchema = z.object({
@@ -90,6 +94,8 @@ function FormBody({
   const [showVendors, setShowVendors] = useState(false);
 
   const [isProcessing, setIsProcessing] = useState(false);
+  const [split, setSplit] = useState<ExpenseSplit | undefined>(initialData?.split);
+  const [paidBy, setPaidBy] = useState<string | undefined>(initialData?.paidBy);
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting }, reset } =
     useForm<FormData>({
       resolver: zodResolver(expenseSchema),
@@ -154,6 +160,27 @@ function FormBody({
     return vendors.filter(v => v.toLowerCase().includes(q)).slice(0, 5);
   }, [vendors, watch('vendor')]);
 
+  // Auto-categorization
+  const vendor = watch('vendor');
+  const [manualCategorySet, setManualCategorySet] = useState(false);
+
+  useEffect(() => {
+    if (!vendor || manualCategorySet || isEdit) return;
+    
+    const timeoutId = setTimeout(() => {
+      const predicted = localIntelligence.predictCategory(vendor, amount || 0);
+      if (predicted && predicted !== 'others') {
+        setValue('category', predicted, { shouldValidate: true });
+        toast.info(`Suggested category: ${predicted}`, {
+          description: `Auto-selected based on "${vendor}"`,
+          duration: 2000,
+        });
+      }
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [vendor, manualCategorySet, isEdit, setValue, amount]);
+
   const processFile = (file: File) => {
     if (!file.type.startsWith('image/')) return;
     const r = new FileReader();
@@ -189,6 +216,9 @@ function FormBody({
         isReimbursement: data.isReimbursement,
         tags,
         projectCode:  data.projectCode || undefined,
+        paidBy:       paidBy,
+        split:        split,
+        tripId:       initialData?.tripId,
         createdAt:    initialData?.createdAt || new Date().toISOString(),
         updatedAt:    new Date().toISOString(),
       };
@@ -317,6 +347,7 @@ function FormBody({
                 onClick={() => {
                   haptics.light();
                   setValue('category', key, { shouldValidate: true });
+                  setManualCategorySet(true);
                 }}
                 className={cn(
                   'flex flex-col items-center gap-1 p-2 rounded-xl border transition-all duration-200 active:scale-95 overflow-hidden',
@@ -376,6 +407,17 @@ function FormBody({
           {...register('description')}
           placeholder="Add context or purpose..."
           className="bg-muted/30 border-border/40 focus:border-primary/40 min-h-[60px] resize-none text-sm placeholder:text-muted-foreground/40"
+        />
+      </div>
+
+      {/* ── Split Bill ── */}
+      <div className="mb-5">
+        <SplitBillSection 
+          amount={amount || 0} 
+          onSplitChange={setSplit} 
+          onPaidByChange={setPaidBy}
+          initialSplit={initialData?.split}
+          initialPaidBy={initialData?.paidBy}
         />
       </div>
 
@@ -532,17 +574,22 @@ export function ExpenseForm({
 
   // Lock body scroll while open
   useEffect(() => {
-    if (open) {
+    if (open && !isEdit) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
     }
     return () => { document.body.style.overflow = ''; };
-  }, [open]);
+  }, [open, isEdit]);
 
-  // For inline edit mode (no dialog needed)
+  const formContent = <FormBody onSubmit={onSubmit} initialData={initialData} isEdit={isEdit} onClose={onClose} />;
+
   if (isEdit) {
-    return <FormBody onSubmit={onSubmit} initialData={initialData} isEdit onClose={onClose} />;
+    return (
+      <div className="w-full max-w-full overflow-x-hidden px-1">
+        {formContent}
+      </div>
+    );
   }
 
   const overlay = (

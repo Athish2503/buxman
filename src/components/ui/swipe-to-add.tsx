@@ -75,9 +75,10 @@ export function SwipeToAdd({
     if (!success && !isSubmitting && done) {
       const timer = setTimeout(() => {
         setDone(false);
+        isTriggered.current = false;
         x.set(0);
         lastTick.current = 0;
-      }, 1200);
+      }, 800);
       return () => clearTimeout(timer);
     }
   }, [success, isSubmitting, done, x]);

@@ -11,6 +11,7 @@ export interface FinancialNotificationPlugin {
 }
 
 const FinancialNotification = registerPlugin<FinancialNotificationPlugin>('FinancialNotification');
+console.log('FinancialNotification plugin registered:', FinancialNotification);
 
 export default FinancialNotification;
 

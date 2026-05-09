@@ -11,6 +11,9 @@ export const useTransactionListener = () => {
   useEffect(() => {
     // 1. Sync categories on mount
     const syncCats = async () => {
+      const { Capacitor } = await import('@capacitor/core');
+      if (!Capacitor.isNativePlatform()) return;
+
       const cats = categoryService.getVisible().map(c => c.label);
       await FinancialNotification.updateCategories({ categories: cats });
       // Flush any transactions detected while the app was closed
@@ -25,49 +28,57 @@ export const useTransactionListener = () => {
     syncCats();
 
     // 2. Listen for real-time transactions
-    const transactionSub = FinancialNotification.addListener('transactionDetected', (data) => {
-      console.log('Transaction detected via plugin:', data);
-      addTransaction({
-        amount: data.amount,
-        merchant: data.merchant,
-        type: data.type,
-        appName: data.appName,
-        timestamp: data.timestamp,
-        rawText: data.rawText,
-        reference: data.reference,
+    let transactionSub: any;
+    let overlaySub: any;
+
+    const setupListeners = async () => {
+      const { Capacitor } = await import('@capacitor/core');
+      if (!Capacitor.isNativePlatform()) return;
+
+      transactionSub = FinancialNotification.addListener('transactionDetected', (data) => {
+        console.log('Transaction detected via plugin:', data);
+        addTransaction({
+          amount: data.amount,
+          merchant: data.merchant,
+          type: data.type,
+          appName: data.appName,
+          timestamp: data.timestamp,
+          rawText: data.rawText,
+          reference: data.reference,
+        });
       });
-    });
 
-    // 3. Listen for overlay actions
-    const overlaySub = FinancialNotification.addListener('overlayAction', (data) => {
-      console.log('Overlay action received:', data);
-      
-      // Find the transaction in our store that matches this data
-      // (Overlay actions happen shortly after detection)
-      const pendingTx = transactions.find(t => 
-        t.status === 'pending' && 
-        t.amount === data.amount && 
-        t.merchant === data.merchant
-      );
+      // 3. Listen for overlay actions
+      overlaySub = FinancialNotification.addListener('overlayAction', (data) => {
+        console.log('Overlay action received:', data);
+        
+        const pendingTx = transactions.find(t => 
+          t.status === 'pending' && 
+          t.amount === data.amount && 
+          t.merchant === data.merchant
+        );
 
-      if (pendingTx) {
-        if (data.action === 'save') {
-          updateTransaction(pendingTx.id, {
-            status: 'completed',
-            category: data.category,
-            notes: data.notes
-          });
-        } else if (data.action === 'dismiss') {
-          updateTransaction(pendingTx.id, {
-            status: 'ignored'
-          });
+        if (pendingTx) {
+          if (data.action === 'save') {
+            updateTransaction(pendingTx.id, {
+              status: 'completed',
+              category: data.category,
+              notes: data.notes
+            });
+          } else if (data.action === 'dismiss') {
+            updateTransaction(pendingTx.id, {
+              status: 'ignored'
+            });
+          }
         }
-      }
-    });
+      });
+    };
+
+    setupListeners();
 
     return () => {
-      transactionSub.then(h => h.remove());
-      overlaySub.then(h => h.remove());
+      if (transactionSub) transactionSub.then((h: any) => h.remove());
+      if (overlaySub) overlaySub.then((h: any) => h.remove());
     };
   }, [addTransaction, updateTransaction, transactions]);
 };
