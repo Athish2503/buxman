@@ -14,6 +14,8 @@ export interface FullExportData {
   fuel: any[];
   wallet: any[];
   dining: any[];
+  contacts: any[];
+  trips: any[];
 }
 
 export const dataMigrationService = {
@@ -32,6 +34,8 @@ export const dataMigrationService = {
       fuel: JSON.parse(localStorage.getItem('reimburse_fuel_v1') || '[]'),
       wallet: JSON.parse(localStorage.getItem('reimburse_wallet_v1') || '[]'),
       dining: JSON.parse(localStorage.getItem('reimburse_food_v1') || '[]'),
+      contacts: JSON.parse(localStorage.getItem('reimburse_contacts') || '[]'),
+      trips: JSON.parse(localStorage.getItem('reimburse_trips') || '[]'),
     };
     return data;
   },
@@ -74,6 +78,8 @@ export const dataMigrationService = {
     addEntities('FUEL', data.fuel);
     addEntities('WALLET', data.wallet);
     addEntities('DINING', data.dining);
+    addEntities('CONTACTS', data.contacts);
+    addEntities('TRIPS', data.trips);
 
     return lines.join('\n');
   },
@@ -93,7 +99,9 @@ export const dataMigrationService = {
       mileage: [],
       fuel: [],
       wallet: [],
-      dining: []
+      dining: [],
+      contacts: [],
+      trips: []
     };
 
     let currentHeaders: string[] = [];
@@ -173,6 +181,8 @@ export const dataMigrationService = {
         else if (currentType === 'FUEL') data.fuel.push(rowData);
         else if (currentType === 'WALLET') data.wallet.push(rowData);
         else if (currentType === 'DINING') data.dining.push(rowData);
+        else if (currentType === 'CONTACTS') data.contacts.push(rowData);
+        else if (currentType === 'TRIPS') data.trips.push(rowData);
       }
     });
 
@@ -214,6 +224,8 @@ export const dataMigrationService = {
       await syncKey('reimburse_fuel_v1', data.fuel);
       await syncKey('reimburse_wallet_v1', data.wallet);
       await syncKey('reimburse_food_v1', data.dining);
+      await syncKey('reimburse_contacts', data.contacts);
+      await syncKey('reimburse_trips', data.trips);
 
       console.log('[Data Migration] Import successful');
       return true;
