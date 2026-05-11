@@ -119,7 +119,7 @@ class OverlayService : Service() {
             b.chipGroupCategories.addView(chip)
         }
 
-        b.btn_close.setOnClickListener { dismissWithAnimation() }
+        b.btnClose.setOnClickListener { dismissWithAnimation() }
         b.btnDismiss.setOnClickListener { 
             FinancialNotificationPlugin.onOverlayAction("dismiss", amount, merchant)
             dismissWithAnimation() 
