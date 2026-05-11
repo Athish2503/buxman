@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   MapPin, Calendar, Star, ThumbsUp, ThumbsDown, 
-  Share2, Download, Trash2, Edit2, Utensils,
-  ChevronRight, ArrowLeft, Camera, Quote, Copy, Check
+  Share2, Download, Trash2, Edit, Utensils,
+  ChevronRight, ArrowLeft, Camera, Quote, Copy, Check, FileText
 } from 'lucide-react';
 import { DiningExperience, Dish } from '@/types/food';
 import { FormattedText } from './FormattedText';
@@ -52,7 +52,7 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
       return `${statusIcon} *${d.name}* ${ratingStars}\n${d.notes.replace(/[*#=]/g, '')}`;
     }).join('\n\n');
 
-    const text = `🍽️ *${restaurantName}*\n📅 ${format(new Date(visitDate), 'MMM d, yyyy')}\n📍 ${location?.address || 'N/A'}\n\n*The Experience:*\n${dishList}\n\n_Logged via Culinary Diary_`;
+    const text = `🍽️ *${restaurantName}*\n📅 ${format(new Date(visitDate), 'MMM d, yyyy')}\n📍 ${location?.address || 'N/A'}\n\n*Items:*\n${dishList}\n\n_Logged via Buxman_`;
 
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -113,8 +113,8 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
                   {dishes.length} Items
                 </div>
                 {likedDishes.length > 0 && (
-                  <div className="flex items-center gap-1 text-[10px] font-bold text-success uppercase tracking-widest">
-                    <Star className="h-3 w-3 fill-success" />
+                  <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
+                    <Star className="h-3 w-3 fill-emerald-400" />
                     {likedDishes.length} Must Try
                   </div>
                 )}
@@ -207,7 +207,7 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
         {dishes.length > 0 && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">The Culinary Journey</h3>
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Items Ordered</h3>
               <div className="h-px flex-1 bg-border/20 mx-4" />
               <div className="flex items-center gap-1.5 text-[10px] font-black text-primary uppercase tracking-widest">
                 <Utensils className="h-3 w-3" />
@@ -284,7 +284,7 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
                 onClick={(e) => { e.stopPropagation(); onEdit?.(); }}
                 className="flex-1 h-14 rounded-2xl bg-primary text-white hover:opacity-90 font-black uppercase tracking-widest text-[10px] shadow-glow gap-2 border-none"
               >
-                <Edit2 className="h-4 w-4" /> Edit Log
+                <Edit className="h-4.5 w-4.5" /> Edit Expense
               </Button>
               
               <Button 

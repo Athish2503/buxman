@@ -85,10 +85,10 @@ export function DiningDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div className="space-y-1">
           <h1 className="text-5xl font-black tracking-tighter flex items-center gap-3">
-            Culinary <span className="text-primary italic">Diary</span>
-            <Sparkles className="h-7 w-7 text-amber-400 animate-pulse" />
+            Food <span className="text-primary italic">& Dining</span>
+            <Utensils className="h-7 w-7 text-amber-400" />
           </h1>
-          <p className="text-muted-foreground/60 text-xs font-black uppercase tracking-[0.3em]">Capture your finest moments</p>
+          <p className="text-muted-foreground/60 text-xs font-black uppercase tracking-[0.3em]">Track your meals and visits</p>
         </div>
         
         <div className="flex items-center gap-4">
@@ -102,7 +102,7 @@ export function DiningDashboard() {
             </div>
             <div className="h-10 w-px bg-white/10" />
             <div className="text-center">
-              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary/60 mb-1">Dish Insights</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary/60 mb-1">Items Logged</p>
               <div className="flex items-center justify-center gap-1.5">
                 <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]" />
                 <p className="text-2xl font-black tabular-nums">{experiences.reduce((s, e) => s + e.dishes.length, 0)}</p>
@@ -176,15 +176,15 @@ export function DiningDashboard() {
             <ChefHat className="h-10 w-10 text-muted-foreground/30" />
           </div>
           <div>
-            <h3 className="text-xl font-bold">No logs found</h3>
-            <p className="text-muted-foreground text-sm">Start your food journey by adding your first experience.</p>
+            <h3 className="text-xl font-bold">No entries</h3>
+            <p className="text-muted-foreground text-sm">Add a dining entry to get started.</p>
           </div>
           <Button 
             variant="outline" 
             onClick={() => setIsEntryFormOpen(true)}
             className="rounded-xl border-primary/20 text-primary hover:bg-primary/5"
           >
-            Create First Log
+            Add First Entry
           </Button>
         </div>
       )}
@@ -230,7 +230,7 @@ export function DiningDashboard() {
               Delete "{experiences.find(e => e.id === idToDelete)?.restaurantName || 'Experience'}"?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground font-medium">
-              Are you sure you want to remove this culinary experience from your history? This action cannot be undone.
+              Are you sure you want to remove this entry? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-3">

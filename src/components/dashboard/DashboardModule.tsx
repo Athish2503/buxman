@@ -101,7 +101,7 @@ function BalanceHeroCard({ expenses, onNavigate }: { expenses: Expense[]; onNavi
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-[10px] text-white/50 font-semibold uppercase tracking-widest">{greeting}</p>
-            <p className="text-sm font-display font-bold text-white/90 mt-0.5">Your Expense Hub</p>
+            <p className="text-sm font-display font-bold text-white/90 mt-0.5">Summary</p>
           </div>
           <div className="h-9 w-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center">
             <Sparkles className="h-4.5 w-4.5 text-white/70" />
@@ -110,7 +110,7 @@ function BalanceHeroCard({ expenses, onNavigate }: { expenses: Expense[]; onNavi
 
         {/* Total Balance */}
         <div className="mb-5">
-          <p className="label-caps text-white/40 mb-1">Total Tracked</p>
+          <p className="label-caps text-white/40 mb-1">Total Expenses</p>
           <div className="text-4xl font-display font-black text-white tracking-tight">
             ₹<AnimatedNumber value={total} />
           </div>
@@ -121,7 +121,7 @@ function BalanceHeroCard({ expenses, onNavigate }: { expenses: Expense[]; onNavi
           {[
             { label: 'Personal', value: personal, icon: Wallet, color: 'text-violet-300', bg: 'bg-violet-500/15' },
             { label: 'Pending', value: pending, icon: Clock, color: 'text-amber-300', bg: 'bg-amber-500/15' },
-            { label: 'Recovered', value: recovered, icon: CheckCircle2, color: 'text-emerald-300', bg: 'bg-emerald-500/15' },
+            { label: 'Settled', value: recovered, icon: CheckCircle2, color: 'text-emerald-300', bg: 'bg-emerald-500/15' },
           ].map((stat, i) => (
             <motion.div
               key={stat.label}
@@ -154,7 +154,7 @@ function QuickActions({ onNavigate }: { onNavigate: (t: any) => void }) {
 
   return (
     <div className="mb-4">
-      <p className="label-caps text-muted-foreground mb-3 px-0.5">Quick Access</p>
+      <p className="label-caps text-muted-foreground mb-3 px-0.5">Navigation</p>
       <div className="grid grid-cols-4 gap-2.5">
         {actions.map((a, i) => (
           <motion.button
@@ -180,8 +180,8 @@ function QuickActions({ onNavigate }: { onNavigate: (t: any) => void }) {
 }
 
 /* ── KPI Widget ── */
-function KpiWidget({ label, value, icon: Icon, color, delay = 0, prefix = '₹', suffix = '' }: {
-  label: string; value: number; icon: any; color: string; delay?: number; prefix?: string; suffix?: string;
+function KpiWidget({ label, value, icon: Icon, color, delay = 0, prefix = '₹', suffix = '', decimals = 0 }: {
+  label: string; value: number; icon: any; color: string; delay?: number; prefix?: string; suffix?: string; decimals?: number;
 }) {
   return (
     <motion.div
@@ -197,7 +197,7 @@ function KpiWidget({ label, value, icon: Icon, color, delay = 0, prefix = '₹',
         </div>
       </div>
       <div className="text-xl font-display font-black tracking-tight">
-        {prefix}<AnimatedNumber value={value} />
+        {prefix}<AnimatedNumber value={value} decimals={decimals} />
         {suffix && <span className="text-xs font-medium text-muted-foreground ml-1">{suffix}</span>}
       </div>
     </motion.div>
@@ -308,14 +308,14 @@ export function DashboardModule({
                 <MonthlySummary expenses={expenses} onViewAll={() => onNavigate('expenses')} />
               </div>
               <div className="card-premium p-4">
-                <p className="label-caps text-muted-foreground mb-3">By Category</p>
+                <p className="label-caps text-muted-foreground mb-3">Spending by Category</p>
                 <CategoryRings expenses={expenses} />
               </div>
             </div>
 
             {/* Spending Trend */}
             <div className="card-premium p-4">
-              <SectionHeader title="Spending Trend" />
+              <SectionHeader title="Spending Chart" />
               <SpendingTrendChart expenses={expenses} />
             </div>
 
@@ -385,7 +385,7 @@ export function DashboardModule({
             {/* Fleet efficiency bars */}
             {vehicleSummaries.length > 0 && (
               <div className="card-premium p-4">
-                <SectionHeader title="Fleet Efficiency" action="Garage" onAction={() => onNavigate('vehicle')} />
+                <SectionHeader title="Vehicle Stats" action="Garage" onAction={() => onNavigate('vehicle')} />
                 <div className="space-y-4">
                   {vehicleSummaries.map(v => (
                     <div key={v.id} className="space-y-2">
@@ -430,7 +430,7 @@ export function DashboardModule({
               onClick={() => onNavigate('vehicle')}
               className="w-full py-4 rounded-2xl bg-surface-2 border border-border/40 hover:bg-surface-3 transition-all flex items-center justify-center gap-2 group"
             >
-              <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Open Full Garage</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Go to Garage</span>
               <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" />
             </motion.button>
           </motion.div>

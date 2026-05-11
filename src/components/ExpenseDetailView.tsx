@@ -191,7 +191,7 @@ export function ExpenseDetailView({ expense, onClose, onEdit, onDelete }: Expens
         {expense.description && (
           <div className="bg-card/40 backdrop-blur-xl p-5 rounded-[1.5rem] border border-white/5">
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 mb-3 flex items-center gap-2">
-              <FileText className="h-3.5 w-3.5" /> Context & Notes
+              <FileText className="h-3.5 w-3.5" /> Notes
             </p>
             <p className="text-sm font-medium leading-relaxed text-foreground/80">{expense.description}</p>
           </div>
@@ -235,7 +235,7 @@ export function ExpenseDetailView({ expense, onClose, onEdit, onDelete }: Expens
               onEdit(expense);
             }}
           >
-            <Edit className="h-4.5 w-4.5" /> Edit Record
+            <Edit className="h-4.5 w-4.5" /> Edit Expense
           </Button>
           <Button 
             variant="outline" 
