@@ -26,6 +26,17 @@ import { SMSExpenseNudge } from '@/components/sms-expense-nudge';
 import { PermissionGuard } from '@/components/permission-guard';
 import { FloatingAddMenu } from '@/components/floating-add-menu';
 import { DiningDashboard } from '@/components/food/DiningDashboard';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { formatCurrency } from '@/lib/utils';
 
 import { DashboardModule } from '@/components/dashboard/DashboardModule';
 import { ExpensesModule } from '@/components/dashboard/ExpensesModule';
@@ -51,11 +62,11 @@ const Index = () => {
   const [activeTab, setActiveTab]   = useState<Tab>('dashboard');
   const [onboarded, setOnboarded]   = useState(true);
   const { theme, toggle: toggleTheme } = useTheme();
-  
   const [navOrder, setNavOrder] = useState<Tab[]>(() => {
     const settings = settingsService.get();
     return (settings.navOrder as Tab[]) || (Object.keys(NAV_ITEMS_CONFIG) as Tab[]);
   });
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
 
   useEffect(() => {
     setOnboarded(metaService.get().onboardingDone);
@@ -88,8 +99,17 @@ const Index = () => {
     haptics.success();
   };
   const handleDeleteExpense = (id: string) => {
-    const updated = storageService.deleteExpense(id);
+    const exp = expenses.find(e => e.id === id);
+    if (exp) {
+      setExpenseToDelete(exp);
+    }
+  };
+
+  const confirmDeleteExpense = () => {
+    if (!expenseToDelete) return;
+    const updated = storageService.deleteExpense(expenseToDelete.id);
     setExpenses(updated);
+    setExpenseToDelete(null);
     toast.success('Deleted');
     haptics.medium();
   };
@@ -307,6 +327,29 @@ const Index = () => {
               />
             </div>
           </nav>
+
+          {/* Delete Confirmation Dialog */}
+          <AlertDialog open={!!expenseToDelete} onOpenChange={(open) => !open && setExpenseToDelete(null)}>
+            <AlertDialogContent className="rounded-3xl border-white/10 glass max-w-[90vw] sm:max-w-md">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-xl font-bold">
+                  Delete "{expenseToDelete?.vendor || 'Expense'}"?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-muted-foreground">
+                  Are you sure you want to remove this {formatCurrency(expenseToDelete?.amount || 0)} expense? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="gap-2">
+                <AlertDialogCancel className="rounded-xl border-white/10 hover:bg-white/5">Cancel</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={confirmDeleteExpense}
+                  className="rounded-xl bg-rose-500 hover:bg-rose-600 text-white border-none"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </PermissionGuard>
     </BiometricLock>

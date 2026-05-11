@@ -55,6 +55,7 @@ class SMSReceiver : BroadcastReceiver() {
                 putExtra("appName", transaction.appName)
                 putExtra("timestamp", transaction.timestamp)
                 putExtra("rawText", transaction.rawText)
+                putExtra("confidence", transaction.confidence)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startService(intent)

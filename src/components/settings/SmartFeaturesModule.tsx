@@ -107,12 +107,23 @@ export function SmartFeaturesModule({ permissionsStatus, onBack }: SmartFeatures
         <Button 
           variant="ghost" 
           className="w-full justify-center gap-3 h-12 rounded-2xl border-dashed border-border/60 text-muted-foreground hover:bg-muted/50 transition-all mt-4"
-          onClick={() => {
-            const event = new CustomEvent('simulate-sms', { 
-              detail: { body: "HDFC Bank: Rs. 1,250.00 spent at STARBUCKS on 01-MAY-26. Info: POS" } 
-            });
-            window.dispatchEvent(event);
-            toast.info('Simulating bank notification...');
+          onClick={async () => {
+            const { Capacitor } = await import('@capacitor/core');
+            if (Capacitor.isNativePlatform()) {
+              const FinancialNotification = (await import('@/lib/financial-notifications')).default;
+              await FinancialNotification.simulateTransaction({ 
+                amount: 1250, 
+                merchant: "STARBUCKS", 
+                appName: "GPay" 
+              });
+              toast.info('Native simulation triggered');
+            } else {
+              const event = new CustomEvent('simulate-sms', { 
+                detail: { body: "HDFC Bank: Rs. 1,250.00 spent at STARBUCKS on 01-MAY-26. Info: POS" } 
+              });
+              window.dispatchEvent(event);
+              toast.info('Web simulation triggered');
+            }
           }}
         >
           <RotateCcw className="h-4 w-4" />

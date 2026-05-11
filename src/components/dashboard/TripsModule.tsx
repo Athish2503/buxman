@@ -210,7 +210,9 @@ export function TripsModule() {
       <AlertDialog open={!!tripToDelete} onOpenChange={(open) => !open && setTripToDelete(null)}>
         <AlertDialogContent className="rounded-3xl border-border/40 glass">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-bold">Delete Trip?</AlertDialogTitle>
+            <AlertDialogTitle className="text-xl font-bold">
+              Delete "{trips.find(t => t.id === tripToDelete)?.name || 'Trip'}"?
+            </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
               This will permanently remove the trip and all its shared expense data. This action cannot be undone.
             </AlertDialogDescription>

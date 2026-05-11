@@ -29,76 +29,108 @@ export function ExpenseItem({
   expense, isSelected, onToggleSelect, onView, onEdit, onDelete, onStatusChange
 }: ExpenseItemProps) {
   const x = useMotionValue(0);
-  
-  // Swipe right to approve (positive x)
-  const backgroundRight = useTransform(x, [0, 80], ['rgba(34, 197, 94, 0)', 'rgba(34, 197, 94, 1)']);
-  const opacityRight = useTransform(x, [0, 60], [0, 1]);
-  const scaleRight = useTransform(x, [0, 60], [0.5, 1]);
+  const isReimb = expense.isReimbursement;
 
-  // Swipe left to reject (negative x)
-  const backgroundLeft = useTransform(x, [-80, 0], ['rgba(239, 68, 68, 1)', 'rgba(239, 68, 68, 0)']);
+  // Configuration for swipe actions based on type
+  const swipeConfig = {
+    right: isReimb 
+      ? { label: 'Approve', icon: Check, color: 'rgb(16, 185, 129)', status: 'approved' } // Emerald-500
+      : { label: 'Update', icon: Edit, color: 'rgb(59, 130, 246)', action: () => onEdit(expense) }, // Blue-500
+    left: isReimb
+      ? { label: 'Reimbursed', icon: Briefcase, color: 'rgb(139, 92, 246)', status: 'reimbursed' } // Violet-500
+      : { label: 'Delete', icon: Trash2, color: 'rgb(244, 63, 94)', action: () => onDelete(expense.id) } // Rose-500
+  };
+
+  // Swipe right (positive x)
+  const backgroundRight = useTransform(x, [0, 80], [`rgba(${swipeConfig.right.color.match(/\d+/g)?.join(',')}, 0)`, swipeConfig.right.color]);
+  const opacityRight = useTransform(x, [0, 60], [0, 1]);
+  const scaleRight = useTransform(x, [0, 80], [0.5, 1.2]);
+
+  // Swipe left (negative x)
+  const backgroundLeft = useTransform(x, [-80, 0], [swipeConfig.left.color, `rgba(${swipeConfig.left.color.match(/\d+/g)?.join(',')}, 0)`]);
   const opacityLeft = useTransform(x, [-60, 0], [1, 0]);
-  const scaleLeft = useTransform(x, [-60, 0], [1, 0.5]);
+  const scaleLeft = useTransform(x, [-80, 0], [1.2, 0.5]);
 
   const cfg = getCategoryConfig(expense.category);
   const Icon = cfg.icon;
 
   const handleDragEnd = (_: any, info: any) => {
     const threshold = 100;
+    
     if (info.offset.x > threshold) {
-      haptics.success();
-      onStatusChange(expense.id, 'approved');
+      if (swipeConfig.right.status) {
+        haptics.success();
+        onStatusChange(expense.id, swipeConfig.right.status as ExpenseStatus);
+      } else if (swipeConfig.right.action) {
+        haptics.selection();
+        swipeConfig.right.action();
+      }
     } else if (info.offset.x < -threshold) {
-      haptics.warning();
-      onStatusChange(expense.id, 'rejected');
+      if (swipeConfig.left.status) {
+        haptics.success();
+        onStatusChange(expense.id, swipeConfig.left.status as ExpenseStatus);
+      } else if (swipeConfig.left.action) {
+        haptics.heavy();
+        swipeConfig.left.action();
+      }
     }
     
-    // Always snap back to 0
-    animate(x, 0, { type: 'spring', stiffness: 300, damping: 30 });
+    // Always snap back to 0 with a premium spring
+    animate(x, 0, { 
+      type: 'spring', 
+      stiffness: 350, 
+      damping: 25,
+      mass: 0.8
+    });
   };
 
   return (
     <div className="relative overflow-hidden rounded-2xl mb-3 group">
-      {/* Background Actions */}
+      {/* Background Actions - Right (Approve/Update) */}
       <motion.div 
         style={{ background: backgroundRight }}
         className="absolute inset-0 flex items-center pl-8 z-0"
       >
         <motion.div style={{ opacity: opacityRight, scale: scaleRight }} className="flex flex-col items-center">
-          <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/30">
-            <Check className="text-white h-6 w-6" strokeWidth={3} />
+          <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/30 shadow-xl">
+            <swipeConfig.right.icon className="text-white h-6 w-6" strokeWidth={3} />
           </div>
-          <span className="text-[10px] text-white font-bold uppercase tracking-widest mt-1">Approve</span>
+          <span className="text-[10px] text-white font-black uppercase tracking-[0.2em] mt-2 drop-shadow-md">
+            {swipeConfig.right.label}
+          </span>
         </motion.div>
       </motion.div>
 
+      {/* Background Actions - Left (Reimbursed/Delete) */}
       <motion.div 
         style={{ background: backgroundLeft }}
         className="absolute inset-0 flex items-center justify-end pr-8 z-0"
       >
         <motion.div style={{ opacity: opacityLeft, scale: scaleLeft }} className="flex flex-col items-center">
-          <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/30">
-            <X className="text-white h-6 w-6" strokeWidth={3} />
+          <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/30 shadow-xl">
+            <swipeConfig.left.icon className="text-white h-6 w-6" strokeWidth={3} />
           </div>
-          <span className="text-[10px] text-white font-bold uppercase tracking-widest mt-1">Reject</span>
+          <span className="text-[10px] text-white font-black uppercase tracking-[0.2em] mt-2 drop-shadow-md">
+            {swipeConfig.left.label}
+          </span>
         </motion.div>
       </motion.div>
 
       <motion.div
         drag="x"
-        dragConstraints={{ left: -120, right: 120 }}
-        dragElastic={0.1}
+        dragConstraints={{ left: -140, right: 140 }}
+        dragElastic={0.15}
         dragMomentum={false}
         onDragEnd={handleDragEnd}
         onClick={(e) => {
-          // Prevent onView if it was a selection tap
-          if (e.defaultPrevented) return;
+          // Prevent onView if it was a selection tap or a drag
+          if (Math.abs(x.get()) > 5) return;
           onView(expense);
           haptics.selection();
         }}
         style={{ x }}
         className={cn(
-          "relative z-10 flex items-center gap-4 p-4 pl-12 transition-all duration-300 cursor-pointer",
+          "relative z-10 flex items-center gap-4 p-4 pl-12 transition-all duration-300 cursor-pointer active:scale-[0.99]",
           isSelected
             ? "bg-primary/10 border-primary/40 shadow-glow shadow-primary/5"
             : "glass-card border-white/5 hover:border-white/10"

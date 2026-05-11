@@ -226,9 +226,11 @@ export function DiningDashboard() {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="rounded-[2.5rem] border-white/10 bg-black/80 backdrop-blur-3xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-black tracking-tight text-white">Delete Memory?</AlertDialogTitle>
+            <AlertDialogTitle className="text-2xl font-black tracking-tight text-white">
+              Delete "{experiences.find(e => e.id === idToDelete)?.restaurantName || 'Experience'}"?
+            </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground font-medium">
-              Are you sure you want to remove this culinary experience? This action cannot be undone.
+              Are you sure you want to remove this culinary experience from your history? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-3">

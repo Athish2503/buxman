@@ -1,5 +1,7 @@
 package com.pixel.reimburse
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -8,8 +10,13 @@ import android.os.Build
 import android.os.IBinder
 import android.view.*
 import android.view.WindowManager.LayoutParams
-import android.widget.ArrayAdapter
+import android.widget.TextView
+import androidx.core.view.children
+import androidx.appcompat.view.ContextThemeWrapper
+import com.google.android.material.chip.Chip
 import com.pixel.reimburse.databinding.LayoutOverlayPopupBinding
+import java.util.*
+import kotlin.math.abs
 
 class OverlayService : Service() {
     private lateinit var windowManager: WindowManager
@@ -18,6 +25,7 @@ class OverlayService : Service() {
 
     companion object {
         var categories: List<String> = listOf("Meals", "Travel", "Shopping", "Health", "Other")
+        private var selectedCategory: String? = null
         
         fun updateCategories(list: List<String>) {
             categories = list
@@ -29,7 +37,7 @@ class OverlayService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val amount = intent?.getDoubleExtra("amount", 0.0) ?: 0.0
         val merchant = intent?.getStringExtra("merchant") ?: "Unknown"
-        val appName = intent?.getStringExtra("appName") ?: "GPay"
+        val appName = intent?.getStringExtra("appName") ?: "Bank"
 
         if (binding == null) {
             showOverlay(amount, merchant, appName)
@@ -65,6 +73,16 @@ class OverlayService : Service() {
 
         setupUI(amount, merchant, appName)
         windowManager.addView(binding?.root, params)
+        
+        // Entrance Animation
+        binding?.cardContainer?.alpha = 0f
+        binding?.cardContainer?.translationY = -100f
+        binding?.cardContainer?.animate()
+            ?.alpha(1f)
+            ?.translationY(0f)
+            ?.setDuration(400)
+            ?.setInterpolator(android.view.animation.OvershootInterpolator())
+            ?.start()
     }
 
     private fun updateOverlay(amount: Double, merchant: String, appName: String) {
@@ -74,32 +92,43 @@ class OverlayService : Service() {
     private fun setupUI(amount: Double, merchant: String, appName: String) {
         val b = binding ?: return
         
-        // App-specific coloring
-        when {
-            appName.contains("GPay", true) -> b.headerLayout.setBackgroundColor(0xFF1A73E8.toInt())
-            appName.contains("PhonePe", true) -> b.headerLayout.setBackgroundColor(0xFF5F259F.toInt())
-            appName.contains("Paytm", true) -> b.headerLayout.setBackgroundColor(0xFF00B9F1.toInt())
-            appName.contains("Amazon", true) -> b.headerLayout.setBackgroundColor(0xFFFF9900.toInt())
-            appName.contains("SBI", true) -> b.headerLayout.setBackgroundColor(0xFF285BA3.toInt())
-            else -> b.headerLayout.setBackgroundColor(0xFF7C3AED.toInt())
-        }
-
-        b.tvAmount.text = "₹%.2f".format(amount)
+        b.tvAmount.text = "₹${"%,.0f".format(amount)}"
         b.tvMerchant.text = merchant
 
-        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, categories)
-        b.autoCompleteCategory.setAdapter(adapter)
+        // Setup Chips
+        b.chipGroupCategories.removeAllViews()
+        categories.forEach { category ->
+            val chip = Chip(ContextThemeWrapper(this, com.google.android.material.R.style.Widget_MaterialComponents_Chip_Choice))
+            chip.text = category
+            chip.isCheckable = true
+            chip.setTextColor(0xFFFFFFFF.toInt())
+            chip.setChipBackgroundColorResource(android.R.color.transparent)
+            chip.setChipStrokeColorResource(android.R.color.white)
+            chip.chipStrokeWidth = 1f
+            
+            chip.setOnCheckedChangeListener { _, isChecked ->
+                if (isChecked) {
+                    selectedCategory = category
+                    chip.setChipBackgroundColorResource(android.R.color.white)
+                    chip.setTextColor(0xFF000000.toInt())
+                } else {
+                    chip.setChipBackgroundColorResource(android.R.color.transparent)
+                    chip.setTextColor(0xFFFFFFFF.toInt())
+                }
+            }
+            b.chipGroupCategories.addView(chip)
+        }
 
-        b.btnDismiss.setOnClickListener {
+        b.btn_close.setOnClickListener { dismissWithAnimation() }
+        b.btnDismiss.setOnClickListener { 
             FinancialNotificationPlugin.onOverlayAction("dismiss", amount, merchant)
-            stopSelf()
+            dismissWithAnimation() 
         }
 
         b.btnSave.setOnClickListener {
-            val category = b.autoCompleteCategory.text.toString()
             val notes = b.etNotes.text.toString()
-            FinancialNotificationPlugin.onOverlayAction("save", amount, merchant, category, notes)
-            stopSelf()
+            FinancialNotificationPlugin.onOverlayAction("save", amount, merchant, selectedCategory, notes)
+            dismissWithAnimation()
         }
 
         // Handle Keyboard Focus
@@ -114,36 +143,45 @@ class OverlayService : Service() {
             }
         }
 
-        setupDragBehavior()
+        setupSwipeBehavior()
     }
 
-    private fun setupDragBehavior() {
+    private fun setupSwipeBehavior() {
         val b = binding ?: return
         b.cardContainer.setOnTouchListener(object : View.OnTouchListener {
-            private var initialX = 0
-            private var initialY = 0
-            private var initialTouchX = 0f
             private var initialTouchY = 0f
+            private var initialY = 0
 
             override fun onTouch(v: View, event: MotionEvent): Boolean {
                 val p = params ?: return false
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
-                        initialX = p.x
-                        initialY = p.y
-                        initialTouchX = event.rawX
                         initialTouchY = event.rawY
+                        initialY = p.y
                         return true
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        p.x = initialX + (event.rawX - initialTouchX).toInt()
-                        p.y = initialY + (event.rawY - initialTouchY).toInt()
+                        val deltaY = event.rawY - initialTouchY
+                        p.y = initialY + deltaY.toInt()
                         
-                        val displayMetrics = resources.displayMetrics
-                        p.x = p.x.coerceIn(-displayMetrics.widthPixels/2, displayMetrics.widthPixels/2)
-                        p.y = p.y.coerceIn(-displayMetrics.heightPixels/2, displayMetrics.heightPixels/2)
+                        // Apply slight alpha based on swipe up
+                        if (deltaY < 0) {
+                            b.cardContainer.alpha = (1f + deltaY / 500f).coerceIn(0f, 1f)
+                        }
                         
                         windowManager.updateViewLayout(b.root, p)
+                        return true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        val deltaY = event.rawY - initialTouchY
+                        if (deltaY < -200) {
+                            dismissWithAnimation()
+                        } else {
+                            // Snap back
+                            p.y = 100
+                            b.cardContainer.animate().alpha(1f).setDuration(200).start()
+                            windowManager.updateViewLayout(b.root, p)
+                        }
                         return true
                     }
                 }
@@ -152,10 +190,26 @@ class OverlayService : Service() {
         })
     }
 
+    private fun dismissWithAnimation() {
+        binding?.cardContainer?.animate()
+            ?.alpha(0f)
+            ?.translationY(-200f)
+            ?.setDuration(300)
+            ?.setListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    stopSelf()
+                }
+            })
+            ?.start()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         binding?.let {
-            windowManager.removeView(it.root)
+            try {
+                windowManager.removeView(it.root)
+            } catch (e: Exception) {}
         }
     }
 }
+

@@ -6,6 +6,9 @@ export interface FinancialNotificationPlugin {
   openOverlaySettings(): Promise<void>;
   updateCategories(options: { categories: string[] }): Promise<void>;
   flushPendingQueue(): Promise<void>;
+  requestIgnoreBatteryOptimizations(): Promise<void>;
+  isIgnoringBatteryOptimizations(): Promise<{ isIgnoring: boolean }>;
+  simulateTransaction(options: { amount?: number; merchant?: string; appName?: string }): Promise<void>;
   addListener(eventName: 'transactionDetected', listenerFunc: (data: any) => void): Promise<any>;
   addListener(eventName: 'overlayAction', listenerFunc: (data: any) => void): Promise<any>;
 }

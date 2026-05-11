@@ -38,6 +38,7 @@ import { ExportDialog } from './export-dialog';
 import { ImageViewer } from './image-viewer';
 import { ExpenseItem } from './expense-item';
 import { PullToRefresh } from './pull-to-refresh';
+import { ExpenseDetailView } from './ExpenseDetailView';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -446,149 +447,18 @@ export function ExpenseList({
         )}
       </div>
 
-      <Dialog open={!!selectedExpense} onOpenChange={open => !open && setSelectedExpense(null)}>
-        <DialogContent className="glass max-w-sm mx-4 p-0 overflow-hidden border-white/10 rounded-[2.5rem] shadow-2xl">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Expense Details</DialogTitle>
-          </DialogHeader>
-          {selectedExpense && (
-            <div className="flex flex-col">
-              <div className="p-8 pb-6 text-center relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none" />
-                <div className={cn(
-                  "h-16 w-16 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 shadow-xl border border-white/10",
-                  getCategoryConfig(selectedExpense.category).bgColor
-                )}>
-                  {(() => {
-                    const Icon = getCategoryConfig(selectedExpense.category).icon;
-                    return <Icon className={cn("h-8 w-8", getCategoryConfig(selectedExpense.category).color)} />;
-                  })()}
-                </div>
-                <h2 className="text-xl font-black tracking-tight mb-1">{selectedExpense.vendor}</h2>
-                <p className="text-3xl font-black font-mono tracking-tighter text-primary">
-                  {formatCurrency(selectedExpense.amount)}
-                </p>
-                {selectedExpense.isReimbursement && (
-                  <Badge className={cn(
-                    "mt-4 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full",
-                    STATUS_COLORS[selectedExpense.status]
-                  )}>
-                    {selectedExpense.status}
-                  </Badge>
-                )}
-              </div>
-
-              <div className="px-6 py-6 space-y-4 bg-black/10">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40 mb-1 flex items-center gap-1.5">
-                      <Calendar className="h-3 w-3" /> Date
-                    </p>
-                    <p className="text-xs font-bold">{format(new Date(selectedExpense.date), 'EEEE, do MMM yyyy')}</p>
-                  </div>
-                  <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40 mb-1 flex items-center gap-1.5">
-                      <Tag className="h-3 w-3" /> Category
-                    </p>
-                    <p className="text-xs font-bold">{getCategoryConfig(selectedExpense.category).label}</p>
-                  </div>
-                </div>
-
-                {/* Split Details Section */}
-                {(selectedExpense.split || selectedExpense.paidBy) && (
-                  <div className="bg-white/5 p-4 rounded-3xl border border-white/10 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
-                        <Users className="h-3.5 w-3.5" /> Split Billing
-                      </p>
-                      {selectedExpense.paidBy && (
-                        <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest bg-primary/10 border-primary/20 text-primary">
-                          Paid by {selectedExpense.paidBy === 'user' ? 'You' : contacts.find(c => c.id === selectedExpense.paidBy)?.name || 'Unknown'}
-                        </Badge>
-                      )}
-                    </div>
-                    
-                    {selectedExpense.split && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-widest text-muted-foreground/40 px-1">
-                          <span>Participant</span>
-                          <span>Share</span>
-                        </div>
-                        <div className="space-y-1.5">
-                          {selectedExpense.split.members.map(member => {
-                            const isUser = member.contactId === 'user';
-                            const contact = isUser ? { name: 'You (Owner)' } : contacts.find(c => c.id === member.contactId);
-                            return (
-                              <div key={member.contactId} className="flex items-center justify-between bg-white/5 p-2.5 rounded-xl border border-white/5">
-                                <span className="text-[11px] font-bold">{contact?.name || 'Unknown'}</span>
-                                <span className="text-xs font-mono font-black">₹{member.amount.toFixed(2)}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div className="pt-2 flex items-center justify-between px-1">
-                          <span className="text-[9px] font-bold text-muted-foreground uppercase">Split Type</span>
-                          <span className="text-[10px] font-black uppercase text-primary tracking-widest">{selectedExpense.split.splitType}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {selectedExpense.description && (
-                  <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40 mb-1 flex items-center gap-1.5">
-                      <FileText className="h-3 w-3" /> Note
-                    </p>
-                    <p className="text-xs font-medium leading-relaxed">{selectedExpense.description}</p>
-                  </div>
-                )}
-
-                {selectedExpense.receiptImage && (
-                  <div className="space-y-2">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40 flex items-center gap-1.5 px-1">
-                      <Camera className="h-3 w-3" /> Receipt
-                    </p>
-                    <div 
-                      className="relative rounded-2xl overflow-hidden border border-white/10 group cursor-pointer"
-                      onClick={() => setViewingReceipt(selectedExpense.receiptImage!)}
-                    >
-                      <img src={selectedExpense.receiptImage} className="w-full aspect-[4/3] object-cover transition-transform group-hover:scale-105" />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <ZoomIn className="h-8 w-8 text-white" />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-4 bg-card/60 backdrop-blur-xl border-t border-white/5 flex gap-2">
-                <Button 
-                  variant="outline" 
-                  className="flex-1 h-11 rounded-xl font-black uppercase tracking-widest text-[10px] border-white/5"
-                  onClick={() => {
-                    setEditingExpense(selectedExpense);
-                    setSelectedExpense(null);
-                  }}
-                >
-                  <Edit className="h-3.5 w-3.5 mr-2" /> Edit
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="h-11 w-11 rounded-xl border-destructive/10 text-destructive hover:bg-destructive/10"
-                  onClick={() => {
-                    onDeleteExpense(selectedExpense.id);
-                    setSelectedExpense(null);
-                    haptics.heavy();
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ExpenseDetailView 
+        expense={selectedExpense} 
+        onClose={() => setSelectedExpense(null)} 
+        onEdit={(exp) => {
+          setEditingExpense(exp);
+          setSelectedExpense(null);
+        }}
+        onDelete={(id) => {
+          onDeleteExpense(id);
+          setSelectedExpense(null);
+        }}
+      />
 
       <ImageViewer src={viewingReceipt || ''} isOpen={!!viewingReceipt} onClose={() => setViewingReceipt(null)} title="Receipt" />
       <Dialog open={!!editingExpense} onOpenChange={open => !open && setEditingExpense(null)}>

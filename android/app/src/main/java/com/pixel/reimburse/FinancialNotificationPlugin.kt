@@ -143,8 +143,65 @@ class FinancialNotificationPlugin : Plugin() {
         call.resolve()
     }
 
+    @PluginMethod
+    fun requestIgnoreBatteryOptimizations(call: PluginCall) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                Uri.parse("package:${context.packageName}"))
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        }
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun isIgnoringBatteryOptimizations(call: PluginCall) {
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        val result = JSObject().apply {
+            put("isIgnoring", if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                powerManager.isIgnoringBatteryOptimizations(context.packageName)
+            } else {
+                true
+            })
+        }
+        call.resolve(result)
+    }
+
+    @PluginMethod
+    fun simulateTransaction(call: PluginCall) {
+        val amount = call.getDouble("amount") ?: 1250.0
+        val merchant = call.getString("merchant") ?: "STARBUCKS"
+        val appName = call.getString("appName") ?: "GPay"
+        
+        val transaction = ParsedTransaction(
+            amount = amount,
+            merchant = merchant,
+            type = "debit",
+            appName = appName,
+            timestamp = System.currentTimeMillis(),
+            rawText = "Simulated transaction for testing",
+            confidence = 100
+        )
+        
+        onTransactionDetected(transaction)
+        
+        val intent = Intent(context, OverlayService::class.java).apply {
+            putExtra("amount", transaction.amount)
+            putExtra("merchant", transaction.merchant)
+            putExtra("appName", transaction.appName)
+            putExtra("timestamp", transaction.timestamp)
+            putExtra("rawText", transaction.rawText)
+            putExtra("confidence", transaction.confidence)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startService(intent)
+        
+        call.resolve()
+    }
+
     private fun isNotificationServiceEnabled(): Boolean {
         val enabledListeners = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
         return enabledListeners != null && enabledListeners.contains(context.packageName)
     }
 }
+
