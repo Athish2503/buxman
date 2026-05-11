@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Receipt, BarChart3, Settings,
@@ -26,7 +27,6 @@ import { PermissionGuard } from '@/components/permission-guard';
 import { FloatingAddMenu } from '@/components/floating-add-menu';
 import { DiningDashboard } from '@/components/food/DiningDashboard';
 
-// Import sub-modules
 import { DashboardModule } from '@/components/dashboard/DashboardModule';
 import { ExpensesModule } from '@/components/dashboard/ExpensesModule';
 import { ReimbursementsModule } from '@/components/dashboard/ReimbursementsModule';
@@ -37,28 +37,35 @@ import { TripsModule } from '@/components/dashboard/TripsModule';
 type Tab = 'dashboard' | 'expenses' | 'food' | 'reimbursements' | 'trips' | 'vehicle' | 'analytics' | 'settings';
 
 const NAV_ITEMS: { id: Tab; label: string; icon: any }[] = [
-  { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
-  { id: 'expenses', label: 'Expenses', icon: Receipt },
-  { id: 'food', label: 'Dining', icon: Utensils },
-  { id: 'reimbursements', label: 'Claims', icon: Briefcase },
-  { id: 'trips', label: 'Trips', icon: Plane },
-  { id: 'vehicle', label: 'Vehicle', icon: Car },
-  { id: 'analytics', label: 'Charts', icon: BarChart3 },
-  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'dashboard',       label: 'Home',     icon: LayoutDashboard },
+  { id: 'expenses',        label: 'Expenses', icon: Receipt         },
+  { id: 'food',            label: 'Dining',   icon: Utensils        },
+  { id: 'reimbursements',  label: 'Claims',   icon: Briefcase       },
+  { id: 'trips',           label: 'Trips',    icon: Plane           },
+  { id: 'vehicle',         label: 'Garage',   icon: Car             },
+  { id: 'analytics',       label: 'Charts',   icon: BarChart3       },
+  { id: 'settings',        label: 'Settings', icon: Settings        },
 ];
 
-const LEFT_NAV  = NAV_ITEMS.slice(0, 2);   // Home, Expenses
-const RIGHT_NAV = NAV_ITEMS.slice(2, 4);   // Dining, Reimburse
-const MORE_NAV  = NAV_ITEMS.slice(4);      // Vehicle, Analytics, Settings
+// First 2 left of FAB, next 2 right of FAB (visible without scroll)
+const LEFT_NAV  = NAV_ITEMS.slice(0, 2);
+const RIGHT_NAV = NAV_ITEMS.slice(2, 4);
+const MORE_NAV  = NAV_ITEMS.slice(4);
+
+// Page transition variants
+const pageVariants = {
+  initial: { opacity: 0, y: 10, filter: 'blur(8px)' },
+  animate: { opacity: 1, y: 0,  filter: 'blur(0px)' },
+  exit:    { opacity: 0, y: -6, filter: 'blur(4px)'  },
+};
 
 const Index = () => {
-  const [expenses, setExpenses] = useState(() => storageService.getExpenses());
-  const [logs, setLogs] = useState(() => fuelService.getLogs());
-  const [vehicles, setVehicles] = useState(() => mileageService.getVehicles());
-  const [isFabOpen, setIsFabOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
-  const [onboarded, setOnboarded] = useState(true);
-  const navRef = useRef<HTMLDivElement>(null);
+  const [expenses, setExpenses]     = useState(() => storageService.getExpenses());
+  const [logs, setLogs]             = useState(() => fuelService.getLogs());
+  const [vehicles, setVehicles]     = useState(() => mileageService.getVehicles());
+  const [isFabOpen, setIsFabOpen]   = useState(false);
+  const [activeTab, setActiveTab]   = useState<Tab>('dashboard');
+  const [onboarded, setOnboarded]   = useState(true);
   const { theme, toggle: toggleTheme } = useTheme();
 
   useEffect(() => {
@@ -67,45 +74,45 @@ const Index = () => {
     permissions.requestAll();
   }, []);
 
+  const navigate = (tab: Tab) => {
+    haptics.selection();
+    setActiveTab(tab);
+  };
+
   const handleAddExpense = (expense: Expense) => {
     const updated = storageService.addExpense(expense);
     setExpenses(updated);
-    toast.success('Expense added successfully');
+    toast.success('Expense added');
     haptics.success();
   };
-
   const handleUpdateExpense = (expense: Expense) => {
     const updated = storageService.updateExpense(expense);
     setExpenses(updated);
-    toast.success('Expense updated');
+    toast.success('Updated');
     haptics.success();
   };
-
   const handleDeleteExpense = (id: string) => {
     const updated = storageService.deleteExpense(id);
     setExpenses(updated);
-    toast.success('Expense deleted');
+    toast.success('Deleted');
     haptics.medium();
   };
-
   const handleDeleteAll = () => {
     storageService.saveExpenses([]);
     setExpenses([]);
-    toast.success('All expenses cleared');
+    toast.success('All cleared');
     haptics.medium();
   };
-
   const handleBatchDelete = (ids: string[]) => {
     const updated = storageService.batchDeleteExpenses(ids);
     setExpenses(updated);
-    toast.success(`${ids.length} expenses deleted`);
+    toast.success(`${ids.length} deleted`);
     haptics.medium();
   };
-
   const handleBatchStatus = (ids: string[], status: ExpenseStatus) => {
     const updated = storageService.batchUpdateStatus(ids, status);
     setExpenses(updated);
-    toast.success(`${ids.length} expenses marked as ${status}`);
+    toast.success(`Marked ${status}`);
     haptics.success();
   };
 
@@ -115,7 +122,7 @@ const Index = () => {
     switch (activeTab) {
       case 'dashboard':
         return (
-          <DashboardModule 
+          <DashboardModule
             expenses={expenses}
             onNavigate={setActiveTab}
             onUpdateExpense={handleUpdateExpense}
@@ -128,7 +135,7 @@ const Index = () => {
         );
       case 'expenses':
         return (
-          <ExpensesModule 
+          <ExpensesModule
             expenses={expenses}
             onAddExpense={handleAddExpense}
             onUpdateExpense={handleUpdateExpense}
@@ -138,11 +145,10 @@ const Index = () => {
             onBatchStatus={handleBatchStatus}
           />
         );
-      case 'food':
-        return <DiningDashboard />;
+      case 'food':          return <DiningDashboard />;
       case 'reimbursements':
         return (
-          <ReimbursementsModule 
+          <ReimbursementsModule
             expenses={expenses}
             onAddExpense={handleAddExpense}
             onUpdateExpense={handleUpdateExpense}
@@ -152,11 +158,10 @@ const Index = () => {
             onBatchStatus={handleBatchStatus}
           />
         );
-      case 'trips':
-        return <TripsModule />;
+      case 'trips':    return <TripsModule />;
       case 'vehicle':
         return (
-          <GarageModule 
+          <GarageModule
             vehicles={vehicles}
             logs={logs}
             onRefresh={() => {
@@ -165,12 +170,9 @@ const Index = () => {
             }}
           />
         );
-      case 'analytics':
-        return <AnalyticsModule expenses={expenses} onNavigate={setActiveTab} />;
-      case 'settings':
-        return <SettingsPage theme={theme} onThemeToggle={toggleTheme} />;
-      default:
-        return null;
+      case 'analytics': return <AnalyticsModule expenses={expenses} onNavigate={setActiveTab} />;
+      case 'settings':  return <SettingsPage theme={theme} onThemeToggle={toggleTheme} />;
+      default:          return null;
     }
   };
 
@@ -178,43 +180,44 @@ const Index = () => {
     <BiometricLock enabled={!!settings.biometricLock}>
       <PermissionGuard>
         <SMSExpenseNudge onAdd={handleAddExpense} />
-        <div className="min-h-screen bg-background bg-aurora">
+
+        <div className="min-h-dvh bg-background bg-aurora">
           {!onboarded && <Onboarding onComplete={() => setOnboarded(true)} />}
-          
-          {/* ── Sidebar (desktop) ── */}
-          <aside className="hidden sm:flex fixed left-0 top-0 bottom-0 w-60 flex-col glass border-r border-border/40 z-30">
-            <div className="p-5 border-b border-border/30">
+
+          {/* ── Desktop Sidebar ── */}
+          <aside className="hidden sm:flex fixed left-0 top-0 bottom-0 w-60 flex-col glass border-r border-border/30 z-30">
+            <div className="p-5 border-b border-border/20">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-card border border-border/40 flex items-center justify-center shadow-glow shrink-0 overflow-hidden">
+                <div className="h-9 w-9 rounded-xl bg-gradient-brand flex items-center justify-center shadow-glow shrink-0 overflow-hidden">
                   <img src="/logo.png" alt="Buxman" className="h-6 w-6 object-contain" />
                 </div>
                 <div>
-                  <h1 className="text-sm font-bold tracking-tight">Buxman</h1>
-                  <p className="text-[10px] text-muted-foreground">Expense Tracker</p>
+                  <h1 className="text-sm font-display font-bold tracking-tight">Buxman</h1>
+                  <p className="text-[10px] text-muted-foreground">Smart Expense Hub</p>
                 </div>
               </div>
             </div>
 
-            <nav className="flex-1 p-3 space-y-1">
+            <nav className="flex-1 p-3 space-y-0.5">
               {NAV_ITEMS.map(item => {
-                const Icon = item.icon;
+                const Icon  = item.icon;
                 const active = activeTab === item.id;
                 return (
                   <button
                     key={item.id}
-                    onClick={() => setActiveTab(item.id)}
+                    onClick={() => navigate(item.id)}
                     className={cn(
-                      "relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+                      'relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 overflow-hidden',
                       active
-                        ? "bg-primary/15 text-primary"
-                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        ? 'bg-primary/12 text-primary'
+                        : 'text-muted-foreground hover:bg-surface-2/80 hover:text-foreground'
                     )}
                   >
                     {active && (
-                      <motion.div 
+                      <motion.div
                         layoutId="sidebar-pill"
-                        className="absolute inset-0 bg-primary/10 border-l-4 border-primary z-0" 
-                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                        className="absolute inset-0 rounded-xl bg-primary/8 border-l-[3px] border-primary"
+                        transition={{ type: 'spring', bounce: 0.2, duration: 0.55 }}
                       />
                     )}
                     <Icon className="h-4 w-4 shrink-0 relative z-10" />
@@ -224,87 +227,83 @@ const Index = () => {
               })}
             </nav>
 
-            <div className="p-3 border-t border-border/30">
+            <div className="p-3 border-t border-border/20">
               <ExpenseForm onSubmit={handleAddExpense} />
             </div>
           </aside>
 
-          {/* ── Main content ── */}
+          {/* ── Main Content ── */}
           <div className="sm:ml-60">
-            <main className="px-4 sm:px-8 py-6 sm:py-10 pb-32 sm:pb-12 max-w-5xl mx-auto min-h-screen">
+            <main className="px-4 sm:px-8 py-5 sm:py-10 pb-nav sm:pb-12 max-w-5xl mx-auto min-h-dvh">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeTab}
-                  initial={{ opacity: 0, scale: 0.98, filter: 'blur(10px)' }}
-                  animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                  exit={{ opacity: 0, scale: 1.02, filter: 'blur(10px)' }}
-                  transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  variants={pageVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  transition={{ duration: 0.30, ease: [0.16, 1, 0.3, 1] }}
                 >
                   {renderActiveTab()}
                 </motion.div>
               </AnimatePresence>
             </main>
-
-            <footer className="hidden sm:block border-t border-border/30 px-6 py-4 text-center text-xs text-muted-foreground">
-              Buxman · Data stored locally on your device · Built with ♥
-            </footer>
           </div>
 
-          {/* ── High-Density Pro Navigation (mobile) ── */}
-          <nav className="sm:hidden fixed bottom-[max(2rem,env(safe-area-inset-bottom,2rem))] left-1/2 -translate-x-1/2 z-40 w-[94vw] max-w-md h-20">
-            <div className="relative h-full w-full bg-card/80 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-2xl flex items-center overflow-visible">
-              <div 
-                ref={navRef}
-                className={cn(
-                  "absolute inset-0 flex items-center overflow-x-auto no-scrollbar snap-x snap-mandatory transition-all duration-500 overflow-y-visible px-4",
-                  isFabOpen ? "blur-md opacity-40 scale-[0.98] pointer-events-none" : "blur-0 opacity-100 scale-100"
-                )}
-              >
-                {[
-                  ...LEFT_NAV,
-                  { id: 'add', isFab: true },
-                  ...RIGHT_NAV,
-                  ...MORE_NAV
-                ].map((item: any) => {
-                  if ('isFab' in item) {
-                    return (
-                      <div key="fab-item" className="flex-shrink-0 w-[20%] flex justify-center items-center snap-center relative overflow-visible">
-                        <FloatingAddMenu 
-                          onAddExpense={handleAddExpense} 
-                          onFuelSuccess={() => setLogs(fuelService.getLogs())}
-                          onOpenChange={setIsFabOpen}
-                        />
-                      </div>
-                    );
-                  }
+          {/* ══════════════════════════════════════════
+              MOBILE BOTTOM NAV — Premium Pill
+              ══════════════════════════════════════════ */}
+          <nav
+            className="sm:hidden fixed z-40"
+            style={{
+              bottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 'calc(100vw - 24px)',
+              maxWidth: '420px',
+            }}
+          >
+            <div
+              className={cn(
+                'mobile-nav-bar relative h-[68px] flex items-center transition-all duration-300',
+                isFabOpen && 'opacity-30 scale-[0.97] pointer-events-none blur-sm'
+              )}
+            >
+              {/* Left Nav Items */}
+              {LEFT_NAV.map(item => (
+                <NavItem
+                  key={item.id}
+                  item={item}
+                  active={activeTab === item.id}
+                  onClick={() => navigate(item.id)}
+                />
+              ))}
 
-                  const Icon = item.icon;
-                  const active = activeTab === item.id;
-                  
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveTab(item.id as Tab)}
-                      className={cn(
-                        "flex-shrink-0 w-[20%] flex flex-col items-center justify-center gap-1 transition-all duration-300 snap-center",
-                        active ? "text-primary" : "text-muted-foreground/50"
-                      )}
-                    >
-                      <div className={cn(
-                        "p-2.5 rounded-xl transition-all duration-300",
-                        active ? "bg-primary/10 scale-110" : "bg-transparent"
-                      )}>
-                        <Icon className="h-5.5 w-5.5" />
-                      </div>
-                      {active && (
-                        <span className="text-[8px] font-black tracking-tighter uppercase leading-none">
-                          {item.label}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
+              {/* FAB Center Slot */}
+              <div className="flex-1 flex justify-center items-center">
+                <FloatingAddMenu
+                  onAddExpense={handleAddExpense}
+                  onFuelSuccess={() => setLogs(fuelService.getLogs())}
+                  onOpenChange={setIsFabOpen}
+                />
               </div>
+
+              {/* Right Nav Items */}
+              {RIGHT_NAV.map(item => (
+                <NavItem
+                  key={item.id}
+                  item={item}
+                  active={activeTab === item.id}
+                  onClick={() => navigate(item.id)}
+                />
+              ))}
+
+              {/* More overflow — swipe hint if needed */}
+              <MoreNavButton
+                items={MORE_NAV}
+                activeTab={activeTab}
+                onNavigate={navigate}
+              />
             </div>
           </nav>
         </div>
@@ -312,5 +311,146 @@ const Index = () => {
     </BiometricLock>
   );
 };
+
+/* ── Nav Item Component ── */
+function NavItem({
+  item, active, onClick
+}: { item: { id: Tab; label: string; icon: any }; active: boolean; onClick: () => void }) {
+  const Icon = item.icon;
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'flex-1 flex flex-col items-center justify-center gap-0.5 h-full relative',
+        'transition-all duration-200 press-scale'
+      )}
+      aria-label={item.label}
+    >
+      {/* Active pip */}
+      {active && (
+        <motion.div
+          layoutId="nav-pip"
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-[3px] bg-gradient-brand rounded-full"
+          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+        />
+      )}
+      <div className={cn(
+        'flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200',
+        active ? 'bg-primary/14' : 'bg-transparent'
+      )}>
+        <Icon
+          className={cn(
+            'h-5 w-5 transition-all duration-200',
+            active ? 'text-primary' : 'text-muted-foreground/60'
+          )}
+          strokeWidth={active ? 2.2 : 1.8}
+        />
+      </div>
+      <span className={cn(
+        'text-[9px] font-bold tracking-wider uppercase leading-none transition-all duration-200',
+        active ? 'text-primary opacity-100' : 'text-muted-foreground/50 opacity-0 scale-75'
+      )}>
+        {item.label}
+      </span>
+    </button>
+  );
+}
+
+/* ── More Nav (overflow drawer button) ── */
+function MoreNavButton({
+  items, activeTab, onNavigate
+}: { items: typeof NAV_ITEMS; activeTab: Tab; onNavigate: (t: Tab) => void }) {
+  const [open, setOpen] = useState(false);
+  const hasActive = items.some(i => i.id === activeTab);
+
+  return (
+    <>
+      <button
+        onClick={() => { haptics.selection(); setOpen(o => !o); }}
+        className={cn(
+          'flex-1 flex flex-col items-center justify-center gap-0.5 h-full relative press-scale'
+        )}
+        aria-label="More"
+      >
+        {hasActive && (
+          <motion.div
+            layoutId="nav-pip"
+            className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-[3px] bg-gradient-brand rounded-full"
+            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+          />
+        )}
+        <div className={cn(
+          'flex flex-col items-center justify-center gap-[3px] w-9 h-9 rounded-xl transition-all duration-200',
+          (open || hasActive) ? 'bg-primary/14' : 'bg-transparent'
+        )}>
+          {[0,1,2].map(i => (
+            <span key={i} className={cn(
+              'block h-[2.5px] rounded-full transition-all duration-200',
+              (open || hasActive) ? 'bg-primary w-4' : 'bg-muted-foreground/50 w-3.5'
+            )} />
+          ))}
+        </div>
+        <span className={cn(
+          'text-[9px] font-bold tracking-wider uppercase leading-none transition-all duration-200',
+          (open || hasActive) ? 'text-primary' : 'text-muted-foreground/50 opacity-0 scale-75'
+        )}>
+          More
+        </span>
+      </button>
+
+      {/* More Menu Sheet */}
+      {typeof document !== 'undefined' && ReactDOM.createPortal(
+        <AnimatePresence>
+          {open && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm"
+                onClick={() => setOpen(false)}
+              />
+              <motion.div
+                initial={{ y: '100%', opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: '100%', opacity: 0 }}
+                transition={{ type: 'spring', damping: 26, stiffness: 340 }}
+                className="fixed bottom-0 left-0 right-0 z-[10000] bg-card border-t border-border/50 rounded-t-3xl p-6 pb-10"
+              >
+                <div className="w-10 h-1 bg-border rounded-full mx-auto mb-6" />
+                <div className="grid grid-cols-4 gap-3">
+                  {items.map(item => {
+                    const Icon = item.icon;
+                    const active = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => { onNavigate(item.id); setOpen(false); }}
+                        className={cn(
+                          'flex flex-col items-center gap-2 p-3 rounded-2xl transition-all duration-200 press-scale',
+                          active ? 'bg-primary/12' : 'bg-surface-2 hover:bg-surface-3'
+                        )}
+                      >
+                        <div className={cn(
+                          'w-10 h-10 rounded-xl flex items-center justify-center',
+                          active ? 'bg-primary/20' : 'bg-surface-3'
+                        )}>
+                          <Icon className={cn('h-5 w-5', active ? 'text-primary' : 'text-muted-foreground')} />
+                        </div>
+                        <span className={cn(
+                          'text-[10px] font-bold',
+                          active ? 'text-primary' : 'text-muted-foreground'
+                        )}>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+    </>
+  );
+}
 
 export default Index;

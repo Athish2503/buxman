@@ -11,12 +11,13 @@ export interface FinancialNotificationPlugin {
 }
 
 const FinancialNotification = registerPlugin<FinancialNotificationPlugin>('FinancialNotification');
-console.log('FinancialNotification plugin registered:', FinancialNotification);
 
 export default FinancialNotification;
 
 export const syncCategoriesToNative = async (categories: string[]) => {
   try {
+    const { Capacitor } = await import('@capacitor/core');
+    if (!Capacitor.isNativePlatform()) return;
     await FinancialNotification.updateCategories({ categories });
   } catch (e) {
     console.error('Failed to sync categories to native', e);

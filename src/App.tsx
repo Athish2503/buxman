@@ -4,8 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { storageEngine } from "./lib/storage-engine";
@@ -19,23 +18,16 @@ import { ThemeEngine } from "./components/ThemeEngine";
 const queryClient = new QueryClient();
 
 const App = () => {
-  const [isReady, setIsReady] = useState(false);
-  const [showSplash, setShowSplash] = useState(() => {
-    // Only show splash if it hasn't been shown in this session
-    if (typeof window !== 'undefined') {
-      return !sessionStorage.getItem('splashShown');
-    }
-    return true;
-  });
+  const [isReady, setIsReady]   = useState(false);
+  const [showSplash, setShowSplash] = useState(true); // always show splash on mount
+  const [permissionsNeeded, setPermissionsNeeded] = useState(false);
 
   useTransactionListener();
 
-  const [permissionsNeeded, setPermissionsNeeded] = useState(false);
-
   useEffect(() => {
+    // Init storage in parallel with splash
     storageEngine.init().then(async () => {
       setIsReady(true);
-      // Check for financial permissions on startup (mobile only)
       if (Capacitor.isNativePlatform()) {
         const status = await permissions.checkStatus();
         if (!status.financialNotifications || !status.overlay) {
@@ -45,19 +37,36 @@ const App = () => {
     });
   }, []);
 
+  // Splash screen — always shown on fresh mount, disappears after ~2s
   if (showSplash) {
     return (
-      <SplashScreen 
-        onComplete={() => {
-          sessionStorage.setItem('splashShown', 'true');
-          setShowSplash(false);
-        }} 
+      <SplashScreen
+        onComplete={() => setShowSplash(false)}
       />
     );
   }
 
+  // By the time splash completes (~2.5s), storage should be ready.
+  // If not (very slow device), show a minimal spinner instead of blank.
   if (!isReady) {
-    return null; // Storage not ready but splash handled the initial view
+    return (
+      <div
+        className="fixed inset-0 flex items-center justify-center"
+        style={{ background: 'hsl(225 22% 5%)' }}
+      >
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-brand flex items-center justify-center animate-pulse-glow">
+            <img src="/logo.png" alt="Buxman" className="h-6 w-6 object-contain" />
+          </div>
+          <div className="w-32 h-[2px] bg-white/6 rounded-full overflow-hidden relative">
+            <div
+              className="absolute top-0 bottom-0 w-1/2 bg-gradient-brand animate-shimmer"
+              style={{ backgroundSize: '200% 100%' }}
+            />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (permissionsNeeded) {
@@ -73,15 +82,18 @@ const App = () => {
           position="top-center"
           toastOptions={{
             classNames: {
-              toast: 'glass border border-border/50 shadow-lg text-foreground',
+              toast:   'glass border border-border/50 shadow-lg text-foreground',
               success: '!text-success',
-              error: '!text-destructive',
+              error:   '!text-destructive',
             }
           }}
         />
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/dashboard" element={<Navigate to="/" replace />} />
+            <Route path="/expenses" element={<Navigate to="/" replace />} />
+            <Route path="/settings" element={<Navigate to="/" replace />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
