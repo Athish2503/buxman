@@ -1,5 +1,6 @@
 import { MileageLog, ReceiptDraft, VehicleRate, FuelLog } from '@/types/modules';
 import { storageEngine } from '@/lib/storage-engine';
+import { notificationService } from './notifications';
 
 const KEYS = {
   vehicles: 'reimburse_vehicles_v1',
@@ -110,8 +111,21 @@ export const walletService = {
     const r: ReceiptDraft = { id: crypto.randomUUID(), imageUri, createdAt: new Date().toISOString() };
     const all = this.getReceipts();
     storageEngine.set(KEYS.wallet, JSON.stringify([r, ...all]));
+    
+    // Schedule reminders
+    notificationService.scheduleWalletReminders(r.id, r.createdAt);
   },
   removeReceipt(id: string) {
     storageEngine.set(KEYS.wallet, JSON.stringify(this.getReceipts().filter(r => r.id !== id)));
+    
+    // Cancel reminders
+    notificationService.cancelWalletReminders(id);
+  },
+  syncReminders() {
+    const receipts = this.getReceipts();
+    receipts.forEach(r => {
+      notificationService.scheduleWalletReminders(r.id, r.createdAt);
+    });
   }
 };
+

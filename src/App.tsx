@@ -15,6 +15,8 @@ import { FinancialPermissionGuidance } from "./components/financial-permission-g
 import { permissions } from "./lib/permissions";
 import { ThemeEngine } from "./components/ThemeEngine";
 
+import { walletService } from "./lib/modules-storage";
+
 const queryClient = new QueryClient();
 
 const App = () => {
@@ -27,6 +29,9 @@ const App = () => {
   useEffect(() => {
     // Init storage in parallel with splash
     storageEngine.init().then(async () => {
+      // Sync wallet reminders
+      walletService.syncReminders();
+
       setIsReady(true);
       if (Capacitor.isNativePlatform()) {
         const status = await permissions.checkStatus();

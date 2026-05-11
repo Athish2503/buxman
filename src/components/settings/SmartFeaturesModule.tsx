@@ -104,31 +104,47 @@ export function SmartFeaturesModule({ permissionsStatus, onBack }: SmartFeatures
           </Button>
         </div>
 
-        <Button 
-          variant="ghost" 
-          className="w-full justify-center gap-3 h-12 rounded-2xl border-dashed border-border/60 text-muted-foreground hover:bg-muted/50 transition-all mt-4"
-          onClick={async () => {
-            const { Capacitor } = await import('@capacitor/core');
-            if (Capacitor.isNativePlatform()) {
-              const FinancialNotification = (await import('@/lib/financial-notifications')).default;
-              await FinancialNotification.simulateTransaction({ 
-                amount: 1250, 
-                merchant: "STARBUCKS", 
-                appName: "GPay" 
-              });
-              toast.info('Native simulation triggered');
-            } else {
-              const event = new CustomEvent('simulate-sms', { 
-                detail: { body: "HDFC Bank: Rs. 1,250.00 spent at STARBUCKS on 01-MAY-26. Info: POS" } 
-              });
-              window.dispatchEvent(event);
-              toast.info('Web simulation triggered');
-            }
-          }}
-        >
-          <RotateCcw className="h-4 w-4" />
-          <span className="text-xs font-semibold uppercase tracking-wider">Test Detection Simulation</span>
-        </Button>
+        <div className="grid grid-cols-1 gap-3 mt-4">
+          <Button 
+            variant="ghost" 
+            className="w-full justify-center gap-3 h-12 rounded-2xl border-dashed border-border/60 text-muted-foreground hover:bg-muted/50 transition-all"
+            onClick={async () => {
+              const { Capacitor } = await import('@capacitor/core');
+              if (Capacitor.isNativePlatform()) {
+                const FinancialNotification = (await import('@/lib/financial-notifications')).default;
+                await FinancialNotification.simulateTransaction({ 
+                  amount: 1250, 
+                  merchant: "STARBUCKS", 
+                  appName: "GPay" 
+                });
+                toast.info('Native simulation triggered');
+              } else {
+                const event = new CustomEvent('simulate-sms', { 
+                  detail: { body: "HDFC Bank: Rs. 1,250.00 spent at STARBUCKS on 01-MAY-26. Info: POS" } 
+                });
+                window.dispatchEvent(event);
+                toast.info('Web simulation triggered');
+              }
+            }}
+          >
+            <RotateCcw className="h-4 w-4" />
+            <span className="text-xs font-semibold uppercase tracking-wider">Test Detection Simulation</span>
+          </Button>
+
+          <Button 
+            variant="ghost" 
+            className="w-full justify-center gap-3 h-12 rounded-2xl border-dashed border-border/60 text-emerald-500/80 hover:bg-emerald-500/5 transition-all"
+            onClick={async () => {
+              const { notificationService } = await import('@/lib/notifications');
+              await notificationService.testNotification();
+              toast.success('Android notification scheduled (2s delay)');
+            }}
+          >
+            <Bell className="h-4 w-4" />
+            <span className="text-xs font-semibold uppercase tracking-wider">Test Actual Android Notification</span>
+          </Button>
+        </div>
+
       </div>
     </div>
   );

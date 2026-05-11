@@ -49,11 +49,10 @@ export function ReceiptWallet({ expenses, onAddExpense }: ReceiptWalletProps) {
             onClick: () => setProcessingReceipt(oldest)
           }
         });
-
-        notificationService.scheduleFunnyReminder("Pixel Reimburse", randomMsg);
       }
     }
   }, []);
+
 
   const reload = () => setReceipts(walletService.getReceipts());
 
