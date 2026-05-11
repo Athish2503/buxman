@@ -8,12 +8,14 @@ import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import android.view.*
 import android.view.WindowManager.LayoutParams
 import android.widget.TextView
 import androidx.core.view.children
 import androidx.appcompat.view.ContextThemeWrapper
 import com.google.android.material.chip.Chip
+import com.pixel.reimburse.R
 import com.pixel.reimburse.databinding.LayoutOverlayPopupBinding
 import java.util.*
 import kotlin.math.abs
@@ -49,8 +51,18 @@ class OverlayService : Service() {
     }
 
     private fun showOverlay(amount: Double, merchant: String, appName: String) {
+        Log.d("OverlayService", "Showing overlay for $merchant, amount: $amount")
+        
+        // Use a themed context for inflation to support Material components
+        val themedContext = ContextThemeWrapper(this, R.style.AppTheme)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-        binding = LayoutOverlayPopupBinding.inflate(LayoutInflater.from(this))
+        
+        try {
+            binding = LayoutOverlayPopupBinding.inflate(LayoutInflater.from(themedContext))
+        } catch (e: Exception) {
+            Log.e("OverlayService", "Failed to inflate layout", e)
+            return
+        }
 
         val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -72,7 +84,14 @@ class OverlayService : Service() {
         }
 
         setupUI(amount, merchant, appName)
-        windowManager.addView(binding?.root, params)
+        
+        try {
+            windowManager.addView(binding?.root, params)
+        } catch (e: Exception) {
+            Log.e("OverlayService", "Failed to add view to WindowManager. Ensure overlay permission is granted.", e)
+            stopSelf()
+            return
+        }
         
         // Entrance Animation
         binding?.cardContainer?.alpha = 0f

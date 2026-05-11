@@ -30,9 +30,10 @@ class FinancialNotificationPlugin : Plugin() {
             }
             
             if (instance != null) {
+                Log.d("FinancialNotification", "Notifying listeners: transactionDetected")
                 instance?.notifyListeners("transactionDetected", data)
             } else {
-                // If app is not running, store it for later sync
+                Log.d("FinancialNotification", "Instance is null, saving pending transaction")
                 savePendingTransaction(data)
             }
         }
@@ -174,6 +175,8 @@ class FinancialNotificationPlugin : Plugin() {
         val merchant = call.getString("merchant") ?: "STARBUCKS"
         val appName = call.getString("appName") ?: "GPay"
         
+        Log.d("FinancialNotification", "Simulating transaction: $merchant, $amount")
+        
         val transaction = ParsedTransaction(
             amount = amount,
             merchant = merchant,
@@ -186,16 +189,20 @@ class FinancialNotificationPlugin : Plugin() {
         
         onTransactionDetected(transaction)
         
-        val intent = Intent(context, OverlayService::class.java).apply {
-            putExtra("amount", transaction.amount)
-            putExtra("merchant", transaction.merchant)
-            putExtra("appName", transaction.appName)
-            putExtra("timestamp", transaction.timestamp)
-            putExtra("rawText", transaction.rawText)
-            putExtra("confidence", transaction.confidence)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            val intent = Intent(context, OverlayService::class.java).apply {
+                putExtra("amount", transaction.amount)
+                putExtra("merchant", transaction.merchant)
+                putExtra("appName", transaction.appName)
+                putExtra("timestamp", transaction.timestamp)
+                putExtra("rawText", transaction.rawText)
+                putExtra("confidence", transaction.confidence)
+            }
+            context.startService(intent)
+            Log.d("FinancialNotification", "OverlayService started from simulation")
+        } catch (e: Exception) {
+            Log.e("FinancialNotification", "Failed to start OverlayService", e)
         }
-        context.startService(intent)
         
         call.resolve()
     }
