@@ -14,6 +14,7 @@ import { SpendingTrendChart, VehicleEfficiencyChart, FuelCostChart } from '@/com
 import { BudgetTracker } from '@/components/budget-tracker';
 import { ExpenseList } from '@/components/expense-list';
 import { settingsService } from '@/lib/settings';
+import { haptics } from '@/lib/haptics';
 
 interface DashboardModuleProps {
   expenses: Expense[];
@@ -161,7 +162,7 @@ function QuickActions({ onNavigate }: { onNavigate: (t: any) => void }) {
             initial={{ opacity: 0, scale: 0.88 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.15 + i * 0.05, type: 'spring', stiffness: 360, damping: 24 }}
-            onClick={() => onNavigate(a.tab)}
+            onClick={() => { haptics.selection(); onNavigate(a.tab); }}
             className={cn(
               'flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all duration-200 press-scale',
               a.bg
@@ -266,7 +267,7 @@ export function DashboardModule({
         {(['overview', 'vehicle'] as const).map(t => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => { haptics.selection(); setTab(t); }}
             className={cn(
               'flex-1 py-2 rounded-xl text-xs font-bold transition-all duration-250 capitalize flex items-center justify-center gap-2',
               tab === t

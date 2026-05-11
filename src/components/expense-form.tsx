@@ -28,7 +28,7 @@ import { MoreHorizontal } from 'lucide-react';
 import { storageService } from '@/lib/storage';
 import { vendorService } from '@/lib/recurring';
 import { haptics } from '@/lib/haptics';
-import { cn } from '@/lib/utils';
+import { cn, rewardBurst } from '@/lib/utils';
 import { toast } from 'sonner';
 import { VoiceInput } from './voice-input';
 import { localIntelligence } from '@/lib/intelligence';
@@ -229,6 +229,7 @@ function FormBody({
       await new Promise(r => setTimeout(r, 850));
 
       if (!isEdit) {
+        rewardBurst();
         reset(); 
         setReceiptPreview(null); 
         setTags([]); 

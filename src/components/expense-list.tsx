@@ -33,7 +33,7 @@ import { exportCSV } from '@/lib/csv-exporter';
 import { settingsService } from '@/lib/settings';
 import { haptics } from '@/lib/haptics';
 import { ExpenseForm } from './expense-form';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, cn, rewardBurst } from '@/lib/utils';
 import { ExportDialog } from './export-dialog';
 import { ImageViewer } from './image-viewer';
 import { ExpenseItem } from './expense-item';
@@ -273,7 +273,11 @@ export function ExpenseList({
           <div className="flex flex-wrap gap-2">
             <div className="flex flex-wrap gap-1.5 flex-1">
               {(['approved', 'reimbursed', 'rejected'] as ExpenseStatus[]).map(s => (
-                <Button key={s} size="sm" variant="outline" className="h-8 text-[10px] px-2.5 capitalize font-bold" onClick={() => { onBatchStatus?.(Array.from(selected), s); clearSelection(); }}>
+                <Button key={s} size="sm" variant="outline" className="h-8 text-[10px] px-2.5 capitalize font-bold" onClick={() => { 
+                  onBatchStatus?.(Array.from(selected), s); 
+                  if (s === 'reimbursed' || s === 'approved') rewardBurst();
+                  clearSelection(); 
+                }}>
                   {s}
                 </Button>
               ))}

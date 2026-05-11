@@ -330,7 +330,7 @@ function NavItem({
       {active && (
         <motion.div
           layoutId="nav-pip"
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-[3px] bg-gradient-brand rounded-full"
+          className="absolute top-0 left-0 right-0 mx-auto w-6 h-[3px] bg-gradient-brand rounded-full"
           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
         />
       )}
@@ -375,7 +375,7 @@ function MoreNavButton({
         {hasActive && (
           <motion.div
             layoutId="nav-pip"
-            className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-[3px] bg-gradient-brand rounded-full"
+            className="absolute top-0 left-0 right-0 mx-auto w-6 h-[3px] bg-gradient-brand rounded-full"
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
           />
         )}
