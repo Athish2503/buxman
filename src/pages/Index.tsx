@@ -33,24 +33,8 @@ import { ReimbursementsModule } from '@/components/dashboard/ReimbursementsModul
 import { GarageModule } from '@/components/dashboard/GarageModule';
 import { AnalyticsModule } from '@/components/dashboard/AnalyticsModule';
 import { TripsModule } from '@/components/dashboard/TripsModule';
+import { Tab, NAV_ITEMS_CONFIG } from '@/lib/nav-config';
 
-type Tab = 'dashboard' | 'expenses' | 'food' | 'reimbursements' | 'trips' | 'vehicle' | 'analytics' | 'settings';
-
-const NAV_ITEMS: { id: Tab; label: string; icon: any }[] = [
-  { id: 'dashboard',       label: 'Home',     icon: LayoutDashboard },
-  { id: 'expenses',        label: 'Expenses', icon: Receipt         },
-  { id: 'food',            label: 'Dining',   icon: Utensils        },
-  { id: 'reimbursements',  label: 'Claims',   icon: Briefcase       },
-  { id: 'trips',           label: 'Trips',    icon: Plane           },
-  { id: 'vehicle',         label: 'Garage',   icon: Car             },
-  { id: 'analytics',       label: 'Charts',   icon: BarChart3       },
-  { id: 'settings',        label: 'Settings', icon: Settings        },
-];
-
-// First 2 left of FAB, next 2 right of FAB (visible without scroll)
-const LEFT_NAV  = NAV_ITEMS.slice(0, 2);
-const RIGHT_NAV = NAV_ITEMS.slice(2, 4);
-const MORE_NAV  = NAV_ITEMS.slice(4);
 
 // Page transition variants
 const pageVariants = {
@@ -67,11 +51,23 @@ const Index = () => {
   const [activeTab, setActiveTab]   = useState<Tab>('dashboard');
   const [onboarded, setOnboarded]   = useState(true);
   const { theme, toggle: toggleTheme } = useTheme();
+  
+  const [navOrder, setNavOrder] = useState<Tab[]>(() => {
+    const settings = settingsService.get();
+    return (settings.navOrder as Tab[]) || (Object.keys(NAV_ITEMS_CONFIG) as Tab[]);
+  });
 
   useEffect(() => {
     setOnboarded(metaService.get().onboardingDone);
     audio.unlock();
     permissions.requestAll();
+    
+    const handleSettingsUpdate = () => {
+      const settings = settingsService.get();
+      if (settings.navOrder) setNavOrder(settings.navOrder as Tab[]);
+    };
+    window.addEventListener('settings-updated', handleSettingsUpdate);
+    return () => window.removeEventListener('settings-updated', handleSettingsUpdate);
   }, []);
 
   const navigate = (tab: Tab) => {
@@ -176,6 +172,11 @@ const Index = () => {
     }
   };
 
+  const navItems = navOrder.map(id => NAV_ITEMS_CONFIG[id]).filter(Boolean);
+  const leftNav = navItems.slice(0, 2);
+  const rightNav = navItems.slice(2, 4);
+  const moreNav = navItems.slice(4);
+
   return (
     <BiometricLock enabled={!!settings.biometricLock}>
       <PermissionGuard>
@@ -199,7 +200,7 @@ const Index = () => {
             </div>
 
             <nav className="flex-1 p-3 space-y-0.5">
-              {NAV_ITEMS.map(item => {
+              {navItems.map(item => {
                 const Icon  = item.icon;
                 const active = activeTab === item.id;
                 return (
@@ -270,7 +271,7 @@ const Index = () => {
               )}
             >
               {/* Left Nav Items */}
-              {LEFT_NAV.map(item => (
+              {leftNav.map(item => (
                 <NavItem
                   key={item.id}
                   item={item}
@@ -289,7 +290,7 @@ const Index = () => {
               </div>
 
               {/* Right Nav Items */}
-              {RIGHT_NAV.map(item => (
+              {rightNav.map(item => (
                 <NavItem
                   key={item.id}
                   item={item}
@@ -300,7 +301,7 @@ const Index = () => {
 
               {/* More overflow — swipe hint if needed */}
               <MoreNavButton
-                items={MORE_NAV}
+                items={moreNav}
                 activeTab={activeTab}
                 onNavigate={navigate}
               />
@@ -359,7 +360,7 @@ function NavItem({
 /* ── More Nav (overflow drawer button) ── */
 function MoreNavButton({
   items, activeTab, onNavigate
-}: { items: typeof NAV_ITEMS; activeTab: Tab; onNavigate: (t: Tab) => void }) {
+}: { items: { id: Tab; label: string; icon: any }[]; activeTab: Tab; onNavigate: (t: Tab) => void }) {
   const [open, setOpen] = useState(false);
   const hasActive = items.some(i => i.id === activeTab);
 

@@ -26,9 +26,10 @@ import { CategoryManagementModule } from './settings/CategoryManagementModule';
 import { BudgetControlsModule } from './settings/BudgetControlsModule';
 import { SecurityModule } from './settings/SecurityModule';
 import { DataManagementModule } from './settings/DataManagementModule';
+import { NavigationSettingsModule } from './settings/NavigationSettingsModule';
 import { Field } from './settings/Common';
 
-type SettingsTab = 'overview' | 'organization' | 'smart' | 'security' | 'categories' | 'budgets' | 'data';
+type SettingsTab = 'overview' | 'organization' | 'smart' | 'security' | 'categories' | 'budgets' | 'data' | 'navigation';
 
 interface SettingsPageProps {
   theme: 'dark' | 'light';
@@ -162,6 +163,8 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
         return <BudgetControlsModule settings={settings} categories={categories} newBudget={newBudget} setNewBudget={setNewBudget} updateSettings={updateSettings} onBack={() => setActiveTab('overview')} />;
       case 'security':
         return <SecurityModule settings={settings} theme={theme} bioAvailable={bioAvailable} onThemeToggle={onThemeToggle} updateSettings={updateSettings} onBack={() => setActiveTab('overview')} />;
+      case 'navigation':
+        return <NavigationSettingsModule onBack={() => setActiveTab('overview')} />;
       case 'data':
         return (
           <DataManagementModule 

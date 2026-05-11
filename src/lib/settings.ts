@@ -20,6 +20,7 @@ const defaultSettings: AppSettings = {
   accentColor: '#3b82f6',
   glassIntensity: 0.6,
   budgets: [],
+  navOrder: ['dashboard', 'expenses', 'food', 'reimbursements', 'trips', 'vehicle', 'analytics', 'settings'],
 };
 
 export const settingsService = {
@@ -46,6 +47,7 @@ export const settingsService = {
         billedTo: { ...defaultSettings.billedTo, ...parsed.billedTo },
         billedFrom: { ...defaultSettings.billedFrom, ...parsed.billedFrom },
         budgets: parsed.budgets || [],
+        navOrder: parsed.navOrder || defaultSettings.navOrder,
       };
     } catch {
       return defaultSettings;

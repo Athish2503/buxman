@@ -1,4 +1,4 @@
-import { Building, Zap, LayoutGrid, Target, Lock, Database } from 'lucide-react';
+import { Building, Zap, LayoutGrid, Target, Lock, Database, AppWindow } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChevronRight } from 'lucide-react';
 
@@ -38,6 +38,10 @@ export function OverviewModule({ onNavigate }: OverviewModuleProps) {
       <ModuleCard 
         icon={LayoutGrid} title="Categories" description="Manage expense types, icons & visibility" 
         onClick={() => onNavigate('categories')} color="bg-purple-500"
+      />
+      <ModuleCard 
+        icon={AppWindow} title="Navigation Layout" description="Customize main menu & more options" 
+        onClick={() => onNavigate('navigation')} color="bg-cyan-500"
       />
       <ModuleCard 
         icon={Target} title="Budgeting" description="Set spending limits & goals" 

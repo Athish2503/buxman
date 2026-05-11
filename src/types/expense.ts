@@ -55,4 +55,5 @@ export interface AppSettings {
   glassIntensity?: number;
   budgets: BudgetGoal[];
   biometricLock?: boolean;
+  navOrder?: string[];
 }
