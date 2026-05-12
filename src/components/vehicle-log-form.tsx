@@ -19,6 +19,16 @@ interface VehicleLogFormProps {
   editLog?: FuelLog;
 }
 
+const INDIAN_STATIONS = [
+  { id: 'IndianOil', name: 'IndianOil', short: 'IOCL', color: 'border-orange-500/30 text-orange-500 bg-orange-500/5' },
+  { id: 'Bharat Petroleum', name: 'Bharat Petroleum', short: 'BPCL', color: 'border-yellow-500/30 text-yellow-500 bg-yellow-500/5' },
+  { id: 'Hindustan Petroleum', name: 'Hindustan Petroleum', short: 'HPCL', color: 'border-blue-500/30 text-blue-500 bg-blue-500/5' },
+  { id: 'Jio-bp', name: 'Jio-bp', short: 'Jio-bp', color: 'border-emerald-500/30 text-emerald-500 bg-emerald-500/5' },
+  { id: 'Nayara Energy', name: 'Nayara Energy', short: 'Nayara', color: 'border-sky-500/30 text-sky-500 bg-sky-500/5' },
+  { id: 'Shell', name: 'Shell', short: 'Shell', color: 'border-amber-500/30 text-amber-500 bg-amber-500/5' },
+  { id: 'Reliance', name: 'Reliance', short: 'Reliance', color: 'border-indigo-500/30 text-indigo-500 bg-indigo-500/5' },
+];
+
 export function VehicleLogForm({ onSuccess, trigger, editLog, open: externalOpen, onOpenChange }: VehicleLogFormProps & { open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
@@ -32,6 +42,7 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, open: externalOpen
   const [liters, setLiters] = useState(editLog?.liters.toString() || '');
   const [price, setPrice] = useState(editLog?.pricePerLiter.toString() || '');
   const [isFullTank, setIsFullTank] = useState(editLog?.isFullTank ?? true);
+  const [station, setStation] = useState(editLog?.station || 'IndianOil');
   const [date, setDate] = useState(editLog?.date || format(new Date(), 'yyyy-MM-dd'));
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,6 +56,7 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, open: externalOpen
       setLiters(editLog.liters.toString());
       setPrice(editLog.pricePerLiter.toString());
       setIsFullTank(editLog.isFullTank);
+      setStation(editLog.station || 'IndianOil');
       setDate(editLog.date);
     }
   }, [editLog]);
@@ -80,6 +92,7 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, open: externalOpen
       pricePerLiter: Number(price),
       totalCost: Number(liters) * Number(price),
       isFullTank,
+      station,
       createdAt: editLog?.createdAt || new Date().toISOString()
     };
 
@@ -226,6 +239,37 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, open: externalOpen
               type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00"
               className="h-12 bg-muted/30 border-border/40 text-lg font-mono focus:border-primary/50"
             />
+          </div>
+        </div>
+
+        {/* Fuel Station Selector */}
+        <div>
+          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5 ml-1">
+            <Fuel className="h-3 w-3 text-primary" /> Fuel Station
+          </Label>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar -mx-1 px-1">
+            {INDIAN_STATIONS.map(s => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => { setStation(s.id); haptics.selection(); }}
+                className={cn(
+                  "relative px-4 py-2 rounded-xl border text-[11px] font-bold transition-all shrink-0 tracking-tight",
+                  station === s.id 
+                    ? `border-primary/40 bg-primary/10 text-primary shadow-sm` 
+                    : 'border-border/40 bg-muted/10 text-muted-foreground hover:border-border/80'
+                )}
+              >
+                {station === s.id && (
+                  <motion.div
+                    layoutId="active-station-pill"
+                    className="absolute inset-0 bg-primary/10 rounded-xl z-0"
+                    transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                  />
+                )}
+                <span className="relative z-10">{s.name}</span>
+              </button>
+            ))}
           </div>
         </div>
 

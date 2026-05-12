@@ -20,6 +20,7 @@ export interface FuelLog {
   pricePerLiter: number;
   totalCost: number;
   isFullTank: boolean;
+  station?: string;
   notes?: string;
   
   // Computed (set during save or calculation)

@@ -18,6 +18,13 @@ interface SmartFeaturesModuleProps {
 
 export function SmartFeaturesModule({ permissionsStatus, onBack }: SmartFeaturesModuleProps) {
   const [isIgnoringBattery, setIsIgnoringBattery] = useState(true);
+  const [manualNotifications, setManualNotifications] = useState(() => localStorage.getItem('manual_perm_notifications') === 'true');
+  const [manualSms, setManualSms] = useState(() => localStorage.getItem('manual_perm_sms') === 'true');
+  const [manualOverlay, setManualOverlay] = useState(() => localStorage.getItem('manual_perm_overlay') === 'true');
+
+  const isNotificationsActive = permissionsStatus.notifications || manualNotifications;
+  const isSmsActive = permissionsStatus.sms || manualSms;
+  const isOverlayActive = permissionsStatus.overlay || manualOverlay;
 
   useEffect(() => {
     const checkBattery = async () => {
@@ -59,88 +66,154 @@ export function SmartFeaturesModule({ permissionsStatus, onBack }: SmartFeatures
       
       <div className="space-y-4">
         {/* Core Detection Permissions */}
-        <div className={cn("p-5 rounded-3xl border transition-all space-y-4", permissionsStatus.notifications ? "bg-emerald-500/5 border-emerald-500/20" : "bg-primary/5 border-primary/20")}>
-          <div className="flex items-center justify-between">
+        <div className={cn("p-5 rounded-3xl border transition-all space-y-4", isNotificationsActive ? "bg-emerald-500/5 border-emerald-500/20" : "bg-primary/5 border-primary/20")}>
+          <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-3">
-              <div className={cn("h-10 w-10 rounded-2xl flex items-center justify-center", permissionsStatus.notifications ? "bg-emerald-500/20" : "bg-primary/20")}>
-                <Bell className={cn("h-5 w-5", permissionsStatus.notifications ? "text-emerald-500" : "text-primary")} />
+              <div className={cn("h-10 w-10 rounded-2xl flex items-center justify-center shrink-0", isNotificationsActive ? "bg-emerald-500/20" : "bg-primary/20")}>
+                <Bell className={cn("h-5 w-5", isNotificationsActive ? "text-emerald-500" : "text-primary")} />
               </div>
               <div>
                 <h4 className="text-sm font-bold">App & Access Monitoring</h4>
                 <p className="text-xs text-muted-foreground">NotificationListener & Accessibility capture engine</p>
               </div>
             </div>
-            {permissionsStatus.notifications && (
-              <div className="h-6 w-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+            {isNotificationsActive && (
+              <div className="h-6 w-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30 shrink-0 mt-0.5">
                 <Check className="h-3.5 w-3.5 text-white" />
               </div>
             )}
           </div>
+
+          <div className="flex items-center justify-between pt-1 border-t border-white/5">
+            <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+              <input 
+                type="checkbox" 
+                checked={isNotificationsActive} 
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setManualNotifications(val);
+                  localStorage.setItem('manual_perm_notifications', String(val));
+                  toast.success(val ? 'Manually enabled engine monitoring' : 'Manual setting cleared');
+                }}
+                disabled={permissionsStatus.notifications}
+                className="rounded border-white/20 bg-black/20 text-emerald-500 focus:ring-emerald-500 h-4 w-4 cursor-pointer disabled:opacity-70 disabled:cursor-default"
+              />
+              <span className="text-[11px] font-bold text-muted-foreground hover:text-foreground transition-colors">
+                {permissionsStatus.notifications ? "Automatically Verified by OS" : "Manually Enabled / Verified"}
+              </span>
+            </label>
+            {isNotificationsActive && <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500">Active</span>}
+          </div>
+
           <Button 
-            className={cn("w-full rounded-2xl h-11 text-white shadow-lg", permissionsStatus.notifications ? "bg-emerald-500 shadow-emerald-500/20" : "bg-primary shadow-primary/20")}
+            className={cn("w-full rounded-2xl h-11 text-white shadow-lg font-bold", isNotificationsActive ? "bg-emerald-500 shadow-emerald-500/20" : "bg-primary shadow-primary/20")}
             onClick={() => {
               import('@/lib/permissions').then(m => m.permissions.requestNotificationListener());
               toast.info('Requesting notification listener access...');
             }}
           >
-            {permissionsStatus.notifications ? 'Engine Monitoring Active' : 'Enable Engine Monitoring'}
+            {isNotificationsActive ? 'Engine Monitoring Active' : 'Enable Engine Monitoring'}
           </Button>
         </div>
 
-        <div className={cn("p-5 rounded-3xl border transition-all space-y-4", permissionsStatus.sms ? "bg-emerald-500/5 border-emerald-500/20" : "bg-indigo-500/5 border-indigo-500/20")}>
-          <div className="flex items-center justify-between">
+        <div className={cn("p-5 rounded-3xl border transition-all space-y-4", isSmsActive ? "bg-emerald-500/5 border-emerald-500/20" : "bg-indigo-500/5 border-indigo-500/20")}>
+          <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-3">
-              <div className={cn("h-10 w-10 rounded-2xl flex items-center justify-center", permissionsStatus.sms ? "bg-emerald-500/20" : "bg-indigo-500/20")}>
-                <Phone className={cn("h-5 w-5", permissionsStatus.sms ? "text-emerald-500" : "text-indigo-500")} />
+              <div className={cn("h-10 w-10 rounded-2xl flex items-center justify-center shrink-0", isSmsActive ? "bg-emerald-500/20" : "bg-indigo-500/20")}>
+                <Phone className={cn("h-5 w-5", isSmsActive ? "text-emerald-500" : "text-indigo-500")} />
               </div>
               <div>
                 <h4 className="text-sm font-bold">SMS Fallback Parser</h4>
                 <p className="text-xs text-muted-foreground">Parse bank debit SMS background stream</p>
               </div>
             </div>
-            {permissionsStatus.sms && (
-              <div className="h-6 w-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+            {isSmsActive && (
+              <div className="h-6 w-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30 shrink-0 mt-0.5">
                 <Check className="h-3.5 w-3.5 text-white" />
               </div>
             )}
           </div>
+
+          <div className="flex items-center justify-between pt-1 border-t border-white/5">
+            <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+              <input 
+                type="checkbox" 
+                checked={isSmsActive} 
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setManualSms(val);
+                  localStorage.setItem('manual_perm_sms', String(val));
+                  toast.success(val ? 'Manually enabled SMS parser' : 'Manual setting cleared');
+                }}
+                disabled={permissionsStatus.sms}
+                className="rounded border-white/20 bg-black/20 text-emerald-500 focus:ring-emerald-500 h-4 w-4 cursor-pointer disabled:opacity-70 disabled:cursor-default"
+              />
+              <span className="text-[11px] font-bold text-muted-foreground hover:text-foreground transition-colors">
+                {permissionsStatus.sms ? "Automatically Verified by OS" : "Manually Enabled / Verified"}
+              </span>
+            </label>
+            {isSmsActive && <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500">Active</span>}
+          </div>
+
           <Button 
-            className={cn("w-full rounded-2xl h-11 text-white shadow-lg", permissionsStatus.sms ? "bg-emerald-500 shadow-emerald-500/20" : "bg-indigo-500 shadow-indigo-500/20")}
+            className={cn("w-full rounded-2xl h-11 text-white shadow-lg font-bold", isSmsActive ? "bg-emerald-500 shadow-emerald-500/20" : "bg-indigo-500 shadow-indigo-500/20")}
             onClick={() => {
               import('@/lib/permissions').then(m => m.permissions.requestSMSPermission());
               toast.info('Requesting SMS broadcast access...');
             }}
           >
-            {permissionsStatus.sms ? 'SMS Parsing Active' : 'Enable SMS Parsing'}
+            {isSmsActive ? 'SMS Parsing Active' : 'Enable SMS Parsing'}
           </Button>
         </div>
 
-        <div className={cn("p-5 rounded-3xl border transition-all space-y-4", permissionsStatus.overlay ? "bg-emerald-500/5 border-emerald-500/20" : "bg-warning/5 border-warning/20")}>
-          <div className="flex items-center justify-between">
+        <div className={cn("p-5 rounded-3xl border transition-all space-y-4", isOverlayActive ? "bg-emerald-500/5 border-emerald-500/20" : "bg-warning/5 border-warning/20")}>
+          <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-3">
-              <div className={cn("h-10 w-10 rounded-2xl flex items-center justify-center", permissionsStatus.overlay ? "bg-emerald-500/20" : "bg-warning/20")}>
-                <Zap className={cn("h-5 w-5", permissionsStatus.overlay ? "text-emerald-500" : "text-warning")} />
+              <div className={cn("h-10 w-10 rounded-2xl flex items-center justify-center shrink-0", isOverlayActive ? "bg-emerald-500/20" : "bg-warning/20")}>
+                <Zap className={cn("h-5 w-5", isOverlayActive ? "text-emerald-500" : "text-warning")} />
               </div>
               <div>
                 <h4 className="text-sm font-bold">Native Overlay Access</h4>
                 <p className="text-xs text-muted-foreground">Instantly pop up native glassmorphic interface</p>
               </div>
             </div>
-            {permissionsStatus.overlay && (
-              <div className="h-6 w-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+            {isOverlayActive && (
+              <div className="h-6 w-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30 shrink-0 mt-0.5">
                 <Check className="h-3.5 w-3.5 text-white" />
               </div>
             )}
           </div>
+
+          <div className="flex items-center justify-between pt-1 border-t border-white/5">
+            <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+              <input 
+                type="checkbox" 
+                checked={isOverlayActive} 
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setManualOverlay(val);
+                  localStorage.setItem('manual_perm_overlay', String(val));
+                  toast.success(val ? 'Manually verified overlay setup' : 'Manual setting cleared');
+                }}
+                disabled={permissionsStatus.overlay}
+                className="rounded border-white/20 bg-black/20 text-emerald-500 focus:ring-emerald-500 h-4 w-4 cursor-pointer disabled:opacity-70 disabled:cursor-default"
+              />
+              <span className="text-[11px] font-bold text-muted-foreground hover:text-foreground transition-colors">
+                {permissionsStatus.overlay ? "Automatically Verified by OS" : "Manually Enabled / Verified"}
+              </span>
+            </label>
+            {isOverlayActive && <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500">Active</span>}
+          </div>
+
           <Button 
-            variant={permissionsStatus.overlay ? "default" : "outline"}
-            className={cn("w-full rounded-2xl h-11 shadow-lg", permissionsStatus.overlay ? "bg-emerald-500 text-white shadow-emerald-500/20 border-transparent" : "border-warning/30 hover:bg-warning/10")}
+            variant={isOverlayActive ? "default" : "outline"}
+            className={cn("w-full rounded-2xl h-11 shadow-lg font-bold", isOverlayActive ? "bg-emerald-500 text-white shadow-emerald-500/20 border-transparent" : "border-warning/30 hover:bg-warning/10")}
             onClick={() => {
               import('@/lib/permissions').then(m => m.permissions.requestOverlayPermission());
               toast.info('Opening native overlay permission setup...');
             }}
           >
-            {permissionsStatus.overlay ? 'Overlay Permission Granted' : 'Grant Overlay Permission'}
+            {isOverlayActive ? 'Overlay Permission Granted' : 'Grant Overlay Permission'}
           </Button>
         </div>
 

@@ -81,6 +81,23 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
     return { avgEconomy, totalSpent, totalDist, costPerKm, chartData };
   }, [activeLogs]);
 
+  const stationAnalytics = useMemo(() => {
+    if (!activeLogs.length) return null;
+    const counts: Record<string, { count: number; spent: number; liters: number }> = {};
+    activeLogs.forEach(l => {
+      const st = l.station || 'IndianOil';
+      if (!counts[st]) counts[st] = { count: 0, spent: 0, liters: 0 };
+      counts[st].count += 1;
+      counts[st].spent += l.totalCost;
+      counts[st].liters += l.liters;
+    });
+
+    const sorted = Object.entries(counts).sort((a,b) => b[1].count - a[1].count);
+    const topStation = sorted[0] ? { name: sorted[0][0], ...sorted[0][1] } : null;
+
+    return { breakdown: sorted, topStation };
+  }, [activeLogs]);
+
   // Vehicle Management State
   const [newVehName, setNewVehName] = useState('');
   const [newVehRate, setNewVehRate] = useState('');
@@ -472,6 +489,44 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
               </div>
             </div>
           )}
+
+          {/* Station Preference Breakdown */}
+          {stationAnalytics && stationAnalytics.breakdown.length > 0 && (
+            <div className="rounded-2xl border border-border/60 bg-card/40 p-4 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                  <Fuel className="h-3 w-3 text-primary" /> Station Insights
+                </h4>
+                {stationAnalytics.topStation && (
+                  <span className="text-[10px] font-bold text-primary">
+                    Most Visited: {stationAnalytics.topStation.name}
+                  </span>
+                )}
+              </div>
+              
+              <div className="space-y-2 pt-1">
+                {stationAnalytics.breakdown.map(([name, data]) => {
+                  const pct = (data.spent / (stats?.totalSpent || data.spent || 1)) * 100;
+                  return (
+                    <div key={name} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold tracking-tight">{name} <span className="text-[10px] text-muted-foreground font-normal">({data.count} visits)</span></span>
+                        <span className="font-mono font-bold text-muted-foreground">₹{Math.round(data.spent).toLocaleString()}</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-black/20 rounded-full overflow-hidden border border-white/5">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min(Math.max(pct, 4), 100)}%` }}
+                          className="h-full bg-primary rounded-full"
+                          transition={{ duration: 0.8, ease: "easeOut" }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       ) : activeLogs.length > 0 ? (
         <div className="rounded-2xl border border-warning/30 bg-warning/5 p-6 text-center shadow-inner">
@@ -522,8 +577,13 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="flex items-center gap-2 mb-1">
-                            <div className="h-2 w-2 rounded-full bg-primary shadow-glow shadow-primary/40" />
+                            <div className="h-2 w-2 rounded-full bg-primary shadow-glow shadow-primary/40 shrink-0" />
                             <p className="font-black font-mono text-xl tracking-tighter text-foreground">{log.odometer.toLocaleString()} <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">km</span></p>
+                            {log.station && (
+                              <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-muted/40 text-muted-foreground border border-border/40 shrink-0">
+                                {log.station}
+                              </span>
+                            )}
                           </div>
                           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.1em] flex items-center gap-1.5">
                             <Calendar className="h-3 w-3 opacity-40" /> {format(new Date(log.date), 'dd MMM yyyy')} · {log.liters}L @ ₹{log.pricePerLiter}
