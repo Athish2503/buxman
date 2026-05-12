@@ -26,7 +26,7 @@ import { SMSExpenseNudge } from '@/components/sms-expense-nudge';
 import { PermissionGuard } from '@/components/permission-guard';
 import { FloatingAddMenu } from '@/components/floating-add-menu';
 import { PendingTransactionsModal } from '@/components/pending-transactions-modal';
-import { DiningDashboard } from '@/components/food/DiningDashboard';
+import { DiningDashboard } from '@/components/food';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,12 +39,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { formatCurrency } from '@/lib/utils';
 
-import { DashboardModule } from '@/components/dashboard/DashboardModule';
-import { ExpensesModule } from '@/components/dashboard/ExpensesModule';
-import { ReimbursementsModule } from '@/components/dashboard/ReimbursementsModule';
-import { GarageModule } from '@/components/dashboard/GarageModule';
-import { AnalyticsModule } from '@/components/dashboard/AnalyticsModule';
-import { TripsModule } from '@/components/dashboard/TripsModule';
+import {
+  DashboardModule,
+  ExpensesModule,
+  ReimbursementsModule,
+  GarageModule,
+  AnalyticsModule,
+  TripsModule,
+} from '@/components/dashboard';
 import { Tab, NAV_ITEMS_CONFIG } from '@/lib/nav-config';
 
 
@@ -461,7 +463,16 @@ function MoreNavButton({
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: '100%', opacity: 0 }}
                 transition={{ type: 'spring', damping: 26, stiffness: 340 }}
-                className="fixed bottom-0 left-0 right-0 z-[10000] bg-card border-t border-border/50 rounded-t-3xl p-6 pb-10"
+                drag="y"
+                dragConstraints={{ top: 0, bottom: 0 }}
+                dragElastic={{ top: 0, bottom: 0.8 }}
+                onDragEnd={(_, info) => {
+                  if (info.offset.y > 80 || info.velocity.y > 400) {
+                    haptics.selection();
+                    setOpen(false);
+                  }
+                }}
+                className="fixed bottom-0 left-0 right-0 z-[10000] bg-card border-t border-border/50 rounded-t-3xl p-6 pb-10 cursor-grab active:cursor-grabbing"
               >
                 <div className="w-10 h-1 bg-border rounded-full mx-auto mb-6" />
                 <div className="grid grid-cols-4 gap-3">

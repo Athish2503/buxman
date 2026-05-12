@@ -121,8 +121,17 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
              </div>
           </div>
           
-          <div className="h-10 w-10 rounded-2xl bg-muted/30 flex items-center justify-center text-muted-foreground group-hover:bg-primary group-hover:text-white group-hover:scale-110 transition-all">
-             <ChevronRight className="h-5 w-5" />
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button 
+              onClick={(e) => { e.stopPropagation(); onShare?.(); }}
+              className="h-10 w-10 rounded-2xl bg-muted/20 hover:bg-primary/20 text-muted-foreground hover:text-primary flex items-center justify-center transition-all shadow-sm active:scale-95"
+              title="Share cinematic layout"
+            >
+              <Share2 className="h-4.5 w-4.5" />
+            </button>
+            <div className="h-10 w-10 rounded-2xl bg-muted/30 flex items-center justify-center text-muted-foreground group-hover:bg-primary group-hover:text-white group-hover:scale-110 transition-all">
+               <ChevronRight className="h-5 w-5" />
+            </div>
           </div>
         </div>
       </motion.div>
@@ -284,7 +293,7 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
                 onClick={(e) => { e.stopPropagation(); onEdit?.(); }}
                 className="flex-1 h-14 rounded-2xl bg-primary text-white hover:opacity-90 font-black uppercase tracking-widest text-[10px] shadow-glow gap-2 border-none"
               >
-                <Edit className="h-4.5 w-4.5" /> Edit Expense
+                <Edit className="h-4.5 w-4.5" /> Edit Experience
               </Button>
               
               <Button 
@@ -369,8 +378,17 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
              </div>
           </div>
           
-          <div className="h-10 w-10 rounded-2xl bg-muted/30 flex items-center justify-center text-muted-foreground group-hover:bg-primary group-hover:text-white group-hover:scale-110 transition-all">
-             <ChevronRight className="h-5 w-5" />
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button 
+              onClick={(e) => { e.stopPropagation(); onShare?.(); }}
+              className="h-10 w-10 rounded-2xl bg-muted/20 hover:bg-primary/20 text-muted-foreground hover:text-primary flex items-center justify-center transition-all shadow-sm active:scale-95"
+              title="Share cinematic layout"
+            >
+              <Share2 className="h-4.5 w-4.5" />
+            </button>
+            <div className="h-10 w-10 rounded-2xl bg-muted/30 flex items-center justify-center text-muted-foreground group-hover:bg-primary group-hover:text-white group-hover:scale-110 transition-all">
+               <ChevronRight className="h-5 w-5" />
+            </div>
           </div>
         </div>
       </motion.div>

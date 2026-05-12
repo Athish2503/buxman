@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Plane, Plus, MapPin, Calendar, Users, ChevronRight, X, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { TripDetailView } from '../trips/TripDetailView';
-import { ContactSelector } from '../split/ContactSelector';
+import { TripDetailView } from '../trips';
+import { ContactSelector } from '../split';
 import {
   AlertDialog,
   AlertDialogAction,
