@@ -8,33 +8,37 @@ import android.provider.Settings
 import android.util.Log
 import com.getcapacitor.*
 import com.getcapacitor.annotation.CapacitorPlugin
+import com.pixel.reimburse.transactions.ParsedTransactionInfo
+import com.pixel.reimburse.transactions.TransactionOverlayService
 
 @CapacitorPlugin(name = "FinancialNotification")
 class FinancialNotificationPlugin : Plugin() {
 
     private val PREFS_NAME = "FinancialNotificationPrefs"
-    private val PENDING_TX_KEY = "pending_transactions"
 
     companion object {
         private var instance: FinancialNotificationPlugin? = null
 
-        fun onTransactionDetected(transaction: ParsedTransaction) {
+        fun onTransactionCaptured(context: Context, info: ParsedTransactionInfo) {
             val data = JSObject().apply {
-                put("amount", transaction.amount)
-                put("merchant", transaction.merchant)
-                put("type", transaction.type)
-                put("appName", transaction.appName)
-                put("timestamp", transaction.timestamp)
-                put("rawText", transaction.rawText)
-                put("reference", transaction.reference)
+                put("amount", info.amount)
+                put("merchant", info.merchant)
+                put("source", info.sourceApp)
+                put("appName", info.sourceApp)
+                put("confidence", info.confidenceScore)
+                put("type", info.type)
+                put("rawText", info.rawText)
+                put("timestamp", info.timestamp)
+                put("reference", info.transactionId)
+                put("transactionId", info.transactionId)
             }
-            
+
             if (instance != null) {
-                Log.d("FinancialNotification", "Notifying listeners: transactionDetected")
+                Log.d("FinancialNotification", "Notifying JS listeners: transactionDetected")
                 instance?.notifyListeners("transactionDetected", data)
             } else {
-                Log.d("FinancialNotification", "Instance is null, saving pending transaction")
-                savePendingTransaction(data)
+                Log.d("FinancialNotification", "Plugin instance null, queueing pending transaction persistently")
+                savePendingTransaction(context, data)
             }
         }
 
@@ -49,30 +53,38 @@ class FinancialNotificationPlugin : Plugin() {
             if (instance != null) {
                 instance?.notifyListeners("overlayAction", data)
             } else {
-                savePendingAction(data)
+                val ctx = instance?.context
+                if (ctx != null) {
+                    savePendingAction(ctx, data)
+                }
             }
         }
 
-        private fun savePendingTransaction(data: JSObject) {
-            val context = instance?.context ?: return
+        private fun savePendingTransaction(context: Context, data: JSObject) {
             val prefs = context.getSharedPreferences("FinancialNotificationPrefs", Context.MODE_PRIVATE)
             val current = prefs.getStringSet("pending_transactions", mutableSetOf()) ?: mutableSetOf()
-            current.add(data.toString())
-            prefs.edit().putStringSet("pending_transactions", current).apply()
+            val updated = mutableSetOf<String>().apply {
+                addAll(current)
+                add(data.toString())
+            }
+            prefs.edit().putStringSet("pending_transactions", updated).apply()
+            Log.d("FinancialNotification", "Saved pending transaction to persistent queue.")
         }
 
-        private fun savePendingAction(data: JSObject) {
-            val context = instance?.context ?: return
+        private fun savePendingAction(context: Context, data: JSObject) {
             val prefs = context.getSharedPreferences("FinancialNotificationPrefs", Context.MODE_PRIVATE)
             val current = prefs.getStringSet("pending_actions", mutableSetOf()) ?: mutableSetOf()
-            current.add(data.toString())
-            prefs.edit().putStringSet("pending_actions", current).apply()
+            val updated = mutableSetOf<String>().apply {
+                addAll(current)
+                add(data.toString())
+            }
+            prefs.edit().putStringSet("pending_actions", updated).apply()
         }
     }
 
     override fun load() {
         instance = this
-        Log.d("FinancialNotification", "Plugin loaded and instance set")
+        Log.d("FinancialNotification", "FinancialNotificationPlugin initialized successfully.")
     }
 
     @PluginMethod
@@ -87,7 +99,7 @@ class FinancialNotificationPlugin : Plugin() {
     @PluginMethod
     fun flushPendingQueue(call: PluginCall) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        
+
         val transactions = prefs.getStringSet("pending_transactions", null)
         if (transactions != null) {
             for (txStr in transactions) {
@@ -111,7 +123,7 @@ class FinancialNotificationPlugin : Plugin() {
             }
             prefs.edit().remove("pending_actions").apply()
         }
-        
+
         call.resolve()
     }
 
@@ -140,7 +152,7 @@ class FinancialNotificationPlugin : Plugin() {
             for (i in 0 until cats.length()) {
                 list.add(cats.getString(i))
             }
-            OverlayService.updateCategories(list)
+            TransactionOverlayService.updateCategories(list)
         }
         call.resolve()
     }
@@ -174,36 +186,114 @@ class FinancialNotificationPlugin : Plugin() {
         val amount = call.getDouble("amount") ?: 1250.0
         val merchant = call.getString("merchant") ?: "STARBUCKS"
         val appName = call.getString("appName") ?: "GPay"
-        
+
         Log.d("FinancialNotification", "Simulating transaction: $merchant, $amount")
-        
-        val transaction = ParsedTransaction(
+
+        val info = ParsedTransactionInfo(
             amount = amount,
             merchant = merchant,
+            sourceApp = appName,
+            confidenceScore = 100,
             type = "debit",
-            appName = appName,
-            timestamp = System.currentTimeMillis(),
+            transactionId = "SIM${System.currentTimeMillis()}",
             rawText = "Simulated transaction for testing",
-            confidence = 100
+            timestamp = System.currentTimeMillis()
         )
-        
-        onTransactionDetected(transaction)
-        
+
+        onTransactionCaptured(context, info)
+
         try {
-            val intent = Intent(context, OverlayService::class.java).apply {
-                putExtra("amount", transaction.amount)
-                putExtra("merchant", transaction.merchant)
-                putExtra("appName", transaction.appName)
-                putExtra("timestamp", transaction.timestamp)
-                putExtra("rawText", transaction.rawText)
-                putExtra("confidence", transaction.confidence)
+            val intent = Intent(context, TransactionOverlayService::class.java).apply {
+                putExtra("amount", info.amount)
+                putExtra("merchant", info.merchant)
+                putExtra("appName", info.sourceApp)
+                putExtra("rawText", info.rawText)
             }
             context.startService(intent)
-            Log.d("FinancialNotification", "OverlayService started from simulation")
         } catch (e: Exception) {
-            Log.e("FinancialNotification", "Failed to start OverlayService", e)
+            Log.e("FinancialNotification", "Failed starting TransactionOverlayService", e)
         }
-        
+
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun simulateNotification(call: PluginCall) {
+        val title = call.getString("title") ?: "GPay"
+        val text = call.getString("text") ?: "Paid ₹850 to Zomato"
+        val packageName = call.getString("packageName") ?: "com.google.android.apps.nbu.paisa.user"
+
+        com.pixel.reimburse.transactions.TransactionDetector.processTransactionContent(
+            context = context,
+            text = "$title $text",
+            packageName = packageName,
+            title = title,
+            source = "SimulatedNotification"
+        )
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun simulateSms(call: PluginCall) {
+        val sender = call.getString("sender") ?: "VM-HDFCBK"
+        val body = call.getString("body") ?: "Your A/c XXXX is debited with INR 450.00 towards Zomato on 12-05-26. Ref: 987654321"
+
+        com.pixel.reimburse.transactions.TransactionDetector.processTransactionContent(
+            context = context,
+            text = body,
+            packageName = sender,
+            title = "SMS",
+            source = "SimulatedSms"
+        )
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun simulateGPayTransaction(call: PluginCall) {
+        val amount = call.getDouble("amount") ?: 1500.0
+        val merchant = call.getString("merchant") ?: "Swiggy Instamart"
+
+        val info = ParsedTransactionInfo(
+            amount = amount,
+            merchant = merchant,
+            sourceApp = "GPay",
+            confidenceScore = 100,
+            type = "debit",
+            transactionId = "SIM${System.currentTimeMillis()}",
+            rawText = "Paid ₹$amount to $merchant",
+            timestamp = System.currentTimeMillis()
+        )
+        onTransactionCaptured(context, info)
+
+        try {
+            val intent = Intent(context, TransactionOverlayService::class.java).apply {
+                putExtra("amount", info.amount)
+                putExtra("merchant", info.merchant)
+                putExtra("appName", info.sourceApp)
+                putExtra("rawText", info.rawText)
+            }
+            context.startService(intent)
+        } catch (e: Exception) {}
+
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun forceOverlay(call: PluginCall) {
+        val amount = call.getDouble("amount") ?: 999.0
+        val merchant = call.getString("merchant") ?: "Forced Overlay Test"
+        val appName = call.getString("appName") ?: "Debug"
+
+        try {
+            val intent = Intent(context, TransactionOverlayService::class.java).apply {
+                putExtra("amount", amount)
+                putExtra("merchant", merchant)
+                putExtra("appName", appName)
+                putExtra("rawText", "Forced manually from developer options")
+            }
+            context.startService(intent)
+        } catch (e: Exception) {}
+
         call.resolve()
     }
 
@@ -212,4 +302,3 @@ class FinancialNotificationPlugin : Plugin() {
         return enabledListeners != null && enabledListeners.contains(context.packageName)
     }
 }
-

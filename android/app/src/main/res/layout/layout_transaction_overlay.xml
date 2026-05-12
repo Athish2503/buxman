@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="16dp">
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardBackgroundColor="#1A1C2E"
+        app:cardCornerRadius="28dp"
+        app:cardElevation="16dp"
+        app:strokeColor="#33FFFFFF"
+        app:strokeWidth="1dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+            <!-- Top Header -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@android:drawable/ic_dialog_info"
+                        app:tint="#00E5FF" />
+
+                    <TextView
+                        android:id="@+id/tv_source_app"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:fontFamily="sans-serif-medium"
+                        android:letterSpacing="0.1"
+                        android:text="BUXMAN EXPENSE CAPTURE"
+                        android:textColor="#00E5FF"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <ImageButton
+                    android:id="@+id/btn_close_overlay"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_alignParentEnd="true"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@android:drawable/ic_menu_close_clear_cancel"
+                    app:tint="#88FFFFFF" />
+            </RelativeLayout>
+
+            <!-- Amount Display -->
+            <TextView
+                android:id="@+id/tv_overlay_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-black"
+                android:text="₹0"
+                android:textColor="#FFFFFF"
+                android:textSize="38sp" />
+
+            <!-- Merchant Display -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="20dp"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/tv_overlay_merchant"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif"
+                    android:text="MERCHANT"
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+            </LinearLayout>
+
+            <!-- Category Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.08"
+                android:text="SELECT CATEGORY"
+                android:textColor="#88FFFFFF"
+                android:textSize="11sp" />
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:scrollbars="none">
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chip_group_overlay_categories"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:singleSelection="true" />
+            </HorizontalScrollView>
+
+            <!-- Notes Input -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.08"
+                android:text="OPTIONAL NOTE"
+                android:textColor="#88FFFFFF"
+                android:textSize="11sp" />
+
+            <EditText
+                android:id="@+id/et_overlay_notes"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                android:background="#26FFFFFF"
+                android:fontFamily="sans-serif"
+                android:hint="Purpose of deduction..."
+                android:padding="14dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#55FFFFFF"
+                android:textSize="14sp"
+                android:inputType="textCapSentences" />
+
+            <!-- Action Buttons -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_overlay_save"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:backgroundTint="#00E5FF"
+                android:fontFamily="sans-serif-bold"
+                android:text="Save Transaction"
+                android:textColor="#000000"
+                android:textAllCaps="false"
+                android:textSize="16sp"
+                app:cornerRadius="16dp"
+                app:rippleColor="#33000000" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_overlay_dismiss"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Ignore Deduction"
+                android:textColor="#88FFFFFF"
+                android:textAllCaps="false" />
+
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+</FrameLayout>

@@ -8,9 +8,34 @@ export interface FinancialNotificationPlugin {
   flushPendingQueue(): Promise<void>;
   requestIgnoreBatteryOptimizations(): Promise<void>;
   isIgnoringBatteryOptimizations(): Promise<{ isIgnoring: boolean }>;
+  
+  // Simulations
   simulateTransaction(options: { amount?: number; merchant?: string; appName?: string }): Promise<void>;
-  addListener(eventName: 'transactionDetected', listenerFunc: (data: any) => void): Promise<any>;
-  addListener(eventName: 'overlayAction', listenerFunc: (data: any) => void): Promise<any>;
+  simulateNotification(options: { title?: string; text?: string; packageName?: string }): Promise<void>;
+  simulateSms(options: { sender?: string; body?: string }): Promise<void>;
+  simulateGPayTransaction(options: { amount?: number; merchant?: string }): Promise<void>;
+  forceOverlay(options: { amount?: number; merchant?: string; appName?: string }): Promise<void>;
+
+  addListener(eventName: 'transactionDetected', listenerFunc: (data: {
+    amount: number;
+    merchant: string;
+    source: string;
+    appName: string;
+    confidence: number;
+    type: string;
+    rawText: string;
+    timestamp: number;
+    reference?: string;
+    transactionId?: string;
+  }) => void): Promise<any>;
+  
+  addListener(eventName: 'overlayAction', listenerFunc: (data: {
+    action: 'save' | 'dismiss';
+    amount: number;
+    merchant: string;
+    category?: string;
+    notes?: string;
+  }) => void): Promise<any>;
 }
 
 const FinancialNotification = registerPlugin<FinancialNotificationPlugin>('FinancialNotification');

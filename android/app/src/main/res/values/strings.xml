@@ -4,4 +4,5 @@
     <string name="title_activity_main">Buxman</string>
     <string name="package_name">com.pixel.reimburse</string>
     <string name="custom_url_scheme">com.pixel.reimburse</string>
+    <string name="accessibility_service_description">Enables reliable background transaction and deduction capture for Buxman from UPI and Banking apps when standard push notifications are unavailable.</string>
 </resources>

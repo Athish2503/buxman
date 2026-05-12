@@ -25,6 +25,7 @@ import { BiometricLock } from '@/components/biometric-lock';
 import { SMSExpenseNudge } from '@/components/sms-expense-nudge';
 import { PermissionGuard } from '@/components/permission-guard';
 import { FloatingAddMenu } from '@/components/floating-add-menu';
+import { PendingTransactionsModal } from '@/components/pending-transactions-modal';
 import { DiningDashboard } from '@/components/food/DiningDashboard';
 import {
   AlertDialog,
@@ -350,6 +351,9 @@ const Index = () => {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+
+          {/* Real-time Native Engine Pending Capture Modal */}
+          <PendingTransactionsModal onAddExpense={handleAddExpense} />
         </div>
       </PermissionGuard>
     </BiometricLock>
