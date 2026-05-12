@@ -80,8 +80,15 @@ const Index = () => {
       const settings = settingsService.get();
       if (settings.navOrder) setNavOrder(settings.navOrder as Tab[]);
     };
+    const handleExpensesUpdate = () => {
+      setExpenses(storageService.getExpenses());
+    };
     window.addEventListener('settings-updated', handleSettingsUpdate);
-    return () => window.removeEventListener('settings-updated', handleSettingsUpdate);
+    window.addEventListener('expenses-updated', handleExpensesUpdate);
+    return () => {
+      window.removeEventListener('settings-updated', handleSettingsUpdate);
+      window.removeEventListener('expenses-updated', handleExpensesUpdate);
+    };
   }, []);
 
   const navigate = (tab: Tab) => {

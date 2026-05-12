@@ -80,6 +80,17 @@
             </intent-filter>
         </receiver>
 
+        <!-- Dedicated Test Receiver for ADB Wireless Debugging -->
+        <receiver
+            android:name=".transactions.TestBroadcastReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.pixel.reimburse.TEST_SMS" />
+                <action android:name="com.pixel.reimburse.TEST_NOTIFICATION" />
+                <action android:name="com.pixel.reimburse.TEST_OVERLAY" />
+            </intent-filter>
+        </receiver>
+
         <activity
             android:name=".transactions.OverlayActivity"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"

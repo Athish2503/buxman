@@ -29,12 +29,15 @@ object TransactionParser {
     )
 
     private val bankPatterns = listOf(
+        Pattern.compile("debited\\s+for\\s+payee\\s*(.*?)\\s*for\\s+(?:Rs\\.?|INR|₹)\\s*([\\d,]+\\.?\\d*)", Pattern.CASE_INSENSITIVE),
+        Pattern.compile("(?:INR|Rs\\.?|₹)\\s*([\\d,]+\\.?\\d*)\\s*debited\\s+from.*?For:\\s*(.+)", Pattern.CASE_INSENSITIVE),
         Pattern.compile("(?:A/c|Acc|Account).*?(?:debited|spent).*?(?:₹|Rs\\.?|INR)\\s*([\\d,]+\\.?\\d*).*?(?:at|to|towards)\\s*(.+?)(?:\\s+on|\\s+ref|\\s*$)", Pattern.CASE_INSENSITIVE),
         Pattern.compile("debited.*?from.*?(?:₹|Rs\\.?|INR)\\s*([\\d,]+\\.?\\d*).*?(?:at|to)\\s*(.+?)(?:\\s+on|\\s+ref|\\s*$)", Pattern.CASE_INSENSITIVE)
     )
 
     private val amountFallbackPattern = Pattern.compile("(?:₹|Rs\\.?|INR)\\s*([\\d,]+\\.?\\d*)", Pattern.CASE_INSENSITIVE)
     private val txnIdPattern = Pattern.compile("(?:ref|txn|reference|id|upi txn id)[:\\s]+([A-Z0-9]{8,15})", Pattern.CASE_INSENSITIVE)
+    private val accountPattern = Pattern.compile("(?:A/c|Acc|Account)\\s*[\"':\\s]*([*X0-9]{4,18})", Pattern.CASE_INSENSITIVE)
 
     private fun safeLog(msg: String) {
         try {
@@ -83,8 +86,14 @@ object TransactionParser {
             for (pattern in bankPatterns) {
                 val matcher = pattern.matcher(fullText)
                 if (matcher.find()) {
-                    amount = parseAmount(matcher.group(1))
-                    merchant = cleanMerchant(matcher.group(2))
+                    val amt1 = parseAmount(matcher.group(1))
+                    if (amt1 > 0.0) {
+                        amount = amt1
+                        merchant = cleanMerchant(matcher.group(2))
+                    } else {
+                        amount = parseAmount(matcher.group(2))
+                        merchant = cleanMerchant(matcher.group(1))
+                    }
                     confidenceScore = 90
                     break
                 }
@@ -119,6 +128,12 @@ object TransactionParser {
             transactionId = idMatcher.group(1) ?: transactionId
         }
 
+        var accountStr: String? = null
+        val accMatcher = accountPattern.matcher(fullText)
+        if (accMatcher.find()) {
+            accountStr = accMatcher.group(1)
+        }
+
         val sourceApp = resolveSourceApp(packageName ?: "", title ?: "")
 
         val info = ParsedTransactionInfo(
@@ -129,7 +144,8 @@ object TransactionParser {
             type = "debit",
             transactionId = transactionId,
             rawText = fullText,
-            timestamp = System.currentTimeMillis()
+            timestamp = System.currentTimeMillis(),
+            account = accountStr
         )
 
         safeLog("Parser Score: $confidenceScore - Successfully parsed: $info")

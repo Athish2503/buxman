@@ -9,10 +9,10 @@
         android:id="@+id/card_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardBackgroundColor="#1A1C2E"
-        app:cardCornerRadius="28dp"
-        app:cardElevation="16dp"
-        app:strokeColor="#33FFFFFF"
+        app:cardBackgroundColor="#12131A"
+        app:cardCornerRadius="32dp"
+        app:cardElevation="20dp"
+        app:strokeColor="#26FFFFFF"
         app:strokeWidth="1dp">
 
         <LinearLayout
@@ -25,7 +25,7 @@
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp">
+                android:layout_marginBottom="18dp">
 
                 <LinearLayout
                     android:layout_width="wrap_content"
@@ -37,7 +37,7 @@
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:src="@android:drawable/ic_dialog_info"
-                        app:tint="#00E5FF" />
+                        app:tint="#A855F7" />
 
                     <TextView
                         android:id="@+id/tv_source_app"
@@ -46,8 +46,8 @@
                         android:layout_marginStart="8dp"
                         android:fontFamily="sans-serif-medium"
                         android:letterSpacing="0.1"
-                        android:text="BUXMAN EXPENSE CAPTURE"
-                        android:textColor="#00E5FF"
+                        android:text="BUXMAN DETECTED"
+                        android:textColor="#A855F7"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -69,21 +69,21 @@
                 android:fontFamily="sans-serif-black"
                 android:text="₹0"
                 android:textColor="#FFFFFF"
-                android:textSize="38sp" />
+                android:textSize="42sp" />
 
             <!-- Merchant Display -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:layout_marginBottom="20dp"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="22dp"
                 android:gravity="center_vertical">
 
                 <TextView
                     android:id="@+id/tv_overlay_merchant"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:fontFamily="sans-serif"
+                    android:fontFamily="sans-serif-medium"
                     android:text="MERCHANT"
                     android:textColor="#B3FFFFFF"
                     android:textSize="16sp"
@@ -96,7 +96,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
                 android:fontFamily="sans-serif-medium"
-                android:letterSpacing="0.08"
+                android:letterSpacing="0.1"
                 android:text="SELECT CATEGORY"
                 android:textColor="#88FFFFFF"
                 android:textSize="11sp" />
@@ -104,7 +104,7 @@
             <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
+                android:layout_marginBottom="18dp"
                 android:scrollbars="none">
 
                 <com.google.android.material.chip.ChipGroup
@@ -120,7 +120,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
                 android:fontFamily="sans-serif-medium"
-                android:letterSpacing="0.08"
+                android:letterSpacing="0.1"
                 android:text="OPTIONAL NOTE"
                 android:textColor="#88FFFFFF"
                 android:textSize="11sp" />
@@ -129,11 +129,11 @@
                 android:id="@+id/et_overlay_notes"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="20dp"
-                android:background="#26FFFFFF"
+                android:layout_marginBottom="22dp"
+                android:background="@drawable/bg_overlay_input"
                 android:fontFamily="sans-serif"
                 android:hint="Purpose of deduction..."
-                android:padding="14dp"
+                android:padding="16dp"
                 android:textColor="#FFFFFF"
                 android:textColorHint="#55FFFFFF"
                 android:textSize="14sp"
@@ -143,26 +143,59 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_overlay_save"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:backgroundTint="#00E5FF"
+                android:layout_height="60dp"
+                android:backgroundTint="#8B5CF6"
                 android:fontFamily="sans-serif-bold"
                 android:text="Save Transaction"
-                android:textColor="#000000"
+                android:textColor="#FFFFFF"
                 android:textAllCaps="false"
                 android:textSize="16sp"
-                app:cornerRadius="16dp"
-                app:rippleColor="#33000000" />
+                app:cornerRadius="20dp"
+                app:rippleColor="#33FFFFFF" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_overlay_dismiss"
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="6dp"
                 android:text="Ignore Deduction"
                 android:textColor="#88FFFFFF"
                 android:textAllCaps="false" />
 
         </LinearLayout>
+
+        <!-- Success Animation Overlay Layer -->
+        <FrameLayout
+            android:id="@+id/layout_success_animation"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#E60D0E15"
+            android:clickable="true"
+            android:focusable="true"
+            android:alpha="0"
+            android:visibility="gone">
+
+            <!-- Outward expanding aura burst ring -->
+            <View
+                android:id="@+id/view_burst_ring"
+                android:layout_width="160dp"
+                android:layout_height="160dp"
+                android:layout_gravity="center"
+                android:background="@drawable/shape_success_burst_ring"
+                android:scaleX="0.2"
+                android:scaleY="0.2"
+                android:alpha="0" />
+
+            <!-- Center popping green tick -->
+            <ImageView
+                android:id="@+id/iv_success_tick"
+                android:layout_width="84dp"
+                android:layout_height="84dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_success_tick"
+                android:scaleX="0"
+                android:scaleY="0" />
+        </FrameLayout>
     </com.google.android.material.card.MaterialCardView>
 </FrameLayout>

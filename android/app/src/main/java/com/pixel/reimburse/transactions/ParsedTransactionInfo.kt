@@ -8,5 +8,6 @@ data class ParsedTransactionInfo(
     val type: String, // "debit" or "credit"
     val transactionId: String,
     val rawText: String,
-    val timestamp: Long
+    val timestamp: Long,
+    val account: String? = null
 )

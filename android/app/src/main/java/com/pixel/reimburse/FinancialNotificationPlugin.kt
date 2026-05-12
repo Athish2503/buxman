@@ -20,7 +20,9 @@ class FinancialNotificationPlugin : Plugin() {
         private var instance: FinancialNotificationPlugin? = null
 
         fun onTransactionCaptured(context: Context, info: ParsedTransactionInfo) {
+            val eventId = "TX_" + System.currentTimeMillis() + "_" + (1000..9999).random()
             val data = JSObject().apply {
+                put("eventId", eventId)
                 put("amount", info.amount)
                 put("merchant", info.merchant)
                 put("source", info.sourceApp)
@@ -31,32 +33,37 @@ class FinancialNotificationPlugin : Plugin() {
                 put("timestamp", info.timestamp)
                 put("reference", info.transactionId)
                 put("transactionId", info.transactionId)
+                if (info.account != null) {
+                    put("account", info.account)
+                }
             }
+
+            // Always save to persistent queue to ensure zero data loss when JS bridge is inactive or app is in background
+            savePendingTransaction(context, data)
 
             if (instance != null) {
                 Log.d("FinancialNotification", "Notifying JS listeners: transactionDetected")
                 instance?.notifyListeners("transactionDetected", data)
-            } else {
-                Log.d("FinancialNotification", "Plugin instance null, queueing pending transaction persistently")
-                savePendingTransaction(context, data)
             }
         }
 
-        fun onOverlayAction(action: String, amount: Double, merchant: String, category: String? = null, notes: String? = null) {
+        fun onOverlayAction(context: Context, action: String, amount: Double, merchant: String, category: String? = null, notes: String? = null, persistedNatively: Boolean = false) {
+            val eventId = "ACT_" + System.currentTimeMillis() + "_" + (1000..9999).random()
             val data = JSObject().apply {
+                put("eventId", eventId)
                 put("action", action)
                 put("amount", amount)
                 put("merchant", merchant)
                 put("category", category)
                 put("notes", notes)
+                put("persistedNatively", persistedNatively)
             }
+            
+            // Always save to persistent queue
+            savePendingAction(context, data)
+
             if (instance != null) {
                 instance?.notifyListeners("overlayAction", data)
-            } else {
-                val ctx = instance?.context
-                if (ctx != null) {
-                    savePendingAction(ctx, data)
-                }
             }
         }
 
@@ -294,6 +301,23 @@ class FinancialNotificationPlugin : Plugin() {
             context.startService(intent)
         } catch (e: Exception) {}
 
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun acknowledgeEvent(call: PluginCall) {
+        val id = call.getString("id")
+        if (id != null) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            
+            val actions = prefs.getStringSet("pending_actions", mutableSetOf()) ?: mutableSetOf()
+            val updatedActions = actions.filterNot { it.contains(id) }.toMutableSet()
+            prefs.edit().putStringSet("pending_actions", updatedActions).apply()
+
+            val txs = prefs.getStringSet("pending_transactions", mutableSetOf()) ?: mutableSetOf()
+            val updatedTxs = txs.filterNot { it.contains(id) }.toMutableSet()
+            prefs.edit().putStringSet("pending_transactions", updatedTxs).apply()
+        }
         call.resolve()
     }
 

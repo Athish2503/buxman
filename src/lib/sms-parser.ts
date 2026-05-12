@@ -18,46 +18,64 @@ export const smsParser = {
     if (!text) return null;
     const lowerText = text.toLowerCase();
     
-    // Check if it looks like a transaction message
     const transactionKeywords = ['rs.', 'inr', 'amt', 'debited', 'spent', 'paid', 'withdrawal', 'transaction', 'vpa', 'upi', 'merchant', 'credited'];
     const hasKeyword = transactionKeywords.some(kw => lowerText.includes(kw));
     if (!hasKeyword) return null;
 
-    // 1. Amount detection (Rs, INR, Amount)
-    // Supports: "Rs 500", "Rs. 500", "INR 500", "500.00 spent", "debited for 500"
-    const amountMatch = text.match(/(?:rs\.?|inr|amt|debited|purchased|spent|paid|withdrawal|for)\s*(?:of)?\s*([\d,]+\.?\d*)/i) ||
-                        text.match(/([\d,]+\.?\d*)\s*(?:rs\.?|inr|amt|debited|purchased|spent|paid|withdrawal)/i) ||
-                        text.match(/vpa\s*[\d,]+\.?\d*/i); // Fallback for some UPI formats
+    let amount = 0;
+    let vendor = '';
 
-    if (!amountMatch) return null;
-    
-    // Extract number from match
-    const amountStr = amountMatch[1] || amountMatch[0].match(/[\d,]+\.?\d*/)?.[0];
-    if (!amountStr) return null;
-
-    const amount = parseFloat(amountStr.replace(/,/g, ''));
-    if (isNaN(amount) || amount === 0) return null;
-
-    // 2. Vendor detection
-    // Patterns: "at [VENDOR]", "to [VENDOR]", "spent on [VENDOR]", "vpa [VENDOR]", "towards [VENDOR]"
-    const vendorMatch = text.match(/(?:at|to|spent on|vpa|into|merchant|towards|transfer to|paid to)\s+([A-Z0-9\s\.\*\-]+?)(?=\s+(?:on|using|info|ref|at|dated|for|balance|from|$))/i);
-    
-    let vendor = vendorMatch ? vendorMatch[1].trim() : '';
-    
-    // Fallback vendor detection
-    if (!vendor) {
-        // Try to find uppercase words that look like a vendor
-        const upperMatch = text.match(/(?:spent|paid|to)\s+([A-Z][A-Z\s]+)(?=\s|$)/);
-        if (upperMatch) vendor = upperMatch[1].trim();
+    // Pattern A: "debited for payee SOMASUNDARAM B for Rs. 1200.00"
+    const payeeMatch = text.match(/debited\s+for\s+payee\s*(.*?)\s*for\s+(?:rs\.?|inr|₹)\s*([\d,]+\.?\d*)/i);
+    if (payeeMatch) {
+      vendor = payeeMatch[1].trim();
+      amount = parseFloat(payeeMatch[2].replace(/,/g, ''));
     }
 
-    // Clean up vendor
+    // Pattern B: "INR 354 debited from HDFC Bank A/c XX277034 on 07-NOV-25. For: DEBIT CARD ANNUAL FEE-Oct-2025"
+    if (!amount) {
+      const forMatch = text.match(/(?:inr|rs\.?|₹)\s*([\d,]+\.?\d*)\s*debited\s+from.*?for:\s*(.+)/i);
+      if (forMatch) {
+        amount = parseFloat(forMatch[1].replace(/,/g, ''));
+        vendor = forMatch[2].split(/\s+(?:on|ref|txn)/i)[0].trim();
+      }
+    }
+
+    // Fallback original parsing
+    if (!amount) {
+      const amountMatch = text.match(/(?:rs\.?|inr|amt|debited|purchased|spent|paid|withdrawal|for)\s*(?:of)?\s*([\d,]+\.?\d*)/i) ||
+                          text.match(/([\d,]+\.?\d*)\s*(?:rs\.?|inr|amt|debited|purchased|spent|paid|withdrawal)/i) ||
+                          text.match(/vpa\s*[\d,]+\.?\d*/i);
+
+      if (amountMatch) {
+        const amountStr = amountMatch[1] || amountMatch[0].match(/[\d,]+\.?\d*/)?.[0];
+        if (amountStr) {
+          amount = parseFloat(amountStr.replace(/,/g, ''));
+        }
+      }
+
+      if (amount) {
+        const vendorMatch = text.match(/(?:at|to|spent on|vpa|into|merchant|towards|transfer to|paid to)\s+([A-Z0-9\s\.\*\-]+?)(?=\s+(?:on|using|info|ref|at|dated|for|balance|from|$))/i);
+        vendor = vendorMatch ? vendorMatch[1].trim() : '';
+        if (!vendor) {
+          const upperMatch = text.match(/(?:spent|paid|to)\s+([A-Z][A-Z\s]+)(?=\s|$)/);
+          if (upperMatch) vendor = upperMatch[1].trim();
+        }
+      }
+    }
+
+    if (!amount || isNaN(amount)) return null;
+
     vendor = vendor.replace(/\b(the|a|an|is|your|for)\b/gi, '').replace(/\*+$/, '').trim();
-    if (vendor.length > 40) vendor = vendor.substring(0, 37) + '...';
+    if (!vendor || vendor.toLowerCase().includes('unknown')) {
+      vendor = 'Unknown Merchant';
+    } else if (vendor.length > 40) {
+      vendor = vendor.substring(0, 37) + '...';
+    }
 
     return {
       amount,
-      vendor: vendor || 'Unknown Merchant',
+      vendor,
       date: new Date().toISOString().split('T')[0]
     };
   }

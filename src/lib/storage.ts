@@ -17,6 +17,9 @@ export const storageService = {
   saveExpenses(expenses: Expense[]): Expense[] {
     try {
       storageEngine.set(STORAGE_KEY, JSON.stringify(expenses));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('expenses-updated'));
+      }
     } catch (error) {
       console.error('Error saving expenses:', error);
     }

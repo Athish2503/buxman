@@ -24,6 +24,7 @@ export function PendingTransactionsModal({ onAddExpense }: PendingTransactionsMo
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('Personal');
   const [notes, setNotes] = useState('');
+  const [isSuccessAnimating, setIsSuccessAnimating] = useState(false);
 
   // Synchronize internal form state when active pending transaction switches
   useEffect(() => {
@@ -41,21 +42,26 @@ export function PendingTransactionsModal({ onAddExpense }: PendingTransactionsMo
 
   const handleSave = () => {
     haptics.success();
-    const finalAmount = parseFloat(amount) || pendingTx.amount;
+    setIsSuccessAnimating(true);
     
-    const newExpense: Expense = {
-      id: Math.random().toString(36).substring(2, 11),
-      amount: finalAmount,
-      vendor: vendor || pendingTx.merchant,
-      category: category,
-      date: new Date(pendingTx.timestamp || Date.now()).toISOString().split('T')[0],
-      type: 'personal',
-      notes: notes || pendingTx.rawText,
-      status: 'settled', // pre-settled since it's a direct confirmed bank capture
-    };
+    setTimeout(() => {
+      const finalAmount = parseFloat(amount) || pendingTx.amount;
+      
+      const newExpense: Expense = {
+        id: Math.random().toString(36).substring(2, 11),
+        amount: finalAmount,
+        vendor: vendor || pendingTx.merchant,
+        category: category,
+        date: new Date(pendingTx.timestamp || Date.now()).toISOString().split('T')[0],
+        type: 'personal',
+        notes: notes || pendingTx.rawText,
+        status: 'settled', // pre-settled since it's a direct confirmed bank capture
+      };
 
-    onAddExpense(newExpense);
-    updateTransaction(pendingTx.id, { status: 'completed', category, notes });
+      onAddExpense(newExpense);
+      updateTransaction(pendingTx.id, { status: 'completed', category, notes });
+      setIsSuccessAnimating(false);
+    }, 1100);
   };
 
   const handleDismiss = () => {
@@ -196,6 +202,53 @@ export function PendingTransactionsModal({ onAddExpense }: PendingTransactionsMo
               </Button>
             </div>
           </div>
+
+          {/* Stunning Success Burst Overlay */}
+          <AnimatePresence>
+            {isSuccessAnimating && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-50 flex items-center justify-center bg-card/95 backdrop-blur-md rounded-3xl overflow-hidden"
+              >
+                {/* Outward Expanding Concentric Burst Ring */}
+                <motion.div
+                  initial={{ scale: 0, opacity: 0.8 }}
+                  animate={{ scale: [0, 2.5, 4], opacity: [0.8, 0.4, 0] }}
+                  transition={{ duration: 0.8, ease: "easeOut" }}
+                  className="absolute w-32 h-32 rounded-full border-4 border-emerald-500/40 bg-emerald-500/10"
+                />
+
+                {/* Second staggered expanding wave */}
+                <motion.div
+                  initial={{ scale: 0, opacity: 0.6 }}
+                  animate={{ scale: [0, 1.8, 3], opacity: [0.6, 0.2, 0] }}
+                  transition={{ duration: 0.8, delay: 0.15, ease: "easeOut" }}
+                  className="absolute w-32 h-32 rounded-full border-2 border-emerald-400/30 bg-emerald-400/5"
+                />
+
+                {/* Centered Popping Premium Green Checkmark Circle */}
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: [0, 1.2, 1] }}
+                  transition={{ type: "spring", damping: 12, stiffness: 200 }}
+                  className="relative flex items-center justify-center w-24 h-24 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/30"
+                >
+                  <Check className="w-12 h-12 text-white stroke-[3]" />
+                </motion.div>
+
+                <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="absolute bottom-12 text-sm font-bold tracking-wide text-emerald-400"
+                >
+                  Transaction Saved
+                </motion.p>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       </div>
     </AnimatePresence>

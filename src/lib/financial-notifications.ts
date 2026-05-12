@@ -16,7 +16,10 @@ export interface FinancialNotificationPlugin {
   simulateGPayTransaction(options: { amount?: number; merchant?: string }): Promise<void>;
   forceOverlay(options: { amount?: number; merchant?: string; appName?: string }): Promise<void>;
 
+  acknowledgeEvent(options: { id: string }): Promise<void>;
+
   addListener(eventName: 'transactionDetected', listenerFunc: (data: {
+    eventId?: string;
     amount: number;
     merchant: string;
     source: string;
@@ -30,6 +33,7 @@ export interface FinancialNotificationPlugin {
   }) => void): Promise<any>;
   
   addListener(eventName: 'overlayAction', listenerFunc: (data: {
+    eventId?: string;
     action: 'save' | 'dismiss';
     amount: number;
     merchant: string;
