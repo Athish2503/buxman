@@ -67,10 +67,29 @@ function AnimatedNumber({ value, prefix = '', suffix = '', decimals = 0 }: {
 
 /* ── Balance Hero Card ── */
 function BalanceHeroCard({ expenses, onNavigate }: { expenses: Expense[]; onNavigate: (t: any) => void }) {
-  const total      = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
-  const personal   = useMemo(() => expenses.filter(e => !e.isReimbursement).reduce((s, e) => s + e.amount, 0), [expenses]);
-  const pending    = useMemo(() => expenses.filter(e => e.isReimbursement && e.status === 'pending').reduce((s, e) => s + e.amount, 0), [expenses]);
-  const recovered  = useMemo(() => expenses.filter(e => e.isReimbursement && e.status === 'reimbursed').reduce((s, e) => s + e.amount, 0), [expenses]);
+  const [timeframe, setTimeframe] = useState<'month' | 'all'>('month');
+
+  // Filter expenses based on selected timeframe
+  const filteredExpenses = useMemo(() => {
+    if (timeframe === 'all') return expenses;
+    const now = new Date();
+    const currMonth = now.getMonth();
+    const currYear = now.getFullYear();
+    return expenses.filter(e => {
+      const d = new Date(e.date);
+      return d.getMonth() === currMonth && d.getFullYear() === currYear;
+    });
+  }, [expenses, timeframe]);
+
+  const total      = useMemo(() => filteredExpenses.reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
+  const personal   = useMemo(() => filteredExpenses.filter(e => !e.isReimbursement).reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
+  const pending    = useMemo(() => filteredExpenses.filter(e => e.isReimbursement && e.status === 'pending').reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
+  const recovered  = useMemo(() => filteredExpenses.filter(e => e.isReimbursement && e.status === 'reimbursed').reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
+
+  // Percentages for the continuous breakdown bar
+  const personalPct  = total > 0 ? (personal / total) * 100 : 0;
+  const pendingPct   = total > 0 ? (pending / total) * 100 : 0;
+  const recoveredPct = total > 0 ? (recovered / total) * 100 : 0;
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -80,61 +99,140 @@ function BalanceHeroCard({ expenses, onNavigate }: { expenses: Expense[]; onNavi
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-      className="relative rounded-3xl overflow-hidden mb-4"
+      className="relative rounded-[2rem] overflow-hidden mb-5 border border-white/10 shadow-2xl"
     >
-      {/* Gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[hsl(258_88%_20%)] via-[hsl(280_85%_14%)] to-[hsl(225_22%_8%)]" />
-      <div className="absolute inset-0 bg-aurora opacity-60" />
-      {/* Shine sweep */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute top-0 bottom-0 w-1/3 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent"
-          animate={{ left: ['-40%', '140%'] }}
-          transition={{ duration: 4, repeat: Infinity, ease: 'linear', repeatDelay: 3 }}
-        />
-      </div>
-      {/* Inner top border */}
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+      {/* Background Layering */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[hsl(255_40%_15%)] via-[hsl(255_35%_11%)] to-[hsl(225_30%_7%)]" />
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-80 h-80 bg-violet-600/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute inset-0 bg-noise opacity-30 mix-blend-overlay pointer-events-none" />
 
-      <div className="relative p-5 pb-4">
-        {/* Greeting */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-[10px] text-white/50 font-semibold uppercase tracking-widest">{greeting}</p>
-            <p className="text-sm font-display font-bold text-white/90 mt-0.5">Summary</p>
+      {/* Subtle top ambient glow line */}
+      <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+
+      <div className="relative p-5 sm:p-6 pb-5">
+        {/* Top Header Row */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2.5">
+            <div className="h-10 w-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow shadow-primary/30">
+              <Sparkles className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-tight">{greeting}</p>
+              <h2 className="text-sm font-display font-bold text-white tracking-tight flex items-center gap-1.5 mt-0.5">
+                Financial Hub
+              </h2>
+            </div>
           </div>
-          <div className="h-9 w-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center">
-            <Sparkles className="h-4.5 w-4.5 text-white/70" />
+
+          {/* Timeframe Scope Switcher */}
+          <div className="flex items-center bg-black/40 backdrop-blur-md p-1 rounded-xl border border-white/5">
+            {(['month', 'all'] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => { haptics.selection(); setTimeframe(t); }}
+                className={cn(
+                  "px-3 py-1 rounded-lg text-[10px] font-bold tracking-wider uppercase transition-all duration-200",
+                  timeframe === t 
+                    ? "bg-white/15 text-white shadow-sm border border-white/10" 
+                    : "text-white/40 hover:text-white/70"
+                )}
+              >
+                {t === 'month' ? 'Month' : 'Total'}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Total Balance */}
-        <div className="mb-5">
-          <p className="label-caps text-white/40 mb-1">Total Expenses</p>
-          <div className="text-4xl font-display font-black text-white tracking-tight">
-            ₹<AnimatedNumber value={total} />
+        {/* Main Balance Display */}
+        <div className="mb-4">
+          <div className="flex items-baseline justify-between mb-1.5">
+            <p className="text-[11px] font-bold text-white/50 uppercase tracking-widest">
+              {timeframe === 'month' ? 'Current Month Spend' : 'Cumulative Spend'}
+            </p>
+            <span className="text-[10px] font-mono text-white/40">
+              {filteredExpenses.length} {filteredExpenses.length === 1 ? 'item' : 'items'}
+            </span>
           </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="text-4xl sm:text-5xl font-display font-black text-white tracking-tight drop-shadow-md">
+              ₹<AnimatedNumber value={total} />
+            </div>
+          </div>
+
+          {/* Distribution Continuous Bar */}
+          {total > 0 && (
+            <div className="mt-3.5 space-y-1.5">
+              <div className="h-2 w-full bg-black/40 rounded-full overflow-hidden flex p-0.5 gap-0.5 border border-white/5 backdrop-blur-sm">
+                {personalPct > 0 && (
+                  <motion.div 
+                    initial={{ width: 0 }} 
+                    animate={{ width: `${personalPct}%` }} 
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                    className="h-full bg-violet-400 rounded-full" 
+                  />
+                )}
+                {pendingPct > 0 && (
+                  <motion.div 
+                    initial={{ width: 0 }} 
+                    animate={{ width: `${pendingPct}%` }} 
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                    className="h-full bg-amber-400 rounded-full" 
+                  />
+                )}
+                {recoveredPct > 0 && (
+                  <motion.div 
+                    initial={{ width: 0 }} 
+                    animate={{ width: `${recoveredPct}%` }} 
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                    className="h-full bg-emerald-400 rounded-full" 
+                  />
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Stats Row */}
-        <div className="grid grid-cols-3 gap-2">
+        {/* Sub Bento Grid Items */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-1">
           {[
-            { label: 'Personal', value: personal, icon: Wallet, color: 'text-violet-300', bg: 'bg-violet-500/15' },
-            { label: 'Pending', value: pending, icon: Clock, color: 'text-amber-300', bg: 'bg-amber-500/15' },
-            { label: 'Settled', value: recovered, icon: CheckCircle2, color: 'text-emerald-300', bg: 'bg-emerald-500/15' },
+            { label: 'Personal', value: personal, icon: Wallet, color: 'text-violet-300', dot: 'bg-violet-400', bg: 'bg-gradient-to-b from-white/[0.07] to-white/[0.02]' },
+            { label: 'Pending', value: pending, icon: Clock, color: 'text-amber-300', dot: 'bg-amber-400', bg: 'bg-gradient-to-b from-white/[0.07] to-white/[0.02]' },
+            { label: 'Settled', value: recovered, icon: CheckCircle2, color: 'text-emerald-300', dot: 'bg-emerald-400', bg: 'bg-gradient-to-b from-white/[0.07] to-white/[0.02]' },
           ].map((stat, i) => (
             <motion.div
               key={stat.label}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 + i * 0.07, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className={cn('rounded-2xl p-3', stat.bg, 'border border-white/8')}
+              transition={{ delay: 0.1 + i * 0.05, duration: 0.4 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={() => {
+                haptics.selection();
+                if (stat.label === 'Pending' || stat.label === 'Settled') {
+                  onNavigate('reimbursements');
+                } else {
+                  onNavigate('expenses');
+                }
+              }}
+              className={cn(
+                "rounded-2xl p-3 sm:p-3.5 border border-white/8 backdrop-blur-md relative overflow-hidden group cursor-pointer hover:border-white/20 transition-all",
+                stat.bg
+              )}
             >
-              <stat.icon className={cn('h-3.5 w-3.5 mb-2', stat.color)} />
-              <p className={cn('text-base font-display font-bold leading-none', stat.color)}>
+              {/* Inner ambient light indicator */}
+              <div className="absolute top-0 right-0 p-2 opacity-30 group-hover:opacity-100 transition-opacity">
+                <div className={cn("w-1.5 h-1.5 rounded-full", stat.dot)} />
+              </div>
+
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <stat.icon className={cn("h-3.5 w-3.5", stat.color)} />
+                <span className="text-[9px] font-black uppercase tracking-wider text-white/50">{stat.label}</span>
+              </div>
+              
+              <p className={cn("text-sm sm:text-base font-display font-bold leading-none tracking-tight", stat.color)}>
                 ₹<AnimatedNumber value={stat.value} />
               </p>
-              <p className="text-[9px] text-white/40 mt-1 font-semibold uppercase tracking-wider">{stat.label}</p>
             </motion.div>
           ))}
         </div>
