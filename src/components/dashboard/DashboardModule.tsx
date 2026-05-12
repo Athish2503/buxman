@@ -66,21 +66,17 @@ function AnimatedNumber({ value, prefix = '', suffix = '', decimals = 0 }: {
 }
 
 /* ── Balance Hero Card ── */
-function BalanceHeroCard({ expenses, onNavigate }: { expenses: Expense[]; onNavigate: (t: any) => void }) {
-  const [timeframe, setTimeframe] = useState<'month' | 'all'>('month');
-
-  // Filter expenses based on selected timeframe
-  const filteredExpenses = useMemo(() => {
-    if (timeframe === 'all') return expenses;
-    const now = new Date();
-    const currMonth = now.getMonth();
-    const currYear = now.getFullYear();
-    return expenses.filter(e => {
-      const d = new Date(e.date);
-      return d.getMonth() === currMonth && d.getFullYear() === currYear;
-    });
-  }, [expenses, timeframe]);
-
+function BalanceHeroCard({ 
+  filteredExpenses,
+  timeframe,
+  setTimeframe,
+  onNavigate 
+}: { 
+  filteredExpenses: Expense[]; 
+  timeframe: 'month' | 'all';
+  setTimeframe: (t: 'month' | 'all') => void;
+  onNavigate: (t: any) => void;
+}) {
   const total      = useMemo(() => filteredExpenses.reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
   const personal   = useMemo(() => filteredExpenses.filter(e => !e.isReimbursement).reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
   const pending    = useMemo(() => filteredExpenses.filter(e => e.isReimbursement && e.status === 'pending').reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
@@ -324,11 +320,32 @@ export function DashboardModule({
   expenses, onNavigate, onUpdateExpense, onDeleteExpense, onDeleteAll, onBatchDelete, onBatchStatus, settings
 }: DashboardModuleProps) {
   const [tab, setTab] = useState<'overview' | 'vehicle'>('overview');
+  const [timeframe, setTimeframe] = useState<'month' | 'all'>('month');
 
-  const personalAmount    = useMemo(() => expenses.filter(e => !e.isReimbursement).reduce((s, e) => s + e.amount, 0), [expenses]);
-  const reimbursableAmt   = useMemo(() => expenses.filter(e => e.isReimbursement).reduce((s, e) => s + e.amount, 0), [expenses]);
-  const pendingAmount     = useMemo(() => expenses.filter(e => e.isReimbursement && e.status === 'pending').reduce((s, e) => s + e.amount, 0), [expenses]);
-  const reimbursedAmount  = useMemo(() => expenses.filter(e => e.isReimbursement && e.status === 'reimbursed').reduce((s, e) => s + e.amount, 0), [expenses]);
+  // Compute filtered expenses reliably based on selected timeframe
+  const filteredExpenses = useMemo(() => {
+    if (timeframe === 'all') return expenses;
+    const now = new Date();
+    const currYear = now.getFullYear();
+    const currMonth = now.getMonth();
+    return expenses.filter(e => {
+      if (!e.date) return false;
+      // Extract year and month directly via regex to avoid timezone/midnight offset drift
+      const match = e.date.match(/^(\d{4})-(\d{2})/);
+      if (match) {
+        const y = parseInt(match[1], 10);
+        const m = parseInt(match[2], 10) - 1; // 0-indexed
+        return y === currYear && m === currMonth;
+      }
+      const d = new Date(e.date);
+      return d.getFullYear() === currYear && d.getMonth() === currMonth;
+    });
+  }, [expenses, timeframe]);
+
+  const personalAmount    = useMemo(() => filteredExpenses.filter(e => !e.isReimbursement).reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
+  const reimbursableAmt   = useMemo(() => filteredExpenses.filter(e => e.isReimbursement).reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
+  const pendingAmount     = useMemo(() => filteredExpenses.filter(e => e.isReimbursement && e.status === 'pending').reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
+  const reimbursedAmount  = useMemo(() => filteredExpenses.filter(e => e.isReimbursement && e.status === 'reimbursed').reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
 
   const vehicleSummaries = useMemo(() => {
     const vList = mileageService.getVehicles();
@@ -355,7 +372,12 @@ export function DashboardModule({
     <div className="space-y-4 stagger">
 
       {/* Balance Hero */}
-      <BalanceHeroCard expenses={expenses} onNavigate={onNavigate} />
+      <BalanceHeroCard 
+        filteredExpenses={filteredExpenses} 
+        timeframe={timeframe} 
+        setTimeframe={setTimeframe} 
+        onNavigate={onNavigate} 
+      />
 
       {/* Quick Actions */}
       <QuickActions onNavigate={onNavigate} />
@@ -407,14 +429,14 @@ export function DashboardModule({
               </div>
               <div className="card-premium p-4">
                 <p className="label-caps text-muted-foreground mb-3">Spending by Category</p>
-                <CategoryRings expenses={expenses} />
+                <CategoryRings expenses={filteredExpenses} />
               </div>
             </div>
 
             {/* Spending Trend */}
             <div className="card-premium p-4">
               <SectionHeader title="Spending Chart" />
-              <SpendingTrendChart expenses={expenses} />
+              <SpendingTrendChart expenses={filteredExpenses} />
             </div>
 
             {/* Budget Goals */}
