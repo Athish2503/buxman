@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Receipt, Check, X, Sparkles, Building2 } from 'lucide-react';
+import { Receipt, Check, X, Sparkles, Building2, MoreHorizontal } from 'lucide-react';
 import { useTransactionStore, Transaction } from '@/lib/useTransactionStore';
-import { categoryService } from '@/lib/category-service';
+import { categoryService, iconMap } from '@/lib/category-service';
 import { Expense } from '@/types/expense';
 import { haptics } from '@/lib/haptics';
 import { formatCurrency } from '@/lib/utils';
@@ -53,9 +53,12 @@ export function PendingTransactionsModal({ onAddExpense }: PendingTransactionsMo
         vendor: vendor || pendingTx.merchant,
         category: category,
         date: new Date(pendingTx.timestamp || Date.now()).toISOString().split('T')[0],
-        type: 'personal',
-        notes: notes || pendingTx.rawText,
-        status: 'settled', // pre-settled since it's a direct confirmed bank capture
+        description: notes || pendingTx.rawText,
+        status: 'approved',
+        currency: 'INR',
+        isReimbursement: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
       onAddExpense(newExpense);
@@ -144,6 +147,7 @@ export function PendingTransactionsModal({ onAddExpense }: PendingTransactionsMo
               <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
                 {categories.map((cat) => {
                   const isSelected = category === cat.label;
+                  const Icon = iconMap[cat.iconName] || MoreHorizontal;
                   return (
                     <button
                       key={cat.id}
@@ -158,7 +162,7 @@ export function PendingTransactionsModal({ onAddExpense }: PendingTransactionsMo
                           : 'bg-white/5 hover:bg-white/10 text-muted-foreground border-white/5'
                       }`}
                     >
-                      <span className="text-sm">{cat.icon}</span>
+                      <Icon className="w-4 h-4" />
                       <span>{cat.label}</span>
                       {isSelected && <Check className="w-3 h-3 ml-0.5" />}
                     </button>

@@ -8,7 +8,6 @@ import {
 import { Expense, BudgetGoal } from '@/types/expense';
 import { formatCompactCurrency, cn } from '@/lib/utils';
 import { mileageService, fuelService } from '@/lib/modules-storage';
-import { MonthlySummary } from '@/components/monthly-summary';
 import { CategoryRings } from '@/components/category-rings';
 import { SpendingTrendChart, VehicleEfficiencyChart, FuelCostChart } from '@/components/analytics-charts';
 import { BudgetTracker } from '@/components/budget-tracker';
@@ -422,15 +421,10 @@ export function DashboardModule({
               <KpiWidget label="Settled"   value={reimbursedAmount} icon={CheckCircle2} color="emerald" delay={0.15} />
             </div>
 
-            {/* Monthly Summary + Category Rings */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="card-premium p-4 overflow-hidden">
-                <MonthlySummary expenses={expenses} onViewAll={() => onNavigate('expenses')} />
-              </div>
-              <div className="card-premium p-4">
-                <p className="label-caps text-muted-foreground mb-3">Spending by Category</p>
-                <CategoryRings expenses={filteredExpenses} />
-              </div>
+            {/* Category Analysis */}
+            <div className="card-premium p-4">
+              <p className="label-caps text-muted-foreground mb-3">Spending by Category</p>
+              <CategoryRings expenses={filteredExpenses} />
             </div>
 
             {/* Spending Trend */}

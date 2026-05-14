@@ -94,6 +94,7 @@ export function MileageTracker({ onAddExpense }: MileageTrackerProps) {
       description: `${log.distance} km @ ₹${log.rateApplied}/km - ${log.purpose}`,
       status: 'pending',
       currency: 'INR',
+      isReimbursement: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
