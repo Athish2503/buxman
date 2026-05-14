@@ -44,16 +44,17 @@ class TransactionNotificationListener : NotificationListenerService() {
         val combinedPayload = "$title $text $bigText $subText".trim()
         if (combinedPayload.isBlank()) return
 
-        // Target packages check/log to ensure specific financial routing
-        val isTarget = packageName.contains("google.android.apps.nbu.paisa") ||
-                packageName.contains("phonepe", true) ||
-                packageName.contains("paytm", true) ||
-                packageName.contains("pop.upi", true) ||
-                packageName.contains("bank", true) ||
-                title.contains("bank", true) ||
-                title.contains("upi", true)
+        // Hard restrict allowed package names as per security requirements
+        val isTarget = packageName == "com.google.android.apps.messaging" ||
+                packageName == "com.android.messaging" ||
+                packageName == "com.google.android.apps.sms"
 
-        Log.d(TAG, "[$eventType] Processing payload (isTarget=$isTarget): [$combinedPayload]")
+        if (!isTarget) {
+            Log.d(TAG, "[$eventType] Ignored package: $packageName (not an allowed SMS app)")
+            return
+        }
+
+        Log.d(TAG, "[$eventType] Processing payload: [$combinedPayload]")
 
         TransactionDetector.processTransactionContent(
             context = this,

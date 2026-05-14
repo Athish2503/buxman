@@ -42,8 +42,10 @@ class TransactionOverlayService : Service() {
         val merchant = intent?.getStringExtra("merchant") ?: "Unknown Merchant"
         val appName = intent?.getStringExtra("appName") ?: "System"
         val rawText = intent?.getStringExtra("rawText") ?: ""
+        val type = intent?.getStringExtra("type") ?: "debit"
+        val account = intent?.getStringExtra("account") ?: ""
 
-        Log.d(TAG, "Overlay triggered for: $merchant | Amount: $amount | App: $appName")
+        Log.d(TAG, "Overlay triggered for: $merchant | Amount: $amount | App: $appName | Type: $type")
 
         if (!Settings.canDrawOverlays(this)) {
             Log.e(TAG, "Cannot show overlay: SYSTEM_ALERT_WINDOW permission missing.")
@@ -52,15 +54,15 @@ class TransactionOverlayService : Service() {
         }
 
         if (binding == null) {
-            showOverlay(amount, merchant, appName, rawText)
+            showOverlay(amount, merchant, appName, rawText, type, account)
         } else {
-            updateOverlay(amount, merchant, appName)
+            updateOverlay(amount, merchant, appName, type, account)
         }
 
         return START_NOT_STICKY
     }
 
-    private fun showOverlay(amount: Double, merchant: String, appName: String, rawText: String) {
+    private fun showOverlay(amount: Double, merchant: String, appName: String, rawText: String, type: String, account: String) {
         val themedContext = ContextThemeWrapper(this, R.style.AppTheme)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
 
@@ -91,7 +93,7 @@ class TransactionOverlayService : Service() {
             y = 120
         }
 
-        setupUI(amount, merchant, appName)
+        setupUI(amount, merchant, appName, type, account)
 
         try {
             windowManager.addView(binding?.root, params)
@@ -114,21 +116,36 @@ class TransactionOverlayService : Service() {
         }
     }
 
-    private fun updateOverlay(amount: Double, merchant: String, appName: String) {
-        setupUI(amount, merchant, appName)
+    private fun updateOverlay(amount: Double, merchant: String, appName: String, type: String, account: String) {
+        setupUI(amount, merchant, appName, type, account)
     }
 
-    private fun setupUI(amount: Double, merchant: String, appName: String) {
+    private fun setupUI(amount: Double, merchant: String, appName: String, type: String, account: String) {
         val b = binding ?: return
         selectedCategory = null
 
+        val isCredit = type == "credit"
+        val accentColor = if (isCredit) 0xFF10B981.toInt() else 0xFFEF4444.toInt() // Emerald-500 vs Red-500
+
         b.tvOverlayAmount.text = "₹${"%,.0f".format(amount)}"
-        b.tvOverlayMerchant.text = merchant
-        b.tvSourceApp.text = "BUXMAN DETECTED • ${appName.uppercase()}"
+        b.tvOverlayAmount.setTextColor(accentColor)
+        
+        b.tvOverlayMerchant.text = if (account.isNotBlank()) "$merchant • $account" else merchant
+        b.tvSourceApp.text = if (isCredit) "INCOME DETECTED" else "EXPENSE DETECTED"
+        b.tvSourceApp.setTextColor(accentColor)
+        
+        // Update Icon Tint
+        val headerIcon = (b.tvSourceApp.parent as android.view.ViewGroup).getChildAt(0) as? android.widget.ImageView
+        headerIcon?.setColorFilter(accentColor)
+
+        b.btnOverlaySave.backgroundTintList = android.content.res.ColorStateList.valueOf(accentColor)
+        b.btnOverlaySave.text = if (isCredit) "Save Income" else "Save Expense"
 
         // Populate dynamic category chips
         b.chipGroupOverlayCategories.removeAllViews()
-        categories.forEach { category ->
+        val currentCategories = if (isCredit) listOf("Salary", "Refund", "Cash Deposit", "Gift", "Other") else categories
+        
+        currentCategories.forEach { category ->
             val themedContext = ContextThemeWrapper(this, R.style.AppTheme)
             val chip = Chip(themedContext, null, com.google.android.material.R.attr.chipStyle)
             chip.text = category
@@ -141,7 +158,7 @@ class TransactionOverlayService : Service() {
             chip.setOnCheckedChangeListener { _, isChecked ->
                 if (isChecked) {
                     selectedCategory = category
-                    chip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(0xFF8B5CF6.toInt())
+                    chip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(accentColor)
                     chip.setTextColor(0xFFFFFFFF.toInt())
                     chip.chipStrokeWidth = 0f
                 } else {
@@ -163,10 +180,10 @@ class TransactionOverlayService : Service() {
         b.btnOverlaySave.setOnClickListener {
             b.btnOverlaySave.isEnabled = false
             val notes = b.etOverlayNotes.text.toString()
-            val category = selectedCategory ?: "Personal"
+            val category = selectedCategory ?: if (isCredit) "Income" else "Other"
 
-            Log.d(TAG, "Save request initiated for merchant: $merchant, amount: $amount")
-            val success = persistTransactionNatively(amount, merchant, category, notes)
+            Log.d(TAG, "Save request initiated for $merchant, amount: $amount, type: $type")
+            val success = persistTransactionNatively(amount, merchant, category, notes, type)
             
             if (success) {
                 FinancialNotificationPlugin.onOverlayAction(this, "save", amount, merchant, category, notes, true)
@@ -174,11 +191,10 @@ class TransactionOverlayService : Service() {
             } else {
                 b.btnOverlaySave.isEnabled = true
                 b.btnOverlaySave.text = "✖ Save Failed - Tap Retry"
-                b.btnOverlaySave.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#EF4444"))
+                b.btnOverlaySave.backgroundTintList = android.content.res.ColorStateList.valueOf(0xFFEF4444.toInt())
             }
         }
 
-        // Adjust window flags when keyboard opens so input fields capture typing events seamlessly
         b.etOverlayNotes.setOnFocusChangeListener { _, hasFocus ->
             params?.let { p ->
                 if (hasFocus) {
@@ -256,40 +272,24 @@ class TransactionOverlayService : Service() {
             ?.start() ?: stopSelf()
     }
 
-    private fun persistTransactionNatively(amount: Double, merchant: String, category: String, notes: String): Boolean {
+    private fun persistTransactionNatively(amount: Double, merchant: String, category: String, notes: String, type: String): Boolean {
         try {
-            Log.d(TAG, "Attempting native database insertion for transaction...")
             val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
-            val existingJsonStr = prefs.getString("reimburse_expenses_v2", "[]") ?: "[]"
+            val storageKey = "reimburse_expenses_v2"
+            val existingJsonStr = prefs.getString(storageKey, "[]") ?: "[]"
             
             val jsonArray = try {
                 org.json.JSONArray(existingJsonStr)
             } catch (e: Exception) {
-                Log.e(TAG, "Validation failure / JSON parse error of existing data, initializing fresh array", e)
                 org.json.JSONArray()
             }
 
-            // Duplicate detection logic
             val now = System.currentTimeMillis()
             val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date(now))
             val isoTimeStr = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
                 timeZone = java.util.TimeZone.getTimeZone("UTC")
             }.format(java.util.Date(now))
 
-            var isDuplicate = false
-            for (i in 0 until jsonArray.length()) {
-                val item = jsonArray.optJSONObject(i)
-                if (item != null) {
-                    val itemAmount = item.optDouble("amount", 0.0)
-                    val itemVendor = item.optString("vendor", "")
-                    if (itemAmount == amount && itemVendor.equals(merchant, ignoreCase = true) && item.optString("date", "") == dateStr) {
-                        Log.d(TAG, "Duplicate detection: Expense for $merchant of amount $amount already exists on $dateStr.")
-                        // We do not reject saving if user clicked save, but we log duplicate detection as instructed.
-                    }
-                }
-            }
-
-            // Transaction object creation matching the frontend Expense interface perfectly
             val newExpense = org.json.JSONObject().apply {
                 put("id", "TXN_" + java.util.UUID.randomUUID().toString().substring(0, 8))
                 put("date", dateStr)
@@ -299,12 +299,11 @@ class TransactionOverlayService : Service() {
                 put("currency", "INR")
                 put("description", notes.takeIf { it.isNotBlank() } ?: "Captured via Smart Overlay")
                 put("status", "approved")
+                put("type", type)
                 put("isReimbursement", false)
                 put("createdAt", isoTimeStr)
                 put("updatedAt", isoTimeStr)
             }
-
-            Log.d(TAG, "Parsed transaction data / created object: $newExpense")
 
             val updatedArray = org.json.JSONArray()
             updatedArray.put(newExpense)
@@ -312,58 +311,35 @@ class TransactionOverlayService : Service() {
                 updatedArray.put(jsonArray.getJSONObject(i))
             }
 
-            val success = prefs.edit().putString("reimburse_expenses_v2", updatedArray.toString()).commit()
-            if (success) {
-                Log.d(TAG, "Database write success: Transaction persisted natively into CapacitorStorage.")
-                return true
-            } else {
-                Log.e(TAG, "Database write failure: commit() returned false.")
-                return false
-            }
+            return prefs.edit().putString(storageKey, updatedArray.toString()).commit()
         } catch (e: Exception) {
-            Log.e(TAG, "Database write failure: Exception encountered during persistence pipeline", e)
+            Log.e(TAG, "Persistence failure", e)
             return false
         }
     }
 
     private fun playSuccessAnimationAndDismiss() {
         val b = binding ?: return
-        
         b.etOverlayNotes.clearFocus()
-
         b.layoutSuccessAnimation.visibility = View.VISIBLE
         b.layoutSuccessAnimation.alpha = 0f
-        b.layoutSuccessAnimation.animate()
-            .alpha(1f)
-            .setDuration(150)
-            .start()
+        b.layoutSuccessAnimation.animate().alpha(1f).setDuration(150).start()
 
         b.ivSuccessTick.scaleX = 0f
         b.ivSuccessTick.scaleY = 0f
         b.ivSuccessTick.animate()
-            .scaleX(1.1f)
-            .scaleY(1.1f)
-            .setDuration(350)
+            .scaleX(1.1f).scaleY(1.1f).setDuration(350)
             .setInterpolator(android.view.animation.OvershootInterpolator(1.5f))
             .withEndAction {
-                b.ivSuccessTick.animate()
-                    .scaleX(1.0f)
-                    .scaleY(1.0f)
-                    .setDuration(100)
-                    .start()
-            }
-            .start()
+                b.ivSuccessTick.animate().scaleX(1.0f).scaleY(1.0f).setDuration(100).start()
+            }.start()
 
         b.viewBurstRing.scaleX = 0.2f
         b.viewBurstRing.scaleY = 0.2f
         b.viewBurstRing.alpha = 0.8f
         b.viewBurstRing.animate()
-            .scaleX(3.0f)
-            .scaleY(3.0f)
-            .alpha(0f)
-            .setDuration(550)
-            .setInterpolator(android.view.animation.DecelerateInterpolator())
-            .start()
+            .scaleX(3.0f).scaleY(3.0f).alpha(0f).setDuration(550)
+            .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
 
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
             dismissWithAnimation()
@@ -373,11 +349,8 @@ class TransactionOverlayService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         binding?.let {
-            try {
-                windowManager.removeView(it.root)
-            } catch (e: Exception) {}
+            try { windowManager.removeView(it.root) } catch (e: Exception) {}
         }
         binding = null
     }
 }
-

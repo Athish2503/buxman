@@ -33,18 +33,53 @@ class FinancialNotificationPlugin : Plugin() {
                 put("timestamp", info.timestamp)
                 put("reference", info.transactionId)
                 put("transactionId", info.transactionId)
-                if (info.account != null) {
-                    put("account", info.account)
-                }
+                put("account", info.account ?: "")
+                put("bankName", info.bankName ?: "")
+                put("referenceNumber", info.referenceNumber ?: "")
+                put("matchedKeywords", JSArray(info.matchedKeywords))
+                put("rejectionReason", info.rejectionReason ?: "")
             }
 
-            // Always save to persistent queue to ensure zero data loss when JS bridge is inactive or app is in background
+            // Always save to persistent queue
             savePendingTransaction(context, data)
+            
+            // Track for diagnostics
+            addToDiagnostics(context, data)
 
             if (instance != null) {
                 Log.d("FinancialNotification", "Notifying JS listeners: transactionDetected")
                 instance?.notifyListeners("transactionDetected", data)
             }
+        }
+
+        private fun addToDiagnostics(context: Context, data: JSObject) {
+            val prefs = context.getSharedPreferences("FinancialDiagnostics", Context.MODE_PRIVATE)
+            val history = prefs.getString("history", "[]") ?: "[]"
+            try {
+                val array = org.json.JSONArray(history)
+                val newObj = org.json.JSONObject(data.toString())
+                
+                // Keep only last 20
+                val newArray = org.json.JSONArray()
+                newArray.put(newObj)
+                for (i in 0 until Math.min(array.length(), 19)) {
+                    newArray.put(array.get(i))
+                }
+                prefs.edit().putString("history", newArray.toString()).apply()
+            } catch (e: Exception) {}
+        }
+
+        fun logRejection(context: Context, text: String, source: String, reason: String, keywords: List<String> = emptyList()) {
+            val data = JSObject().apply {
+                put("type", "REJECTION")
+                put("rawText", text)
+                put("source", source)
+                put("reason", reason)
+                put("confidence", 0)
+                put("matchedKeywords", JSArray(keywords))
+                put("timestamp", System.currentTimeMillis())
+            }
+            addToDiagnostics(context, data)
         }
 
         fun onOverlayAction(context: Context, action: String, amount: Double, merchant: String, category: String? = null, notes: String? = null, persistedNatively: Boolean = false) {
@@ -215,6 +250,8 @@ class FinancialNotificationPlugin : Plugin() {
                 putExtra("merchant", info.merchant)
                 putExtra("appName", info.sourceApp)
                 putExtra("rawText", info.rawText)
+                putExtra("type", info.type)
+                putExtra("account", info.account ?: "")
             }
             context.startService(intent)
         } catch (e: Exception) {
@@ -278,6 +315,8 @@ class FinancialNotificationPlugin : Plugin() {
                 putExtra("merchant", info.merchant)
                 putExtra("appName", info.sourceApp)
                 putExtra("rawText", info.rawText)
+                putExtra("type", info.type)
+                putExtra("account", info.account ?: "")
             }
             context.startService(intent)
         } catch (e: Exception) {}
@@ -286,10 +325,28 @@ class FinancialNotificationPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun getDiagnostics(call: PluginCall) {
+        val prefs = context.getSharedPreferences("FinancialDiagnostics", Context.MODE_PRIVATE)
+        val history = prefs.getString("history", "[]") ?: "[]"
+        val result = JSObject().apply {
+            put("history", JSArray(history))
+        }
+        call.resolve(result)
+    }
+
+    @PluginMethod
+    fun clearDiagnostics(call: PluginCall) {
+        val prefs = context.getSharedPreferences("FinancialDiagnostics", Context.MODE_PRIVATE)
+        prefs.edit().remove("history").apply()
+        call.resolve()
+    }
+
+    @PluginMethod
     fun forceOverlay(call: PluginCall) {
         val amount = call.getDouble("amount") ?: 999.0
         val merchant = call.getString("merchant") ?: "Forced Overlay Test"
         val appName = call.getString("appName") ?: "Debug"
+        val type = call.getString("type") ?: "debit"
 
         try {
             val intent = Intent(context, TransactionOverlayService::class.java).apply {
@@ -297,6 +354,7 @@ class FinancialNotificationPlugin : Plugin() {
                 putExtra("merchant", merchant)
                 putExtra("appName", appName)
                 putExtra("rawText", "Forced manually from developer options")
+                putExtra("type", type)
             }
             context.startService(intent)
         } catch (e: Exception) {}

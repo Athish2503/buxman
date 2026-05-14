@@ -17,8 +17,18 @@ object TransactionDetector {
         Log.d(TAG, "[$source] captured raw payload: text=[$text], package=[$packageName], title=[$title]")
 
         val parsedInfo = TransactionParser.parseTransaction(text, packageName, title)
+        
         if (parsedInfo == null) {
-            Log.d(TAG, "[$source] payload parsing ignored/filtered.")
+            Log.d(TAG, "[$source] REJECTED: Transaction engine determined this is not a valid transaction or confidence too low.")
+            Log.d(TAG, "[$source] RAW TEXT: $text")
+            FinancialNotificationPlugin.logRejection(context, text, source, "Insufficient confidence or non-transactional content")
+            return
+        }
+
+        if (parsedInfo.confidenceScore < 50) {
+            Log.d(TAG, "[$source] FILTERED: Confidence score (${parsedInfo.confidenceScore}) below threshold for popup.")
+            Log.d(TAG, "[$source] MATCHED KEYWORDS: ${parsedInfo.matchedKeywords}")
+            FinancialNotificationPlugin.logRejection(context, text, source, "Confidence score (${parsedInfo.confidenceScore}) too low", parsedInfo.matchedKeywords)
             return
         }
 
@@ -56,6 +66,9 @@ object TransactionDetector {
                 putExtra("merchant", info.merchant)
                 putExtra("appName", info.sourceApp)
                 putExtra("rawText", info.rawText)
+                putExtra("type", info.type)
+                putExtra("confidenceScore", info.confidenceScore)
+                putExtra("account", info.account)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             try {

@@ -40,20 +40,14 @@ class SmsReceiver : BroadcastReceiver() {
             val fullBody = bodyBuilder.toString()
             Log.d(TAG, "[SmsReceiver] Combined SMS from [$sender]: $fullBody")
 
-            // Fast preliminary check to skip obvious personal texts before deep parsing
-            val lowerBody = fullBody.lowercase()
-            val isDebitSms = listOf("debited", "spent", "paid", "sent", "withdrawal").any { lowerBody.contains(it) }
-            val hasCurrency = fullBody.contains("₹") || lowerBody.contains("rs") || lowerBody.contains("inr")
-
-            if (isDebitSms || (hasCurrency && lowerBody.contains("a/c"))) {
-                TransactionDetector.processTransactionContent(
-                    context = context,
-                    text = fullBody,
-                    packageName = sender,
-                    title = "SMS Fallback",
-                    source = "SmsReceiver"
-                )
-            }
+            // Pass to TransactionDetector for deep parsing and confidence scoring
+            TransactionDetector.processTransactionContent(
+                context = context,
+                text = fullBody,
+                packageName = sender,
+                title = "SMS",
+                source = "SmsReceiver"
+            )
         }
     }
 }

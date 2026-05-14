@@ -9,5 +9,9 @@ data class ParsedTransactionInfo(
     val transactionId: String,
     val rawText: String,
     val timestamp: Long,
-    val account: String? = null
+    val account: String? = null,
+    val bankName: String? = null,
+    val referenceNumber: String? = null,
+    val matchedKeywords: List<String> = emptyList(),
+    val rejectionReason: String? = null
 )
