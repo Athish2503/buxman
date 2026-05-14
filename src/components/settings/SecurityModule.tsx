@@ -1,4 +1,4 @@
-import { Shield, Moon, Sun, Palette } from 'lucide-react';
+import { Shield, Moon, Sun, Palette, Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { AppSettings } from '@/types/expense';
@@ -87,6 +87,34 @@ export function SecurityModule({
             )}>
               {theme === 'dark' ? <Moon className="h-3.5 w-3.5 text-white" /> : <Sun className="h-3.5 w-3.5 text-white" />}
             </div>
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between p-5 rounded-3xl bg-white dark:bg-card/30 border border-border/50 dark:border-border/40 shadow-sm dark:shadow-none">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-amber-500/10 flex items-center justify-center">
+              <Volume2 className="h-5 w-5 text-amber-500" />
+            </div>
+            <div>
+              <p className="text-sm font-bold">Touch Haptics & Sound</p>
+              <p className="text-[10px] text-muted-foreground">Feedback on touch and actions</p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              const newVal = !settings.hapticsEnabled;
+              updateSettings({ hapticsEnabled: newVal });
+              toast.success(newVal ? 'Haptics enabled' : 'Haptics disabled');
+            }}
+            className={cn(
+              "relative h-6 w-11 rounded-full transition-colors duration-200 outline-none",
+              settings.hapticsEnabled ? "bg-primary" : "bg-muted-foreground/30"
+            )}
+          >
+            <div className={cn(
+              "absolute top-1 h-4 w-4 rounded-full bg-white transition-all duration-200 shadow-sm",
+              settings.hapticsEnabled ? "left-6" : "left-1"
+            )} />
           </button>
         </div>
 

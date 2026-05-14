@@ -17,6 +17,7 @@ interface VehicleLogFormProps {
   onSuccess: () => void;
   trigger?: React.ReactNode;
   editLog?: FuelLog;
+  defaultVehicleId?: string;
 }
 
 const INDIAN_STATIONS = [
@@ -29,14 +30,14 @@ const INDIAN_STATIONS = [
   { id: 'Reliance', name: 'Reliance', short: 'Reliance', color: 'border-indigo-500/30 text-indigo-500 bg-indigo-500/5' },
 ];
 
-export function VehicleLogForm({ onSuccess, trigger, editLog, open: externalOpen, onOpenChange }: VehicleLogFormProps & { open?: boolean; onOpenChange?: (open: boolean) => void }) {
+export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, open: externalOpen, onOpenChange }: VehicleLogFormProps & { open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
   const isMobile = useIsMobile();
   
   const [vehicles] = useState<VehicleRate[]>(() => mileageService.getVehicles());
-  const [activeVehId, setActiveVehId] = useState(editLog?.vehicleId || vehicles[0]?.id || '');
+  const [activeVehId, setActiveVehId] = useState(editLog?.vehicleId || defaultVehicleId || vehicles[0]?.id || '');
   
   const [odometer, setOdometer] = useState(editLog?.odometer.toString() || '');
   const [liters, setLiters] = useState(editLog?.liters.toString() || '');

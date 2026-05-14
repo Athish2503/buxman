@@ -14,6 +14,9 @@ import {
 } from 'recharts';
 import { VehicleLogForm } from './vehicle-log-form';
 import { VehicleForm } from './vehicle-form';
+import { JourneyTimeline } from './vehicle/JourneyTimeline';
+import { HeroSection } from './vehicle/HeroSection';
+import { FuelActionButton } from './vehicle/FuelActionButton';
 
 interface VehicleTrackerProps {
   vehicles: VehicleRate[];
@@ -23,6 +26,7 @@ interface VehicleTrackerProps {
 
 export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProps) {
   const [mode, setMode] = useState<'dashboard' | 'add' | 'vehicles'>('dashboard');
+  const [viewMode, setViewMode] = useState<'roadway' | 'simple'>('roadway');
   
   const [activeVehId, setActiveVehId] = useState<string>(vehicles[0]?.id || '');
 
@@ -110,6 +114,8 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
   
   const [editingVehId, setEditingVehId] = useState<string | null>(null);
   const [showVehicleForm, setShowVehicleForm] = useState(false);
+  const [showLogForm, setShowLogForm] = useState(false);
+  const [editingLog, setEditingLog] = useState<FuelLog | undefined>(undefined);
 
   const activeEditingVeh = useMemo(() => vehicles.find(v => v.id === editingVehId), [vehicles, editingVehId]);
 
@@ -287,7 +293,115 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
       </motion.div>
     );
   }
+
   // DASHBOARD MODE
+  if (mode === 'dashboard' && activeVeh) {
+    return (
+      <div className="relative -mx-4 -mt-4 min-h-screen">
+        {/* Vehicle Selector (Mini) */}
+        {vehicles.length > 1 && (
+          <div className="fixed top-20 left-0 right-0 z-[60] flex justify-center px-6 pointer-events-none">
+            <div className="flex items-center gap-1.5 p-1 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/5 pointer-events-auto shadow-2xl">
+              {vehicles.map(v => (
+                <button
+                  key={v.id}
+                  onClick={() => { setActiveVehId(v.id); haptics.selection(); }}
+                  className={cn(
+                    "h-8 w-8 rounded-xl flex items-center justify-center transition-all duration-300",
+                    activeVehId === v.id ? 'bg-primary/20 text-primary border border-primary/30' : 'text-white/40 hover:text-white/60'
+                  )}
+                >
+                  {v.icon === 'car' ? <Car className="h-4 w-4" /> : <Bike className="h-4 w-4" />}
+                </button>
+              ))}
+              
+              <div className="w-px h-4 bg-white/10 mx-1" />
+              
+              <button 
+                onClick={() => { setMode('vehicles'); haptics.selection(); }} 
+                className="h-8 w-8 rounded-xl hover:bg-white/5 flex items-center justify-center transition-all active:scale-90"
+              >
+                <Settings className="h-4 w-4 text-white/40" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {viewMode === 'roadway' ? (
+          <JourneyTimeline 
+            vehicle={activeVeh}
+            logs={activeLogs}
+            onAddLog={() => {
+              setEditingLog(undefined);
+              setShowLogForm(true);
+            }}
+            onEditLog={(log) => {
+              setEditingLog(log);
+              setShowLogForm(true);
+            }}
+            onManageVehicle={() => {
+              setMode('vehicles');
+              haptics.selection();
+            }}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+          />
+        ) : (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pt-4 px-4 pb-32">
+             <div className="space-y-6">
+                <HeroSection 
+                  vehicle={activeVeh} 
+                  logs={activeLogs} 
+                  stats={stats} 
+                  onManage={() => setMode('vehicles')} 
+                  viewMode={viewMode}
+                  onViewModeChange={setViewMode}
+                />
+
+                <div className="px-2">
+                  <button 
+                    onClick={() => { setEditingLog(undefined); setShowLogForm(true); haptics.light(); }}
+                    className="w-full h-14 rounded-2xl bg-gradient-primary text-white font-bold flex items-center justify-center gap-2 shadow-glow active:scale-[0.98] transition-all"
+                  >
+                    <Plus className="h-5 w-5" />
+                    Log New Fuel Entry
+                  </button>
+                </div>
+
+                <div className="space-y-3 px-2">
+                   <h3 className="text-sm font-bold opacity-40 uppercase tracking-widest">Recent Logs</h3>
+                   {activeLogs.map(log => (
+                      <div 
+                        key={log.id} 
+                        onClick={() => { setEditingLog(log); setShowLogForm(true); haptics.light(); }}
+                        className="p-4 rounded-2xl bg-card/40 border border-white/5 glass flex justify-between items-center cursor-pointer active:scale-[0.98] transition-all hover:bg-white/5"
+                      >
+                         <div>
+                            <p className="font-bold">{log.odometer.toLocaleString()} KM</p>
+                            <p className="text-[10px] opacity-40">{format(new Date(log.date), 'dd MMM yyyy')}</p>
+                         </div>
+                         <p className="text-primary font-black">{formatCurrency(log.totalCost)}</p>
+                      </div>
+                   ))}
+                </div>
+             </div>
+          </motion.div>
+        )}
+
+        <VehicleLogForm
+          open={showLogForm}
+          onOpenChange={(open) => {
+            setShowLogForm(open);
+            if (!open) setEditingLog(undefined);
+          }}
+          onSuccess={reload}
+          editLog={editingLog}
+          defaultVehicleId={activeVehId}
+        />
+      </div>
+    );
+  }
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}

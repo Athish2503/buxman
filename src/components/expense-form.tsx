@@ -229,6 +229,7 @@ function FormBody({
       await new Promise(r => setTimeout(r, 850));
 
       if (!isEdit) {
+        haptics.success();
         rewardBurst();
         reset(); 
         setReceiptPreview(null); 

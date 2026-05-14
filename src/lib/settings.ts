@@ -20,6 +20,7 @@ const defaultSettings: AppSettings = {
   accentColor: '#3b82f6',
   glassIntensity: 0.6,
   budgets: [],
+  hapticsEnabled: true,
   navOrder: ['dashboard', 'expenses', 'food', 'reimbursements', 'trips', 'vehicle', 'analytics', 'settings'],
 };
 

@@ -129,7 +129,16 @@
     --space-10: 40px;
     --space-12: 48px;
 
-    /* sidebar compat */
+    /* ── Road Journey (Cinematic Automotive) ── */
+    --asphalt-black:    225 22% 4%;
+    --road-gray:        225 10% 12%;
+    --lane-marker:      0 0% 100% / 0.15;
+    --neon-amber:       38 100% 50%;
+    --neon-purple:      270 100% 60%;
+    --neon-fuel:        142 70% 50%;
+    --neon-fuel-glow:   142 70% 50% / 0.4;
+    --neon-warning:     12 100% 50%;
+
     --sidebar-background: 225 22% 7%;
     --sidebar-foreground: 220 10% 68%;
     --sidebar-primary: 258 88% 66%;
@@ -409,6 +418,85 @@
   .inner-border-glow {
     box-shadow: inset 0 1px 0 hsl(var(--primary) / 0.25),
                 inset 0 -1px 0 hsl(0 0% 0% / 0.20);
+  }
+
+  /* ── Road & Journey (Refined Brand Style) ── */
+  .bg-journey {
+    background-color: hsl(var(--background));
+    background-image: 
+      radial-gradient(circle at 50% 0%, hsl(var(--primary) / 0.15) 0%, transparent 70%),
+      radial-gradient(circle at 0% 40%, hsl(var(--secondary) / 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 100% 60%, hsl(var(--accent) / 0.08) 0%, transparent 50%),
+      radial-gradient(circle at 10% 90%, hsl(var(--primary) / 0.05) 0%, transparent 40%),
+      linear-gradient(to bottom, transparent, hsl(var(--background)) 90%),
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    background-attachment: fixed;
+    background-blend-mode: normal, normal, normal, normal, normal, overlay;
+    opacity: 1;
+  }
+
+  .bg-asphalt {
+    background-color: hsl(var(--asphalt-black));
+    background-image: 
+      linear-gradient(to right, hsl(255 100% 100% / 0.02) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(255 100% 100% / 0.02) 1px, transparent 1px);
+    background-size: 4px 4px;
+  }
+
+  .bg-journey::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: 
+      linear-gradient(to right, hsl(var(--primary) / 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--primary) / 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    mask-image: radial-gradient(circle at 50% 50%, black, transparent 80%);
+    pointer-events: none;
+  }
+  
+  .road-spine {
+    background: linear-gradient(to bottom, 
+      hsl(var(--primary) / 0) 0%, 
+      hsl(var(--primary) / 0.15) 15%, 
+      hsl(var(--primary) / 0.15) 85%, 
+      hsl(var(--primary) / 0) 100%
+    );
+    box-shadow: 
+      inset 1px 0 0 hsl(var(--primary) / 0.05),
+      inset -1px 0 0 hsl(var(--primary) / 0.05);
+  }
+
+  .road-lane-line {
+    background: repeating-linear-gradient(
+      to bottom,
+      hsl(var(--primary) / 0.3) 0,
+      hsl(var(--primary) / 0.3) 20px,
+      transparent 20px,
+      transparent 60px
+    );
+  }
+
+  .shadow-neon-fuel { box-shadow: 0 0 20px var(--neon-fuel-glow); }
+  .shadow-neon-amber { box-shadow: 0 0 20px hsl(var(--neon-amber) / 0.3); }
+
+  .text-glow-fuel { text-shadow: 0 0 8px hsl(var(--neon-fuel) / 0.5); }
+
+  .fuel-wave {
+    background: linear-gradient(to top, hsl(var(--neon-fuel) / 0.2), transparent);
+    width: 200%;
+    height: 100%;
+    position: absolute;
+    bottom: 0;
+    left: -50%;
+    animation: wave-float 8s ease-in-out infinite;
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V120c67.81,23.09,144.29,15.48,214.34-3C288.33,101,316.63,60.44,321.39,56.44Z' style='fill:%23000'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V120c67.81,23.09,144.29,15.48,214.34-3C288.33,101,316.63,60.44,321.39,56.44Z' style='fill:%23000'/%3E%3C/svg%3E");
+  }
+
+  @keyframes wave-float {
+    0%, 100% { transform: translateX(0) translateY(0); }
+    50% { transform: translateX(25%) translateY(-5px); }
   }
 
   /* ── Press Scale ── */
