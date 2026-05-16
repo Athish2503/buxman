@@ -112,7 +112,24 @@ function BalanceHeroCard({
             <div className="h-10 w-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow shadow-primary/30">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
-            <div>
+            <div 
+              className="select-none active:scale-95 transition-transform" 
+              onClick={() => {
+                const now = Date.now();
+                const last = (window as any)._lastTap || 0;
+                const count = (window as any)._tapCount || 0;
+                if (now - last < 500) {
+                  (window as any)._tapCount = count + 1;
+                } else {
+                  (window as any)._tapCount = 1;
+                }
+                (window as any)._lastTap = now;
+                if ((window as any)._tapCount >= 3) {
+                  (window as any)._tapCount = 0;
+                  window.location.href = '/diagnostics';
+                }
+              }}
+            >
               <p className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-tight">{greeting}</p>
               <h2 className="text-sm font-display font-bold text-white tracking-tight flex items-center gap-1.5 mt-0.5">
                 Financial Hub

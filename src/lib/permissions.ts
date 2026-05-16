@@ -34,7 +34,7 @@ export const permissions = {
       
       let financialStatus = { notifications: false, overlay: false };
       try {
-        financialStatus = await FinancialNotification.checkPermissions();
+        financialStatus = await FinancialNotification.checkFinancialPermissions();
       } catch (e) {
         console.warn('Plugin check failed, trying NativeBridge...', e);
         if ((window as any).NativeBridge) {
@@ -166,7 +166,7 @@ export const permissions = {
 
   async checkNotificationStatus(): Promise<boolean> {
     if (Capacitor.isNativePlatform()) {
-      const status = await FinancialNotification.checkPermissions();
+      const status = await FinancialNotification.checkFinancialPermissions();
       return status.notifications;
     }
     return false;
@@ -174,7 +174,7 @@ export const permissions = {
 
   async checkOverlayStatus(): Promise<boolean> {
     if (Capacitor.isNativePlatform()) {
-      const status = await FinancialNotification.checkPermissions();
+      const status = await FinancialNotification.checkFinancialPermissions();
       return status.overlay;
     }
     return false;

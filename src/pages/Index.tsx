@@ -3,8 +3,9 @@ import ReactDOM from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Receipt, BarChart3, Settings,
-  Car, Briefcase, Utensils, Plane
+  Car, Briefcase, Utensils, Plane, Terminal
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { Expense, ExpenseStatus } from '@/types/expense';
@@ -91,9 +92,30 @@ const Index = () => {
     };
   }, []);
 
-  const navigate = (tab: Tab) => {
+  const routerNavigate = useNavigate();
+  const [tapCount, setTapCount] = useState(0);
+  const tapTimer = useRef<any>(null);
+
+  const handleLogoTap = () => {
+    setTapCount(prev => prev + 1);
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+    
+    if (tapCount + 1 >= 3) {
+      haptics.success();
+      routerNavigate('/diagnostics');
+      setTapCount(0);
+    } else {
+      tapTimer.current = setTimeout(() => setTapCount(0), 1000);
+    }
+  };
+
+  const navigate = (tab: Tab | 'diagnostics') => {
     haptics.selection();
-    setActiveTab(tab);
+    if (tab === 'diagnostics') {
+      routerNavigate('/diagnostics');
+      return;
+    }
+    setActiveTab(tab as Tab);
   };
 
   const handleAddExpense = (expense: Expense) => {
@@ -205,7 +227,7 @@ const Index = () => {
   const navItems = navOrder.map(id => NAV_ITEMS_CONFIG[id]).filter(Boolean);
   const leftNav = navItems.slice(0, 2);
   const rightNav = navItems.slice(2, 4);
-  const moreNav = navItems.slice(4);
+  const moreNav = [...navItems.slice(4)];
 
   return (
     <BiometricLock enabled={!!settings.biometricLock}>
@@ -218,7 +240,7 @@ const Index = () => {
           {/* ── Desktop Sidebar ── */}
           <aside className="hidden sm:flex fixed left-0 top-0 bottom-0 w-60 flex-col glass border-r border-border/30 z-30">
             <div className="p-5 border-b border-border/20">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 cursor-pointer select-none" onClick={handleLogoTap}>
                 <div className="h-9 w-9 rounded-xl bg-gradient-brand flex items-center justify-center shadow-glow shrink-0 overflow-hidden">
                   <img src="/logo.png" alt="Buxman" className="h-6 w-6 object-contain" />
                 </div>
@@ -416,7 +438,7 @@ function NavItem({
 /* ── More Nav (overflow drawer button) ── */
 function MoreNavButton({
   items, activeTab, onNavigate
-}: { items: { id: Tab; label: string; icon: any }[]; activeTab: Tab; onNavigate: (t: Tab) => void }) {
+}: { items: { id: Tab | 'diagnostics'; label: string; icon: any }[]; activeTab: Tab; onNavigate: (t: Tab | 'diagnostics') => void }) {
   const [open, setOpen] = useState(false);
   const hasActive = items.some(i => i.id === activeTab);
 

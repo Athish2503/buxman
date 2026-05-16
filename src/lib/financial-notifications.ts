@@ -1,7 +1,7 @@
 import { registerPlugin } from '@capacitor/core';
 
 export interface FinancialNotificationPlugin {
-  checkPermissions(): Promise<{ notifications: boolean; overlay: boolean }>;
+  checkFinancialPermissions(): Promise<{ notifications: boolean; overlay: boolean }>;
   openNotificationSettings(): Promise<void>;
   openOverlaySettings(): Promise<void>;
   updateCategories(options: { categories: string[] }): Promise<void>;
@@ -17,6 +17,8 @@ export interface FinancialNotificationPlugin {
   forceOverlay(options: { amount?: number; merchant?: string; appName?: string }): Promise<void>;
 
   acknowledgeEvent(options: { id: string }): Promise<void>;
+  getDiagnostics(): Promise<{ history: any[] }>;
+  clearDiagnostics(): Promise<void>;
 
   addListener(eventName: 'transactionDetected', listenerFunc: (data: {
     eventId?: string;
@@ -30,6 +32,9 @@ export interface FinancialNotificationPlugin {
     timestamp: number;
     reference?: string;
     transactionId?: string;
+    normalizedText?: string;
+    matchedKeywords?: string[];
+    isPromotional?: boolean;
   }) => void): Promise<any>;
   
   addListener(eventName: 'overlayAction', listenerFunc: (data: {
@@ -39,6 +44,7 @@ export interface FinancialNotificationPlugin {
     merchant: string;
     category?: string;
     notes?: string;
+    persistedNatively?: boolean;
   }) => void): Promise<any>;
 }
 

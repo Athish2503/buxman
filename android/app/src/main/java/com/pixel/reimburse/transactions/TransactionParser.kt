@@ -7,201 +7,232 @@ import java.util.regex.Pattern
 object TransactionParser {
     private const val TAG = "TRANSACTION_DEBUG"
 
-    // Confidence Weights
-    private const val WEIGHT_CURRENCY = 15
-    private const val WEIGHT_ACCOUNT = 20
-    private const val WEIGHT_BANKING_KEYWORD = 15
-    private const val WEIGHT_ACTION_KEYWORD = 30
-    private const val WEIGHT_TXN_ID = 15
-    private const val WEIGHT_SENDER_BANK = 10
-    
-    private const val THRESHOLD_MIN_CONFIDENCE = 50
+    // Scoring Constants
+    private const val SCORE_DEBITED = 40
+    private const val SCORE_CREDITED = 40
+    private const val SCORE_UPI = 35
+    private const val SCORE_ACCOUNT_KW = 30
+    private const val SCORE_REF_KW = 25
+    private const val SCORE_BANK_KW = 20
+    private const val SCORE_MASKED_ACC = 15
+    private const val SCORE_DATE = 15
+    private const val SCORE_TXN_ID = 15
+
+    private const val PENALTY_OFFER = -50
+    private const val PENALTY_SALE = -50
+    private const val PENALTY_CASHBACK = -40
+    private const val PENALTY_PROMO = -40
+    private const val PENALTY_EMOJI = -30
+    private const val PENALTY_CONV = -30
+
+    private const val THRESHOLD_MIN_CONFIDENCE = 65
 
     // Keywords
     private val DEBIT_KEYWORDS = listOf("debited", "debit", "paid", "withdrawn", "spent", "trf to", "sent to", "purchase", "payment made")
     private val CREDIT_KEYWORDS = listOf("credited", "credit", "received", "deposited", "refund received", "salary credited", "cash deposit", "received from", "credited by")
-    private val GENERAL_BANKING_KEYWORDS = listOf("upi", "a/c", "account", "refno", "transaction", "imps", "neft", "bank", "debit card", "credit card")
+    private val UPI_KEYWORDS = listOf("upi", "vpa", "bhim", "phonepe", "gpay", "paytm")
+    private val ACCOUNT_KEYWORDS = listOf("a/c", "account", "acc ", "acct")
+    private val REF_KEYWORDS = listOf("ref", "refno", "reference", "txn", "id:", "tran id")
+    private val BANK_KEYWORDS = listOf("bank", "imps", "neft", "rtgs", "card", "hdfc", "icici", "sbi", "axis", "kotak")
     
-    private val NEGATIVE_INDICATORS = listOf("offer", "sale", "discount", "coupon", "cashback offer", "advertisement", "promo", "otp", "verification code", "login attempt")
+    private val NEGATIVE_OFFER = listOf("offer", "discount", "coupon", "deal", "limited time", "save big")
+    private val NEGATIVE_SALE = listOf("sale", "clearance", "off on", "% off", "priced at")
+    private val NEGATIVE_PROMO = listOf("promo", "advertisement", "free", "win", "gift voucher", "congratulations")
 
-    // Patterns
+    // Extraction Patterns
     private val AMOUNT_PATTERN = Pattern.compile("(?:₹|Rs\\.?|INR)\\s*([\\d,]+\\.?\\d*)", Pattern.CASE_INSENSITIVE)
-    private val ACCOUNT_PATTERN = Pattern.compile("(?:A/c|Acc|Account|A/c no|Acct)\\s*[:\\s]*([*X0-9]{3,18})", Pattern.CASE_INSENSITIVE)
-    private val REF_NO_PATTERN = Pattern.compile("(?:ref|txn|reference|id|upi txn id|refno)[:\\s]+([A-Z0-9]{8,15})", Pattern.CASE_INSENSITIVE)
-    private val BANK_NAME_PATTERN = Pattern.compile("(?:at|via|by|with|from|to)\\s+([A-Z\\s]{2,15})(?:\\s+bank|\\s+ref|\\s+on|\\s+$)")
+    private val MASKED_ACC_PATTERN = Pattern.compile("(?:X+|\\*+)(\\d{3,6})", Pattern.CASE_INSENSITIVE)
+    private val DATE_PATTERN = Pattern.compile("(\\d{1,2}[-/](?:\\d{1,2}|[a-zA-Z]{3})[-/]\\d{2,4})", Pattern.CASE_INSENSITIVE)
+    private val REF_ID_PATTERN = Pattern.compile("(?:ref|txn|id)[:\\s]*([A-Z0-9]{8,20})", Pattern.CASE_INSENSITIVE)
 
-    fun parseTransaction(text: String, packageName: String? = null, title: String? = null): ParsedTransactionInfo? {
-        val fullText = "${title ?: ""} $text".replace("\n", " ").trim()
-        val lowerText = fullText.lowercase()
-        
-        // 0. Preliminary Negative Filter
-        if (NEGATIVE_INDICATORS.any { lowerText.contains(it) }) {
-            safeLog("REJECTED: Negative indicator found in text.")
-            return null
-        }
+    fun parseTransaction(text: String, packageName: String? = null, title: String? = null, extractionSource: String = "Unknown"): ParsedTransactionInfo {
+        Log.d(TAG, "--- STARTING PARSE PIPELINE ---")
+        Log.d(TAG, "[STAGE 1: RAW] $text")
 
-        var score = 0
+        // STAGE 2: Normalize
+        val normalized = normalizeMessage(text, title)
+        val lowerText = normalized.lowercase()
+        Log.d(TAG, "[STAGE 2: NORMALIZED] $normalized")
+
+        // STAGE 3: Source Validation
+        val sourceApp = resolveSourceApp(packageName ?: "", title ?: "")
+        Log.d(TAG, "[STAGE 3: SOURCE] $sourceApp ($packageName)")
+
+        // STAGE 4: Keyword Scoring & STAGE 5: Classification
+        val scoreBreakdown = mutableMapOf<String, Int>()
         val matchedKeywords = mutableListOf<String>()
-
-        // 1. Amount Check (Mandatory)
-        val amountMatcher = AMOUNT_PATTERN.matcher(fullText)
-        if (!amountMatcher.find()) {
-            safeLog("REJECTED: No amount found.")
-            return null
-        }
-        val amount = parseAmount(amountMatcher.group(1))
-        if (amount <= 0.0) {
-            safeLog("REJECTED: Amount is zero or invalid.")
-            return null
-        }
-        score += WEIGHT_CURRENCY
-
-        // 2. Identify Transaction Type & Action Keywords
+        val negativeKeywords = mutableListOf<String>()
         var type = "unknown"
-        var foundAction = false
-        
+
+        // Positive Scoring
         for (kw in DEBIT_KEYWORDS) {
             if (lowerText.contains(kw)) {
-                type = "debit"
-                foundAction = true
-                score += WEIGHT_ACTION_KEYWORD
+                scoreBreakdown["DEBIT_KW"] = SCORE_DEBITED
                 matchedKeywords.add(kw)
+                type = "debit"
+                break
+            }
+        }
+        for (kw in CREDIT_KEYWORDS) {
+            if (lowerText.contains(kw)) {
+                scoreBreakdown["CREDIT_KW"] = SCORE_CREDITED
+                matchedKeywords.add(kw)
+                type = "credit"
                 break
             }
         }
         
-        if (!foundAction) {
-            for (kw in CREDIT_KEYWORDS) {
-                if (lowerText.contains(kw)) {
-                    type = "credit"
-                    foundAction = true
-                    score += WEIGHT_ACTION_KEYWORD
-                    matchedKeywords.add(kw)
-                    break
-                }
-            }
+        if (UPI_KEYWORDS.any { lowerText.contains(it) }) {
+            scoreBreakdown["UPI"] = SCORE_UPI
+            matchedKeywords.add("upi")
+        }
+        if (ACCOUNT_KEYWORDS.any { lowerText.contains(it) }) {
+            scoreBreakdown["ACCOUNT_KW"] = SCORE_ACCOUNT_KW
+            matchedKeywords.add("account_kw")
+        }
+        if (REF_KEYWORDS.any { lowerText.contains(it) }) {
+            scoreBreakdown["REF_KW"] = SCORE_REF_KW
+            matchedKeywords.add("ref_kw")
+        }
+        if (BANK_KEYWORDS.any { lowerText.contains(it) }) {
+            scoreBreakdown["BANK_KW"] = SCORE_BANK_KW
+            matchedKeywords.add("bank_kw")
         }
 
-        // 3. Banking Keywords
-        for (kw in GENERAL_BANKING_KEYWORDS) {
-            if (lowerText.contains(kw)) {
-                score += (WEIGHT_BANKING_KEYWORD / 2) // Partial score for each
-                matchedKeywords.add(kw)
-                if (score >= 40) break // Cap at some point
-            }
+        // Negative Scoring
+        if (NEGATIVE_OFFER.any { lowerText.contains(it) }) {
+            scoreBreakdown["NEG_OFFER"] = PENALTY_OFFER
+            negativeKeywords.add("offer")
+        }
+        if (NEGATIVE_SALE.any { lowerText.contains(it) }) {
+            scoreBreakdown["NEG_SALE"] = PENALTY_SALE
+            negativeKeywords.add("sale")
+        }
+        if (NEGATIVE_PROMO.any { lowerText.contains(it) }) {
+            scoreBreakdown["NEG_PROMO"] = PENALTY_PROMO
+            negativeKeywords.add("promo")
+        }
+        if (Regex("[\\uD83C-\\uDBFF\\uDC00-\\uDFFF]").containsMatchIn(text)) {
+            scoreBreakdown["NEG_EMOJI"] = PENALTY_EMOJI
+            negativeKeywords.add("emoji")
         }
 
-        // 4. Account Reference
-        val accMatcher = ACCOUNT_PATTERN.matcher(fullText)
-        var account: String? = null
-        if (accMatcher.find()) {
-            account = accMatcher.group(1)
-            score += WEIGHT_ACCOUNT
-            matchedKeywords.add("account_ref")
+        Log.d(TAG, "[STAGE 4/5: SCORING & CLASS] Score: ${scoreBreakdown.values.sum()}, Type: $type")
+
+        // STAGE 6: Entity Extraction
+        val amount = extractAmount(normalized)
+        val account = extractAccount(normalized)
+        val refNo = extractRefNo(normalized)
+        val date = extractDate(normalized)
+        val merchant = extractMerchant(normalized, type)
+
+        if (account != null) {
+            scoreBreakdown["MASKED_ACC"] = SCORE_MASKED_ACC
+            matchedKeywords.add("masked_acc")
+        }
+        if (date != null) {
+            scoreBreakdown["DATE"] = SCORE_DATE
+            matchedKeywords.add("date")
+        }
+        if (refNo != null) {
+            scoreBreakdown["TXN_ID"] = SCORE_TXN_ID
+            matchedKeywords.add("txn_id")
         }
 
-        // 5. Transaction ID / Ref No
-        val refMatcher = REF_NO_PATTERN.matcher(fullText)
-        var refNo: String? = null
-        if (refMatcher.find()) {
-            refNo = refMatcher.group(1)
-            score += WEIGHT_TXN_ID
-            matchedKeywords.add("ref_no")
-        }
+        Log.d(TAG, "[STAGE 6: ENTITIES] Amt: $amount, Acc: $account, Ref: $refNo, Merchant: $merchant")
 
-        // 6. Source App / Sender context
-        val sourceApp = resolveSourceApp(packageName ?: "", title ?: "")
-        if (sourceApp != "System" && sourceApp != "Unknown") {
-            score += WEIGHT_SENDER_BANK
-        }
+        // STAGE 7: Confidence Calculation
+        val totalScore = scoreBreakdown.values.sum()
+        val isPromotional = negativeKeywords.isNotEmpty() && totalScore < THRESHOLD_MIN_CONFIDENCE
+        
+        Log.d(TAG, "[STAGE 7: CONFIDENCE] Total Score: $totalScore, IsPromo: $isPromotional")
 
-        // 7. Merchant / Payee Extraction
-        val merchant = extractMerchant(fullText, type)
-
-        // Final Confidence Check
-        if (score < THRESHOLD_MIN_CONFIDENCE) {
-            safeLog("REJECTED: Confidence score $score too low (Text: $lowerText)")
-            return null
-        }
-
-        if (type == "unknown") {
-            // Default to debit if score is high but type is ambiguous? 
-            // Better to reject or mark as debit if it looks like a payment.
-            safeLog("REJECTED: Could not determine transaction type (debit/credit).")
-            return null
-        }
-
+        // STAGE 8: Result
         val info = ParsedTransactionInfo(
             amount = amount,
             merchant = merchant,
             sourceApp = sourceApp,
-            confidenceScore = score,
+            confidenceScore = totalScore,
             type = type,
             transactionId = refNo ?: "TXN${System.currentTimeMillis()}",
-            rawText = fullText,
+            rawText = text,
+            normalizedText = normalized,
             timestamp = System.currentTimeMillis(),
             account = account,
             referenceNumber = refNo,
-            matchedKeywords = matchedKeywords
+            matchedKeywords = matchedKeywords,
+            negativeKeywords = negativeKeywords,
+            isPromotional = isPromotional,
+            extractionSource = extractionSource,
+            scoreBreakdown = scoreBreakdown
         )
 
-        safeLog("ACCEPTED: Score=$score, Type=$type, Amount=$amount, Merchant=$merchant")
+        Log.d(TAG, "--- PIPELINE COMPLETE (Score: $totalScore) ---")
         return info
+    }
+
+    private fun normalizeMessage(text: String, title: String?): String {
+        var content = "${title ?: ""} $text".replace("\n", " ").trim()
+        // Remove duplicate spaces
+        content = content.replace(Regex("\\s+"), " ")
+        // Normalize currency formats if needed (e.g. converting Rs to Rs.)
+        content = content.replace(Regex("Rs\\s+(\\d)"), "Rs. $1")
+        return content
+    }
+
+    private fun extractAmount(text: String): Double {
+        val matcher = AMOUNT_PATTERN.matcher(text)
+        if (matcher.find()) {
+            return matcher.group(1)?.replace(",", "")?.toDoubleOrNull() ?: 0.0
+        }
+        return 0.0
+    }
+
+    private fun extractAccount(text: String): String? {
+        val matcher = MASKED_ACC_PATTERN.matcher(text)
+        if (matcher.find()) return matcher.group(0)
+        return null
+    }
+
+    private fun extractRefNo(text: String): String? {
+        val matcher = REF_ID_PATTERN.matcher(text)
+        if (matcher.find()) return matcher.group(1)
+        return null
+    }
+
+    private fun extractDate(text: String): String? {
+        val matcher = DATE_PATTERN.matcher(text)
+        if (matcher.find()) return matcher.group(1)
+        return null
     }
 
     private fun extractMerchant(text: String, type: String): String {
         val lowerText = text.lowercase()
-        
-        // Strategy 1: Look for "trf to", "sent to", "paid to"
         val markers = if (type == "debit") {
-            listOf("trf to", "sent to", "paid to", "at", "to")
+            listOf("trf to", "sent to", "paid to", "at ", "to ")
         } else {
-            listOf("received from", "credited by", "from")
+            listOf("received from", "credited by", "from ")
         }
 
         for (marker in markers) {
-            val idx = lowerText.indexOf(" $marker ")
+            val idx = lowerText.indexOf(marker)
             if (idx != -1) {
-                val start = idx + marker.length + 2
+                val start = idx + marker.length
                 var end = text.length
                 
-                // Possible end markers
-                val endMarkers = listOf(" ref", " txn", " on ", " via", " using", " if not", " -", " upi:")
+                val endMarkers = listOf(" ref", " txn", " on ", " via", " using", " upi:", " a/c")
                 for (endM in endMarkers) {
                     val endIdx = lowerText.indexOf(endM, start)
-                    if (endIdx != -1 && endIdx < end) {
-                        end = endIdx
-                    }
+                    if (endIdx != -1 && endIdx < end) end = endIdx
                 }
                 
                 val result = text.substring(start, end).trim()
-                if (result.length in 3..40) {
-                    return cleanMerchantName(result)
+                if (result.length in 3..40 && !result.lowercase().contains("account")) {
+                    return result.uppercase()
                 }
             }
         }
-
-        return "Unknown Merchant"
-    }
-
-    private fun cleanMerchantName(name: String): String {
-        var clean = name.replace(Regex("[^a-zA-Z0-9. ]"), "").trim()
-        if (clean.contains(" ")) {
-             // Take first 3 words max
-             val words = clean.split(" ")
-             if (words.size > 3) {
-                 clean = words.take(3).joinToString(" ")
-             }
-        }
-        return clean.uppercase()
-    }
-
-    private fun parseAmount(amountStr: String?): Double {
-        return try {
-            amountStr?.replace(",", "")?.trim()?.toDoubleOrNull() ?: 0.0
-        } catch (e: Exception) {
-            0.0
-        }
+        return "UNKNOWN MERCHANT"
     }
 
     private fun resolveSourceApp(packageName: String, title: String): String {
@@ -210,14 +241,8 @@ object TransactionParser {
             lowerPkg.contains("google.android.apps.messaging") -> "Google Messages"
             lowerPkg.contains("com.android.messaging") -> "Android Messages"
             lowerPkg.contains("com.google.android.apps.sms") -> "Google SMS"
-            packageName.isNotBlank() && !packageName.contains(".") -> packageName // Probably a sender ID
+            packageName.isNotBlank() && !packageName.contains(".") -> packageName
             else -> "System"
         }
-    }
-
-    private fun safeLog(msg: String) {
-        try {
-            Log.d(TAG, "[TransactionParser] $msg")
-        } catch (e: Exception) {}
     }
 }

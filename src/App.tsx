@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
+import Diagnostics from "./pages/Diagnostics";
 import NotFound from "./pages/NotFound";
 import { storageEngine } from "./lib/storage-engine";
 
@@ -96,6 +97,7 @@ const App = () => {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/diagnostics" element={<Diagnostics />} />
             <Route path="/dashboard" element={<Navigate to="/" replace />} />
             <Route path="/expenses" element={<Navigate to="/" replace />} />
             <Route path="/settings" element={<Navigate to="/" replace />} />

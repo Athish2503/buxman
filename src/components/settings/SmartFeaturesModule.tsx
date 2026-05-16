@@ -404,7 +404,6 @@ export function SmartFeaturesModule({ permissionsStatus, onBack }: SmartFeatures
               <Terminal className="h-4 w-4 text-emerald-400" />
               <h4 className="text-xs font-black uppercase tracking-widest text-emerald-400">Internal Telemetry & Debug Console</h4>
             </div>
-            <span className="text-[9px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">v2.4 Live</span>
           </div>
 
           <div className="bg-black/40 rounded-3xl p-4 border border-white/5 font-mono text-[11px] space-y-3">

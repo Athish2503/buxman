@@ -10,6 +10,8 @@ import com.getcapacitor.*
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.pixel.reimburse.transactions.ParsedTransactionInfo
 import com.pixel.reimburse.transactions.TransactionOverlayService
+import org.json.JSONArray
+import org.json.JSONObject
 
 @CapacitorPlugin(name = "FinancialNotification")
 class FinancialNotificationPlugin : Plugin() {
@@ -56,17 +58,42 @@ class FinancialNotificationPlugin : Plugin() {
             val prefs = context.getSharedPreferences("FinancialDiagnostics", Context.MODE_PRIVATE)
             val history = prefs.getString("history", "[]") ?: "[]"
             try {
-                val array = org.json.JSONArray(history)
-                val newObj = org.json.JSONObject(data.toString())
+                val array = JSONArray(history)
+                val newObj = JSONObject(data.toString())
                 
                 // Keep only last 20
-                val newArray = org.json.JSONArray()
+                val newArray = JSONArray()
                 newArray.put(newObj)
                 for (i in 0 until Math.min(array.length(), 19)) {
                     newArray.put(array.get(i))
                 }
                 prefs.edit().putString("history", newArray.toString()).apply()
-            } catch (e: Exception) {}
+            } catch (e: Exception) {
+                Log.e("FinancialNotification", "Error updating diagnostics", e)
+            }
+        }
+
+        fun logTransactionAttempt(context: Context, info: ParsedTransactionInfo) {
+            val data = JSObject().apply {
+                put("type", "ATTEMPT")
+                put("amount", info.amount)
+                put("merchant", info.merchant)
+                put("source", info.extractionSource)
+                put("confidence", info.confidenceScore)
+                put("txnType", info.type)
+                put("rawText", info.rawText)
+                put("normalizedText", info.normalizedText)
+                put("matchedKeywords", JSArray(info.matchedKeywords))
+                put("negativeKeywords", JSArray(info.negativeKeywords))
+                put("isPromotional", info.isPromotional)
+                put("rejectionReason", info.rejectionReason ?: "")
+                put("timestamp", info.timestamp)
+                
+                val breakdown = JSObject()
+                info.scoreBreakdown.forEach { (k, v) -> breakdown.put(k, v) }
+                put("scoreBreakdown", breakdown)
+            }
+            addToDiagnostics(context, data)
         }
 
         fun logRejection(context: Context, text: String, source: String, reason: String, keywords: List<String> = emptyList()) {
@@ -130,7 +157,7 @@ class FinancialNotificationPlugin : Plugin() {
     }
 
     @PluginMethod
-    override fun checkPermissions(call: PluginCall) {
+    fun checkFinancialPermissions(call: PluginCall) {
         val result = JSObject().apply {
             put("notifications", isNotificationServiceEnabled())
             put("overlay", Settings.canDrawOverlays(context))
@@ -328,8 +355,11 @@ class FinancialNotificationPlugin : Plugin() {
     fun getDiagnostics(call: PluginCall) {
         val prefs = context.getSharedPreferences("FinancialDiagnostics", Context.MODE_PRIVATE)
         val history = prefs.getString("history", "[]") ?: "[]"
-        val result = JSObject().apply {
-            put("history", JSArray(history))
+        val result = JSObject()
+        try {
+            result.put("history", JSArray(history))
+        } catch (e: Exception) {
+            result.put("history", JSArray())
         }
         call.resolve(result)
     }

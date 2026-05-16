@@ -16,19 +16,20 @@ object TransactionDetector {
     fun processTransactionContent(context: Context, text: String, packageName: String?, title: String?, source: String) {
         Log.d(TAG, "[$source] captured raw payload: text=[$text], package=[$packageName], title=[$title]")
 
-        val parsedInfo = TransactionParser.parseTransaction(text, packageName, title)
+        val parsedInfo = TransactionParser.parseTransaction(text, packageName, title, source)
         
-        if (parsedInfo == null) {
-            Log.d(TAG, "[$source] REJECTED: Transaction engine determined this is not a valid transaction or confidence too low.")
-            Log.d(TAG, "[$source] RAW TEXT: $text")
-            FinancialNotificationPlugin.logRejection(context, text, source, "Insufficient confidence or non-transactional content")
+        // Log to diagnostics regardless of score
+        FinancialNotificationPlugin.logTransactionAttempt(context, parsedInfo)
+
+        if (parsedInfo.isPromotional) {
+            Log.d(TAG, "[$source] REJECTED: Promotional content detected (Score: ${parsedInfo.confidenceScore})")
+            FinancialNotificationPlugin.logRejection(context, text, source, "Promotional content detected", parsedInfo.matchedKeywords)
             return
         }
 
-        if (parsedInfo.confidenceScore < 50) {
-            Log.d(TAG, "[$source] FILTERED: Confidence score (${parsedInfo.confidenceScore}) below threshold for popup.")
-            Log.d(TAG, "[$source] MATCHED KEYWORDS: ${parsedInfo.matchedKeywords}")
-            FinancialNotificationPlugin.logRejection(context, text, source, "Confidence score (${parsedInfo.confidenceScore}) too low", parsedInfo.matchedKeywords)
+        if (parsedInfo.confidenceScore < 40) {
+            Log.d(TAG, "[$source] REJECTED: Confidence score (${parsedInfo.confidenceScore}) way too low.")
+            FinancialNotificationPlugin.logRejection(context, text, source, "Extremely low confidence", parsedInfo.matchedKeywords)
             return
         }
 
@@ -49,12 +50,15 @@ object TransactionDetector {
 
         Log.i(TAG, "SUCCESSFUL CAPTURE [$source]: Amount=${parsedInfo.amount}, Merchant=${parsedInfo.merchant}, Score=${parsedInfo.confidenceScore}")
 
-        // Alert the Capacitor Bridge
+        // Alert the Capacitor Bridge (for the app UI)
         FinancialNotificationPlugin.onTransactionCaptured(context, parsedInfo)
 
-        // Show Overlay instantly if deduction is high-confidence
-        if (parsedInfo.confidenceScore >= 50) {
+        // Show Overlay if confidence is at least 65 (threshold) or if it's a clear transaction even with missing fields
+        // We allow popup even for "unknown" merchant as long as it looks like a transaction
+        if (parsedInfo.confidenceScore >= 65 || (parsedInfo.amount > 0 && parsedInfo.type != "unknown" && parsedInfo.confidenceScore >= 50)) {
             triggerOverlay(context, parsedInfo)
+        } else {
+            Log.d(TAG, "[$source] FILTERED: Confidence score (${parsedInfo.confidenceScore}) below popup threshold (65).")
         }
     }
 
