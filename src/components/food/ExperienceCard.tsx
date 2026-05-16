@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { DiningExperience, Dish } from '@/types/food';
 import { FormattedText } from './FormattedText';
+import { DiningEntryForm } from './DiningEntryForm';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -131,7 +132,7 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
                     <Utensils className="h-3 w-3 text-muted-foreground/40" />
                   </div>
                   <span className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.1em]">
-                    {dishes.length} Items
+                    {dishes.length} Items { experience._visitCount && experience._visitCount > 1 && `• ${experience._visitCount} Visits` }
                   </span>
                 </div>
                 
@@ -319,29 +320,52 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
 
         {/* Integrated Actions for Expanded View */}
         <div className="fixed bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-background via-background/95 to-transparent z-50">
-          <div className="max-w-3xl mx-auto flex gap-4">
-            <Button 
-              onClick={(e) => { e.stopPropagation(); onEdit?.(); }}
-              className="flex-1 h-16 rounded-3xl bg-primary text-white hover:opacity-95 font-black uppercase tracking-widest text-[11px] shadow-glow gap-3 border-none transition-all active:scale-95"
-            >
-              <Edit className="h-5 w-5" /> Edit Experience
-            </Button>
-            
-            <Button 
-              variant="outline"
-              onClick={(e) => { e.stopPropagation(); handleCopyText(); }}
-              className="h-16 w-16 rounded-3xl bg-card/80 backdrop-blur-md border-white/10 text-white hover:bg-white/5 shrink-0 shadow-2xl transition-all active:scale-90"
-            >
-              {copied ? <Check className="h-6 w-6 text-emerald-400" /> : <Copy className="h-6 w-6" />}
-            </Button>
+          <div className="max-w-3xl mx-auto flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 flex gap-4">
+              <Button 
+                onClick={(e) => { e.stopPropagation(); onEdit?.(); }}
+                className="flex-1 h-16 rounded-3xl bg-primary text-white hover:opacity-95 font-black uppercase tracking-widest text-[11px] shadow-glow gap-3 border-none transition-all active:scale-95"
+              >
+                <Edit className="h-5 w-5" /> Edit
+              </Button>
 
-            <Button 
-              variant="outline"
-              onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
-              className="h-16 w-16 rounded-3xl bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white transition-all shrink-0 shadow-2xl active:scale-90"
-            >
-              <Trash2 className="h-6 w-6" />
-            </Button>
+              <DiningEntryForm 
+                trigger={
+                  <Button 
+                    variant="outline"
+                    className="flex-1 h-16 rounded-3xl border-white/10 bg-white/5 text-white hover:bg-white/10 font-black uppercase tracking-widest text-[11px] gap-3 transition-all active:scale-95"
+                  >
+                    <Utensils className="h-5 w-5" /> Revisit
+                  </Button>
+                }
+                initialData={{
+                  ...experience,
+                  id: '', // New ID
+                  visitDate: new Date().toISOString(),
+                  dishes: [], // Start fresh with dishes
+                  overallNotes: '',
+                  overallRating: undefined,
+                }}
+              />
+            </div>
+            
+            <div className="flex gap-4">
+              <Button 
+                variant="outline"
+                onClick={(e) => { e.stopPropagation(); handleCopyText(); }}
+                className="h-16 w-16 rounded-3xl bg-card/80 backdrop-blur-md border-white/10 text-white hover:bg-white/5 shrink-0 shadow-2xl transition-all active:scale-90"
+              >
+                {copied ? <Check className="h-6 w-6 text-emerald-400" /> : <Copy className="h-6 w-6" />}
+              </Button>
+
+              <Button 
+                variant="outline"
+                onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
+                className="h-16 w-16 rounded-3xl bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white transition-all shrink-0 shadow-2xl active:scale-90"
+              >
+                <Trash2 className="h-6 w-6" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>

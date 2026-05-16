@@ -1,4 +1,4 @@
-import { DiningExperience } from '@/types/food';
+import { DiningExperience, Dish } from '@/types/food';
 import { storageEngine } from '@/lib/storage-engine';
 
 const FOOD_STORAGE_KEY = 'reimburse_food_v1';
@@ -39,5 +39,44 @@ export const foodService = {
 
   getExperienceById(id: string): DiningExperience | undefined {
     return this.getExperiences().find((exp) => exp.id === id);
+  },
+
+  getUniqueRestaurants() {
+    const experiences = this.getExperiences();
+    const map = new Map<string, { restaurantName: string, cuisine?: string, location?: any, priceRange?: string }>();
+    
+    // Sort by date descending so we get the most recent metadata
+    const sorted = [...experiences].sort((a, b) => new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime());
+    
+    sorted.forEach(e => {
+      if (!map.has(e.restaurantName.toLowerCase())) {
+        map.set(e.restaurantName.toLowerCase(), {
+          restaurantName: e.restaurantName,
+          cuisine: e.cuisine,
+          location: e.location,
+          priceRange: e.priceRange
+        });
+      }
+    });
+    
+    return Array.from(map.values());
+  },
+
+  getDishesByRestaurant(restaurantName: string): Dish[] {
+    const experiences = this.getExperiences();
+    const dishes = new Map<string, Dish>();
+    
+    experiences
+      .filter(e => e.restaurantName.toLowerCase().trim() === restaurantName.toLowerCase().trim())
+      .forEach(e => {
+        e.dishes.forEach(d => {
+          const key = d.name.toLowerCase().trim();
+          if (!dishes.has(key)) {
+            dishes.set(key, d);
+          }
+        });
+      });
+      
+    return Array.from(dishes.values());
   }
 };

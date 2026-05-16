@@ -26,5 +26,6 @@ export interface DiningExperience {
   dishes: Dish[];
   overallNotes?: string;
   overallRating?: number;
+  _visitCount?: number; // Optional count for grouping UI
   createdAt: string;
 }

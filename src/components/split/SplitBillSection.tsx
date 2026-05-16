@@ -62,6 +62,24 @@ export function SplitBillSection({
       members
     });
   }, [isEnabled, splitType, selectedContactIds, customAmounts, amount]);
+  
+  // Auto-initialize exact amounts to equal shares when participants are added or if all are zero
+  useEffect(() => {
+    if (isEnabled && splitType === 'exact' && selectedContactIds.length > 0) {
+      const missingAny = selectedContactIds.some(id => customAmounts[id] === undefined) || customAmounts['user'] === undefined;
+      const allZero = selectedContactIds.every(id => !customAmounts[id] || customAmounts[id] === 0) && (!customAmounts['user'] || customAmounts['user'] === 0);
+      
+      if (missingAny || allZero) {
+        const share = amount / (selectedContactIds.length + 1);
+        const newAmounts = { ...customAmounts };
+        newAmounts['user'] = Number(share.toFixed(2));
+        selectedContactIds.forEach(id => {
+          newAmounts[id] = Number(share.toFixed(2));
+        });
+        setCustomAmounts(newAmounts);
+      }
+    }
+  }, [isEnabled, splitType, selectedContactIds.length, amount]);
 
   useEffect(() => {
     onPaidByChange(paidBy === 'user' ? undefined : paidBy);
@@ -172,14 +190,24 @@ export function SplitBillSection({
                 <span>Amount</span>
               </div>
               
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-foreground">You (Owner) {paidBy === 'user' && <span className="text-[10px] text-primary font-bold">(Paid)</span>}</span>
-                <span className="font-mono font-bold">
-                  ₹{(amount - selectedContactIds.reduce((acc, id) => {
-                    if (splitType === 'equal') return acc + (amount / (selectedContactIds.length + 1));
-                    return acc + (customAmounts[id] || 0);
-                  }, 0)).toFixed(2)}
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm font-medium text-foreground">
+                  You (Owner) {paidBy === 'user' && <span className="text-[10px] text-primary font-bold">(Paid)</span>}
                 </span>
+                {splitType === 'equal' ? (
+                  <span className="font-mono text-sm">₹{(amount / (selectedContactIds.length + 1)).toFixed(2)}</span>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground text-xs">₹</span>
+                    <input
+                      type="number"
+                      value={customAmounts['user'] ?? ''}
+                      onChange={e => handleCustomAmountChange('user', e.target.value)}
+                      className="w-20 bg-background/50 border border-border/40 rounded-lg px-2 py-1 text-sm font-mono text-right outline-none focus:border-primary/50"
+                      placeholder="0.00"
+                    />
+                  </div>
+                )}
               </div>
 
               {selectedContactIds.map(id => {
@@ -199,7 +227,7 @@ export function SplitBillSection({
                         <span className="text-muted-foreground text-xs">₹</span>
                         <input
                           type="number"
-                          value={customAmounts[id] || ''}
+                          value={customAmounts[id] ?? ''}
                           onChange={e => handleCustomAmountChange(id, e.target.value)}
                           className="w-20 bg-background/50 border border-border/40 rounded-lg px-2 py-1 text-sm font-mono text-right outline-none focus:border-primary/50"
                           placeholder="0.00"
@@ -212,12 +240,35 @@ export function SplitBillSection({
               
               {splitType === 'exact' && (
                 <div className="pt-2 border-t border-border/20 flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase">Remaining</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Unallocated</span>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const share = amount / (selectedContactIds.length + 1);
+                        const newAmounts = { ...customAmounts };
+                        newAmounts['user'] = Number(share.toFixed(2));
+                        selectedContactIds.forEach(id => {
+                          newAmounts[id] = Number(share.toFixed(2));
+                        });
+                        setCustomAmounts(newAmounts);
+                      }}
+                      className="text-[9px] text-primary hover:underline font-bold uppercase tracking-wider text-left"
+                    >
+                      Distribute Equally
+                    </button>
+                  </div>
                   <span className={cn(
                     "text-xs font-mono font-bold",
-                    Math.abs(amount - selectedContactIds.reduce((acc, id) => acc + (customAmounts[id] || 0), 0)) < 0.01 ? "text-emerald-500" : "text-rose-500"
+                    Math.abs(amount - (Object.entries(customAmounts).reduce((acc, [id, val]) => {
+                      if (id !== 'user' && !selectedContactIds.includes(id)) return acc;
+                      return acc + (val || 0);
+                    }, 0))) < 0.01 ? "text-emerald-500" : "text-rose-500"
                   )}>
-                    ₹{(amount - selectedContactIds.reduce((acc, id) => acc + (customAmounts[id] || 0), 0)).toFixed(2)}
+                    ₹{Math.max(0, amount - (Object.entries(customAmounts).reduce((acc, [id, val]) => {
+                      if (id !== 'user' && !selectedContactIds.includes(id)) return acc;
+                      return acc + (val || 0);
+                    }, 0))).toFixed(2)}
                   </span>
                 </div>
               )}

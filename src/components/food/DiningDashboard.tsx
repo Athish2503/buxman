@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Search, Filter, Utensils, 
-  ChefHat, Map, Sparkles, TrendingUp,
+  ChefHat, Map as MapIcon, Sparkles, TrendingUp,
   History, Calendar, Share2, Star, Heart, Layers
 } from 'lucide-react';
 import { DiningExperience } from '@/types/food';
@@ -59,7 +59,7 @@ export function DiningDashboard() {
   }, [experiences]);
 
   const filtered = useMemo(() => {
-    return experiences.filter(e => {
+    const list = experiences.filter(e => {
       const matchSearch = e.restaurantName.toLowerCase().includes(search.toLowerCase()) || 
                           e.cuisine?.toLowerCase().includes(search.toLowerCase());
       const matchCuisine = !selectedCuisine || e.cuisine === selectedCuisine;
@@ -70,6 +70,36 @@ export function DiningDashboard() {
       }
       return matchSearch && matchCuisine;
     });
+
+    if (viewMode === 'overview' || viewMode === 'favorites') {
+      // Group by restaurant name to avoid duplicate cards in overview
+      const groups = new Map<string, DiningExperience>();
+      list.forEach(e => {
+        const key = e.restaurantName.toLowerCase().trim();
+        if (!groups.has(key)) {
+          groups.set(key, { ...e, _visitCount: 1 });
+        } else {
+          const existing = groups.get(key)!;
+          // Merge dishes and update metadata
+          const mergedDishes = [...existing.dishes];
+          e.dishes.forEach(d => {
+            if (!mergedDishes.some(md => md.name.toLowerCase() === d.name.toLowerCase())) {
+              mergedDishes.push(d);
+            }
+          });
+          
+          groups.set(key, {
+            ...existing,
+            dishes: mergedDishes,
+            visitDate: new Date(e.visitDate) > new Date(existing.visitDate) ? e.visitDate : existing.visitDate,
+            _visitCount: (existing._visitCount || 1) + 1
+          });
+        }
+      });
+      return Array.from(groups.values());
+    }
+
+    return list;
   }, [experiences, search, selectedCuisine, viewMode]);
 
   // Derive "Best Experience" dynamic highlight
@@ -145,12 +175,12 @@ export function DiningDashboard() {
       </div>
 
       {/* Primary Module Sub-Navigation Framework */}
-      <div className="flex bg-card/20 backdrop-blur-xl border border-white/5 p-1.5 rounded-[2rem] gap-2 overflow-x-auto no-scrollbar shadow-lg">
+      <div className="flex bg-black/40 backdrop-blur-3xl border border-white/10 p-2 rounded-[2.5rem] gap-2 overflow-x-auto no-scrollbar shadow-2xl snap-x snap-mandatory">
         {[
           { id: 'overview', label: 'Overview', icon: Utensils },
-          { id: 'highlights', label: 'Best Experiences', icon: Sparkles },
-          { id: 'favorites', label: 'Favorite Meals', icon: Heart },
-          { id: 'timeline', label: 'Timeline View', icon: History }
+          { id: 'highlights', label: 'Highlights', icon: Sparkles },
+          { id: 'favorites', label: 'Favorites', icon: Heart },
+          { id: 'timeline', label: 'Timeline', icon: History }
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = viewMode === tab.id;
@@ -159,16 +189,16 @@ export function DiningDashboard() {
               key={tab.id}
               onClick={() => { haptics.light(); setViewMode(tab.id as any); }}
               className={cn(
-                "flex-1 min-w-[120px] py-3 rounded-[1.5rem] font-bold text-xs flex items-center justify-center gap-2 transition-all relative z-10",
-                isActive ? "text-white shadow-sm" : "text-muted-foreground hover:text-white"
+                "shrink-0 px-6 py-4 rounded-[1.8rem] font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all relative z-10 snap-center",
+                isActive ? "text-white" : "text-muted-foreground/60 hover:text-white hover:bg-white/5"
               )}
             >
-              <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-primary" : "")} />
+              <Icon className={cn("h-4 w-4 shrink-0 transition-transform", isActive ? "text-primary scale-110" : "opacity-40")} />
               <span>{tab.label}</span>
               {isActive && (
                 <motion.div
                   layoutId="dining-nav-active"
-                  className="absolute inset-0 bg-primary rounded-[1.5rem] -z-10"
+                  className="absolute inset-0 bg-primary rounded-[1.8rem] -z-10 shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]"
                   transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                 />
               )}
@@ -178,23 +208,25 @@ export function DiningDashboard() {
       </div>
 
       {/* Filters Overlay */}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-6">
         <div className="relative group">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
+          <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground/20 group-focus-within:text-primary transition-all duration-300" />
           <Input 
             placeholder="Search restaurants, cuisines..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-16 pl-14 rounded-[2rem] bg-card/20 backdrop-blur-2xl border-white/5 shadow-2xl focus:border-primary/40 transition-all text-base placeholder:text-muted-foreground/30"
+            className="h-20 pl-16 rounded-[2.5rem] bg-black/30 backdrop-blur-3xl border-white/5 shadow-2xl focus:border-primary/30 transition-all text-lg placeholder:text-muted-foreground/20 font-medium"
           />
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2 px-1">
           <Badge 
-            onClick={() => setSelectedCuisine(null)}
+            onClick={() => { haptics.light(); setSelectedCuisine(null); }}
             className={cn(
-              "px-4 py-2 rounded-xl cursor-pointer font-bold text-[10px] uppercase tracking-widest transition-all",
-              !selectedCuisine ? "bg-primary text-white" : "bg-card/40 text-muted-foreground hover:bg-muted/60"
+              "px-6 py-3 rounded-2xl cursor-pointer font-black text-[10px] uppercase tracking-[0.2em] transition-all shrink-0",
+              !selectedCuisine 
+                ? "bg-primary text-white shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]" 
+                : "bg-white/5 text-muted-foreground/60 border border-white/5 hover:bg-white/10 hover:text-white"
             )}
           >
             All Cuisines
@@ -202,10 +234,12 @@ export function DiningDashboard() {
           {cuisines.map(c => (
             <Badge 
               key={c}
-              onClick={() => setSelectedCuisine(c)}
+              onClick={() => { haptics.light(); setSelectedCuisine(c); }}
               className={cn(
-                "px-4 py-2 rounded-xl cursor-pointer font-bold text-[10px] uppercase tracking-widest transition-all whitespace-nowrap",
-                selectedCuisine === c ? "bg-primary text-white shadow-md" : "bg-card/40 text-muted-foreground hover:bg-muted/60"
+                "px-6 py-3 rounded-2xl cursor-pointer font-black text-[10px] uppercase tracking-[0.2em] transition-all whitespace-nowrap shrink-0",
+                selectedCuisine === c 
+                  ? "bg-primary text-white shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]" 
+                  : "bg-white/5 text-muted-foreground/60 border border-white/5 hover:bg-white/10 hover:text-white"
               )}
             >
               {c}
@@ -383,7 +417,7 @@ export function DiningDashboard() {
         </div>
       ) : (
         /* Standard Views Grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           <AnimatePresence mode="popLayout">
             {filtered.map((exp) => (
               <ExperienceCard 
@@ -398,18 +432,18 @@ export function DiningDashboard() {
       )}
 
       {filtered.length === 0 && (
-        <div className="py-24 flex flex-col items-center justify-center text-center space-y-4">
-          <div className="h-20 w-20 rounded-[2.5rem] bg-muted/30 flex items-center justify-center">
-            <ChefHat className="h-10 w-10 text-muted-foreground/30" />
+        <div className="py-32 flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in zoom-in duration-500">
+          <div className="h-24 w-24 rounded-[3rem] bg-white/5 border border-white/10 flex items-center justify-center shadow-2xl">
+            <ChefHat className="h-10 w-10 text-muted-foreground/20" />
           </div>
-          <div>
-            <h3 className="text-xl font-bold">No matching experiences</h3>
-            <p className="text-muted-foreground text-sm">Try broadening your search parameters or toggle views.</p>
+          <div className="max-w-xs space-y-2">
+            <h3 className="text-2xl font-black tracking-tight">No experiences found</h3>
+            <p className="text-muted-foreground/60 text-sm font-medium">Try adjusting your filters or search terms to find what you're looking for.</p>
           </div>
           <Button 
             variant="outline" 
             onClick={() => setIsEntryFormOpen(true)}
-            className="rounded-xl border-primary/20 text-primary hover:bg-primary/5"
+            className="h-12 px-8 rounded-2xl border-primary/20 text-primary hover:bg-primary/5 font-bold uppercase tracking-widest text-[10px]"
           >
             Log New Visit
           </Button>

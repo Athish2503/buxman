@@ -43,7 +43,7 @@ export const localIntelligence = {
 
     // 2. Check historical data for exact or similar merchant matches
     const history = storageService.getExpenses();
-    const exactMatch = history.find(e => e.description.toLowerCase() === desc);
+    const exactMatch = history.find(e => (e.description || '').toLowerCase() === desc);
     if (exactMatch) return exactMatch.category;
 
     // 3. Fallback to 'others' or 'general'

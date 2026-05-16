@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -98,13 +98,35 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
     haptics.medium();
   };
 
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const restaurantName = watch('restaurantName');
+  
+  const suggestions = useMemo(() => {
+    if (!restaurantName || isEdit) return [];
+    const unique = foodService.getUniqueRestaurants();
+    return unique.filter(r => 
+      r.restaurantName.toLowerCase().includes(restaurantName.toLowerCase()) &&
+      r.restaurantName.toLowerCase() !== restaurantName.toLowerCase()
+    ).slice(0, 3);
+  }, [restaurantName, isEdit]);
+
+  const selectSuggestion = (s: any) => {
+    setValue('restaurantName', s.restaurantName, { shouldValidate: true });
+    if (s.cuisine) setValue('cuisine', s.cuisine);
+    if (s.location?.address) setValue('address', s.location.address);
+    if (s.priceRange) setValue('priceRange', s.priceRange);
+    setShowSuggestions(false);
+    haptics.selection();
+    toast.info(`Pre-filled details for ${s.restaurantName}`);
+  };
+
   const onFormSubmit = async (data: FormData) => {
     if (isProcessing) return;
     setIsProcessing(true);
 
     try {
       const experience: DiningExperience = {
-        id: initialData?.id || crypto.randomUUID(),
+        id: (isEdit && initialData?.id) ? initialData.id : crypto.randomUUID(),
         restaurantName: data.restaurantName,
         visitDate: data.visitDate,
         cuisine: data.cuisine,
@@ -147,13 +169,44 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
         </p>
 
         <div className="space-y-4 relative z-10">
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 relative">
             <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Restaurant Name</Label>
             <Input
               {...register('restaurantName')}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
               placeholder="e.g. The Glass House"
               className="h-12 bg-background/50 border-white/10 text-lg font-bold placeholder:text-muted-foreground/30 focus:border-primary/50 transition-all rounded-2xl"
+              autoComplete="off"
             />
+            
+            <AnimatePresence>
+              {showSuggestions && suggestions.length > 0 && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute top-full left-0 right-0 z-50 mt-2 bg-card/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden p-1"
+                >
+                  <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 px-3 py-2 border-b border-white/5">Previous Visits</p>
+                  {suggestions.map((s, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => selectSuggestion(s)}
+                      className="w-full px-4 py-3 text-left hover:bg-primary/10 transition-colors flex items-center justify-between group"
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold group-hover:text-primary transition-colors">{s.restaurantName}</span>
+                        {s.cuisine && <span className="text-[10px] text-muted-foreground/60">{s.cuisine}</span>}
+                      </div>
+                      <Plus className="h-4 w-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
             {errors.restaurantName && <p className="text-xs text-destructive">{errors.restaurantName.message}</p>}
           </div>
 
@@ -236,6 +289,42 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
           </Button>
         </div>
 
+        {/* Previously Ordered Items (Quick Add) */}
+        {!isEdit && restaurantName && (
+          <div className="px-1">
+            {(() => {
+              const prevDishes = foodService.getDishesByRestaurant(restaurantName);
+              const currentNames = dishes.map(d => d.name.toLowerCase().trim());
+              const suggestions = prevDishes.filter(pd => !currentNames.includes(pd.name.toLowerCase().trim()));
+              
+              if (suggestions.length === 0) return null;
+              
+              return (
+                <div className="space-y-3 p-4 rounded-3xl bg-white/5 border border-white/5">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-primary/60">Ordered Before</p>
+                  <div className="flex flex-wrap gap-2">
+                    {suggestions.map(pd => (
+                      <button
+                        key={pd.id}
+                        type="button"
+                        onClick={() => {
+                          setDishes([...dishes, { ...pd, id: crypto.randomUUID(), images: [] }]);
+                          haptics.light();
+                          toast.info(`Added ${pd.name} from previous visit`);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-background/50 border border-white/5 text-[10px] font-bold hover:bg-primary/10 hover:border-primary/30 transition-all flex items-center gap-2 group"
+                      >
+                        <Plus className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
+                        {pd.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         <div className="space-y-4">
           <AnimatePresence initial={false}>
             {dishes.map((dish, index) => (
@@ -250,7 +339,13 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
                   dish={dish}
                   isExpanded={expandedDishId === dish.id}
                   onToggle={() => setExpandedDishId(expandedDishId === dish.id ? null : dish.id)}
-                  onChange={(updated) => updateDish(index, updated)}
+                  onChange={(updated) => {
+                    const isDuplicate = dishes.some((d, idx) => idx !== index && d.name.toLowerCase().trim() === updated.name.toLowerCase().trim() && updated.name.length > 0);
+                    if (isDuplicate) {
+                      toast.warning(`"${updated.name}" is already in this list`);
+                    }
+                    updateDish(index, updated);
+                  }}
                   onRemove={() => removeDish(index)}
                 />
               </motion.div>
