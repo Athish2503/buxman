@@ -70,6 +70,20 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
     },
   });
 
+  useEffect(() => {
+    if (initialData) {
+      setDishes(initialData.dishes || []);
+      setExpandedDishId(initialData.dishes && initialData.dishes.length > 0 ? initialData.dishes[0].id : null);
+      reset({
+        restaurantName: initialData.restaurantName,
+        visitDate: format(new Date(initialData.visitDate), 'yyyy-MM-dd'),
+        cuisine: initialData.cuisine || '',
+        priceRange: initialData.priceRange || 'mid',
+        address: initialData.location?.address || '',
+      });
+    }
+  }, [initialData, reset]);
+
   const selectedPriceRange = watch('priceRange');
 
   const addDish = () => {

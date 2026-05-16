@@ -8,6 +8,7 @@ export interface Dish {
   status: DishStatus;
   notes: string; // Rich text (HTML)
   rating?: number; // 1-5
+  price?: number; // Optional price for each item
   images: string[]; // Base64 or local URIs
 }
 

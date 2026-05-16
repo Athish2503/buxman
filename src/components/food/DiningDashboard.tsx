@@ -454,16 +454,17 @@ export function DiningDashboard() {
       <AnimatePresence>
         {expandedId && (
           <ExperienceCard 
-            experience={experiences.find(e => e.id === expandedId)!} 
+            experience={filtered.find(e => e.id === expandedId) || experiences.find(e => e.id === expandedId)!} 
             isExpanded={true}
             onClose={() => setExpandedId(null)}
             onEdit={() => {
-              setEditingExperience(experiences.find(e => e.id === expandedId)!);
+              const exp = filtered.find(e => e.id === expandedId) || experiences.find(e => e.id === expandedId);
+              if (exp) setEditingExperience(exp);
               setExpandedId(null);
             }}
             onDelete={() => handleDelete(expandedId)}
             onShare={() => {
-              const exp = experiences.find(e => e.id === expandedId);
+              const exp = filtered.find(e => e.id === expandedId) || experiences.find(e => e.id === expandedId);
               if (exp) {
                 // Launch premium visual dialog instead of plain view-shot
                 triggerShare(exp);

@@ -38,7 +38,9 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
 }, ref) => {
   const [copied, setCopied] = useState(false);
   const isMobile = useIsMobile();
-  const { restaurantName, visitDate, cuisine, priceRange, location, dishes } = experience;
+  const { restaurantName, visitDate, cuisine, priceRange, location, dishes = [] } = experience || {};
+  
+  if (!experience) return null;
   
   const likedDishes = dishes.filter(d => d.status === 'liked');
   const avoidedDishes = dishes.filter(d => d.status === 'not-recommended');
@@ -50,7 +52,8 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
     const dishList = dishes.map(d => {
       const statusIcon = d.status === 'liked' ? '✅' : d.status === 'not-recommended' ? '❌' : '⏺️';
       const ratingStars = d.rating ? '⭐'.repeat(d.rating) : '';
-      return `${statusIcon} *${d.name}* ${ratingStars}\n${d.notes.replace(/[*#=]/g, '')}`;
+      const priceTag = d.price ? `(₹${d.price})` : '';
+      return `${statusIcon} *${d.name}* ${priceTag} ${ratingStars}\n${d.notes.replace(/[*#=]/g, '')}`;
     }).join('\n\n');
 
     const text = `🍽️ *${restaurantName}*\n📅 ${format(new Date(visitDate), 'MMM d, yyyy')}\n📍 ${location?.address || 'N/A'}\n\n*Items:*\n${dishList}\n\n_Logged via Buxman_`;
@@ -282,6 +285,11 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
                       </div>
                       
                       <div className="flex items-center gap-3 mb-3">
+                        {dish.price && (
+                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20">
+                            <span className="text-[11px] font-black text-primary">₹{dish.price}</span>
+                          </div>
+                        )}
                         {dish.rating && (
                           <div className="flex gap-0.5">
                             {[1,2,3,4,5].map(s => (

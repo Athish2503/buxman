@@ -41,7 +41,7 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
 
   if (!experience) return null;
 
-  const { restaurantName, visitDate, location, dishes } = experience;
+  const { restaurantName, visitDate, location, dishes = [] } = experience;
 
   // Extract a background image fallback to provide beautiful ambient backdrops
   const allImages = dishes.flatMap(d => d.images).filter(Boolean);
@@ -63,6 +63,7 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
 
     dishes.forEach(d => {
       let line = `- ${d.name}`;
+      if (d.price) line += ` (₹${d.price})`;
       if (d.rating) line += ` ★ ${d.rating}/5`;
       lines.push(line);
       if (d.notes && d.notes.trim()) {
@@ -159,11 +160,18 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
                         <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#FFFFFF', wordBreak: 'break-word' }}>
                           • {dish.name}
                         </span>
-                        {dish.rating && (
-                          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#FBBF24', backgroundColor: 'rgba(251,191,36,0.1)', padding: '2px 8px', borderRadius: '8px', flexShrink: 0 }}>
-                            ★ {dish.rating}/5
-                          </span>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          {dish.price && (
+                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#34D399', backgroundColor: 'rgba(52,211,153,0.1)', padding: '2px 8px', borderRadius: '8px' }}>
+                              ₹{dish.price}
+                            </span>
+                          )}
+                          {dish.rating && (
+                            <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#FBBF24', backgroundColor: 'rgba(251,191,36,0.1)', padding: '2px 8px', borderRadius: '8px' }}>
+                              ★ {dish.rating}/5
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {dish.notes && dish.notes.trim() && (
@@ -214,11 +222,18 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
                       <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#111827' }}>
                         {dish.name}
                       </span>
-                      {dish.rating && (
-                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#D97706', backgroundColor: '#FEF3C7', padding: '2px 8px', borderRadius: '6px' }}>
-                          ★ {dish.rating}/5
-                        </span>
-                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {dish.price && (
+                          <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#059669', backgroundColor: '#D1FAE5', padding: '2px 8px', borderRadius: '6px' }}>
+                            ₹{dish.price}
+                          </span>
+                        )}
+                        {dish.rating && (
+                          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#D97706', backgroundColor: '#FEF3C7', padding: '2px 8px', borderRadius: '6px' }}>
+                            ★ {dish.rating}/5
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {dish.notes && dish.notes.trim() && (
@@ -268,11 +283,18 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
                         <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#FFFFFF' }}>
                           {dish.name}
                         </span>
-                        {dish.rating && (
-                          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#FECACA' }}>
-                            ★ {dish.rating}/5
-                          </span>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {dish.price && (
+                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#FCA5A5' }}>
+                              ₹{dish.price}
+                            </span>
+                          )}
+                          {dish.rating && (
+                            <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#FECACA' }}>
+                              ★ {dish.rating}/5
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {dish.notes && dish.notes.trim() && (
@@ -320,11 +342,18 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
                       <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#FFFFFF' }}>
                         {dish.name}
                       </span>
-                      {dish.rating && (
-                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#6EE7B7', backgroundColor: 'rgba(110,231,183,0.1)', padding: '2px 8px', borderRadius: '6px' }}>
-                          ★ {dish.rating}/5
-                        </span>
-                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {dish.price && (
+                          <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#A7F3D0' }}>
+                            ₹{dish.price}
+                          </span>
+                        )}
+                        {dish.rating && (
+                          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#6EE7B7', backgroundColor: 'rgba(110,231,183,0.1)', padding: '2px 8px', borderRadius: '6px' }}>
+                            ★ {dish.rating}/5
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {dish.notes && dish.notes.trim() && (

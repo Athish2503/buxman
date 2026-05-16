@@ -150,13 +150,29 @@ export function DishEditor({ dish, isExpanded = true, onToggle, onChange, onRemo
                     <span className="text-[10px] font-black text-amber-500">{dish.rating}</span>
                   </div>
                 )}
+                {dish.price && (
+                  <div className="flex items-center gap-1 bg-primary/10 px-2 py-0.5 rounded-full border border-primary/10">
+                    <span className="text-[10px] font-black text-primary">₹{dish.price}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
         </div>
 
         {isExpanded && (
-          <div className="flex items-center gap-1 bg-muted/30 p-1 rounded-lg border border-border/40 shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <div className="relative w-24">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 font-bold text-sm">₹</span>
+              <Input
+                type="number"
+                value={dish.price || ''}
+                onChange={(e) => onChange({ ...dish, price: e.target.value ? Number(e.target.value) : undefined })}
+                placeholder="Price"
+                className="bg-background/50 border-border/40 font-bold h-10 pl-7 text-sm"
+              />
+            </div>
+            <div className="flex items-center gap-1 bg-muted/30 p-1 rounded-lg border border-border/40">
             {[1, 2, 3, 4, 5].map((star) => (
               <button
                 key={star}
@@ -175,6 +191,7 @@ export function DishEditor({ dish, isExpanded = true, onToggle, onChange, onRemo
                 />
               </button>
             ))}
+            </div>
           </div>
         )}
       </div>

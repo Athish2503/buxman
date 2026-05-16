@@ -62,7 +62,7 @@ export function generateSmartEnhancement(exp: DiningExperience): SmartDiningEnha
   if (exp.cuisine) baseHashtags.push(`#${exp.cuisine.replace(/\s+/g, '')}`);
   
   // Emoji summary
-  const dishListEmoji = exp.dishes.map(d => `✨ ${d.name}`).join(' • ');
+  const dishListEmoji = exp.dishes.map(d => `✨ ${d.name}${d.price ? ` (₹${d.price})` : ''}`).join(' • ');
   const emojiVersion = `🍽️ ${exp.restaurantName}\n🌟 Highlights: ${dishListEmoji || bestDish}\n💭 "${caption}"`;
 
   // Dynamic ambience metrics

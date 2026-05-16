@@ -7,7 +7,9 @@ export const foodService = {
   getExperiences(): DiningExperience[] {
     try {
       const data = localStorage.getItem(FOOD_STORAGE_KEY);
-      return data ? JSON.parse(data) : [];
+      if (!data) return [];
+      const parsed = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed : [];
     } catch (error) {
       console.error('Error fetching dining experiences:', error);
       return [];
