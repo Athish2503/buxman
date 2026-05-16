@@ -70,6 +70,8 @@ export interface ExpenseFormProps {
   trigger?:    React.ReactNode;
   open?:       boolean;
   onOpenChange?: (open: boolean) => void;
+  tripId?:     string;
+  participants?: string[]; // Contact IDs
 }
 
 
@@ -83,6 +85,8 @@ function FormBody({
   isEdit = false,
   onClose,
   onDone,
+  tripId,
+  participants,
 }: ExpenseFormProps & { onDone?: () => void }) {
   const [receiptPreview, setReceiptPreview] = useState<string | null>(
     initialData?.receiptImage || null
@@ -218,7 +222,7 @@ function FormBody({
         projectCode:  data.projectCode || undefined,
         paidBy:       paidBy,
         split:        split,
-        tripId:       initialData?.tripId,
+        tripId:       tripId || initialData?.tripId,
         createdAt:    initialData?.createdAt || new Date().toISOString(),
         updatedAt:    new Date().toISOString(),
       };
@@ -420,6 +424,7 @@ function FormBody({
           onPaidByChange={setPaidBy}
           initialSplit={initialData?.split}
           initialPaidBy={initialData?.paidBy}
+          tripParticipants={participants}
         />
       </div>
 
@@ -566,7 +571,8 @@ export function ExpenseForm({
   onClose, 
   trigger,
   open: externalOpen,
-  onOpenChange
+  onOpenChange,
+  ...props
 }: ExpenseFormProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
@@ -584,7 +590,16 @@ export function ExpenseForm({
     return () => { document.body.style.overflow = ''; };
   }, [open, isEdit]);
 
-  const formContent = <FormBody onSubmit={onSubmit} initialData={initialData} isEdit={isEdit} onClose={onClose} />;
+  const formContent = (
+    <FormBody 
+      onSubmit={onSubmit} 
+      initialData={initialData} 
+      isEdit={isEdit} 
+      onClose={onClose} 
+      tripId={props.tripId}
+      participants={props.participants}
+    />
+  );
 
   if (isEdit) {
     return (
@@ -610,6 +625,14 @@ export function ExpenseForm({
           {isMobile ? (
             /* ── Mobile: bottom sheet ── */
             <motion.div
+              drag="y"
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={{ top: 0, bottom: 0.8 }}
+              onDragEnd={(_, info) => {
+                if (info.offset.y > 100) {
+                  setOpen(false);
+                }
+              }}
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
@@ -643,6 +666,8 @@ export function ExpenseForm({
                   onDone={() => setOpen(false)} 
                   initialData={initialData}
                   isEdit={isEdit}
+                  tripId={props.tripId}
+                  participants={props.participants}
                 />
               </div>
             </motion.div>

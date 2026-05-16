@@ -14,6 +14,7 @@ interface SplitBillSectionProps {
   onPaidByChange: (paidBy: string | undefined) => void;
   initialSplit?: ExpenseSplit;
   initialPaidBy?: string;
+  tripParticipants?: string[];
 }
 
 export function SplitBillSection({ 
@@ -21,13 +22,14 @@ export function SplitBillSection({
   onSplitChange, 
   onPaidByChange,
   initialSplit,
-  initialPaidBy 
+  initialPaidBy,
+  tripParticipants 
 }: SplitBillSectionProps) {
   const [isEnabled, setIsEnabled] = useState(!!initialSplit);
   const [paidBy, setPaidBy] = useState<string>(initialPaidBy || 'user');
   const [splitType, setSplitType] = useState<SplitType>(initialSplit?.splitType || 'equal');
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>(
-    initialSplit?.members.map(m => m.contactId) || []
+    initialSplit?.members.map(m => m.contactId) || tripParticipants || []
   );
   const [customAmounts, setCustomAmounts] = useState<Record<string, number>>(
     initialSplit?.members.reduce((acc, m) => ({ ...acc, [m.contactId]: m.amount }), {}) || {}
@@ -94,6 +96,65 @@ export function SplitBillSection({
 
   return (
     <div className="space-y-4">
+      <div className="space-y-2">
+        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Who paid?</Label>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setPaidBy('user')}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-all",
+              paidBy === 'user'
+                ? "bg-primary/20 border-primary text-primary"
+                : "bg-muted/30 border-border/40 text-muted-foreground hover:bg-muted/50"
+            )}
+          >
+            You
+            {paidBy === 'user' && <Check className="h-3 w-3" />}
+          </button>
+          
+          {/* Trip Participants (if any) */}
+          {tripParticipants && tripParticipants.map(pid => {
+            const contact = contacts.find(c => c.id === pid);
+            if (!contact) return null;
+            return (
+              <button
+                key={contact.id}
+                type="button"
+                onClick={() => setPaidBy(contact.id)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-all",
+                  paidBy === contact.id
+                    ? "bg-primary/20 border-primary text-primary"
+                    : "bg-muted/30 border-border/40 text-muted-foreground hover:bg-muted/50"
+                )}
+              >
+                {contact.name}
+                {paidBy === contact.id && <Check className="h-3 w-3" />}
+              </button>
+            );
+          })}
+
+          {/* Other selected contacts that are NOT in tripParticipants */}
+          {contacts.filter(c => selectedContactIds.includes(c.id) && !tripParticipants?.includes(c.id)).map(contact => (
+            <button
+              key={contact.id}
+              type="button"
+              onClick={() => setPaidBy(contact.id)}
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-all",
+                paidBy === contact.id
+                  ? "bg-primary/20 border-primary text-primary"
+                  : "bg-muted/30 border-border/40 text-muted-foreground hover:bg-muted/50"
+              )}
+            >
+              {contact.name}
+              {paidBy === contact.id && <Check className="h-3 w-3" />}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Users className={cn("h-4 w-4", isEnabled ? "text-primary" : "text-muted-foreground")} />
@@ -122,40 +183,6 @@ export function SplitBillSection({
           animate={{ opacity: 1, height: 'auto' }}
           className="space-y-4 pt-2"
         >
-          <div className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Who paid?</Label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setPaidBy('user')}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-all",
-                  paidBy === 'user'
-                    ? "bg-primary/20 border-primary text-primary"
-                    : "bg-muted/30 border-border/40 text-muted-foreground hover:bg-muted/50"
-                )}
-              >
-                You
-                {paidBy === 'user' && <Check className="h-3 w-3" />}
-              </button>
-              {contacts.filter(c => selectedContactIds.includes(c.id)).map(contact => (
-                <button
-                  key={contact.id}
-                  type="button"
-                  onClick={() => setPaidBy(contact.id)}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-all",
-                    paidBy === contact.id
-                      ? "bg-primary/20 border-primary text-primary"
-                      : "bg-muted/30 border-border/40 text-muted-foreground hover:bg-muted/50"
-                  )}
-                >
-                  {contact.name}
-                  {paidBy === contact.id && <Check className="h-3 w-3" />}
-                </button>
-              ))}
-            </div>
-          </div>
 
           <div className="flex gap-2">
             {(['equal', 'exact'] as SplitType[]).map(type => (

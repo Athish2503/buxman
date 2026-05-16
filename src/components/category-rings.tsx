@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Briefcase } from 'lucide-react';
 import { Expense } from '@/types/expense';
 import { categoryService, iconMap } from '@/lib/category-service';
-import { formatCompactCurrency, cn } from '@/lib/utils';
+import { formatCompactCurrency, cn, calculateUserShare } from '@/lib/utils';
 
 interface CategoryRingsProps {
   expenses: Expense[];
@@ -12,7 +12,7 @@ export function CategoryRings({ expenses }: CategoryRingsProps) {
   const cats = useMemo(() => {
     const map: Record<string, number> = {};
     for (const e of expenses) {
-      map[e.category] = (map[e.category] || 0) + e.amount;
+      map[e.category] = (map[e.category] || 0) + calculateUserShare(e);
     }
     const total = Object.values(map).reduce((a, b) => a + b, 0);
     return Object.entries(map)

@@ -133,6 +133,14 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
           
           {isMobile ? (
             <motion.div
+              drag="y"
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={{ top: 0, bottom: 0.8 }}
+              onDragEnd={(_, info) => {
+                if (info.offset.y > 100) {
+                  setOpen(false);
+                }
+              }}
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}

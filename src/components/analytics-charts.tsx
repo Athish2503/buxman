@@ -8,8 +8,7 @@ import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 import { Expense } from '@/types/expense';
 import { categoryService } from '@/lib/category-service';
-import { formatCurrency, formatCompactCurrency } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { formatCurrency, formatCompactCurrency, cn, calculateUserShare } from '@/lib/utils';
 
 interface ChartsProps {
   expenses: Expense[];
@@ -39,15 +38,15 @@ export function SpendingTrendChart({ expenses }: ChartsProps) {
       start: subMonths(startOfMonth(now), MONTH_COUNT - 1),
       end: startOfMonth(now),
     });
-    return months.map(m => {
-      const monthExp = expenses.filter(e => isSameMonth(new Date(e.date), m));
-      return {
-        month: format(m, 'MMM'),
-        total: monthExp.reduce((s, e) => s + e.amount, 0),
-        reimbursed: monthExp.filter(e => e.status === 'reimbursed').reduce((s, e) => s + e.amount, 0),
-        pending: monthExp.filter(e => e.status === 'pending').reduce((s, e) => s + e.amount, 0),
-      };
-    });
+      return months.map(m => {
+        const monthExp = expenses.filter(e => isSameMonth(new Date(e.date), m));
+        return {
+          month: format(m, 'MMM'),
+          total: monthExp.reduce((s, e) => s + calculateUserShare(e), 0),
+          reimbursed: monthExp.filter(e => e.status === 'reimbursed').reduce((s, e) => s + calculateUserShare(e), 0),
+          pending: monthExp.filter(e => e.status === 'pending').reduce((s, e) => s + calculateUserShare(e), 0),
+        };
+      });
   }, [expenses]);
 
   const currentTotal = data[data.length - 1]?.total || 0;
@@ -133,7 +132,7 @@ export function CategoryBreakdownChart({ expenses }: ChartsProps) {
   const data = useMemo(() => {
     const categoryTotals: Record<string, number> = {};
     expenses.forEach(e => {
-      categoryTotals[e.category] = (categoryTotals[e.category] || 0) + e.amount;
+      categoryTotals[e.category] = (categoryTotals[e.category] || 0) + calculateUserShare(e);
     });
     return Object.entries(categoryTotals)
       .map(([catId, amount]) => {
@@ -202,15 +201,15 @@ export function MonthlyBarChart({ expenses }: ChartsProps) {
       start: subMonths(startOfMonth(now), 5),
       end: startOfMonth(now),
     });
-    return months.map(m => {
-      const monthExp = expenses.filter(e => isSameMonth(new Date(e.date), m));
-      return {
-        month: format(m, 'MMM'),
-        pending: monthExp.filter(e => e.status === 'pending').reduce((s, e) => s + e.amount, 0),
-        approved: monthExp.filter(e => e.status === 'approved').reduce((s, e) => s + e.amount, 0),
-        reimbursed: monthExp.filter(e => e.status === 'reimbursed').reduce((s, e) => s + e.amount, 0),
-      };
-    });
+      return months.map(m => {
+        const monthExp = expenses.filter(e => isSameMonth(new Date(e.date), m));
+        return {
+          month: format(m, 'MMM'),
+          pending: monthExp.filter(e => e.status === 'pending').reduce((s, e) => s + calculateUserShare(e), 0),
+          approved: monthExp.filter(e => e.status === 'approved').reduce((s, e) => s + calculateUserShare(e), 0),
+          reimbursed: monthExp.filter(e => e.status === 'reimbursed').reduce((s, e) => s + calculateUserShare(e), 0),
+        };
+      });
   }, [expenses]);
 
   return (

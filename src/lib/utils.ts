@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import confetti from "canvas-confetti";
+import { Expense } from "@/types/expense";
 
 export function rewardBurst() {
   const duration = 1500;
@@ -76,4 +77,17 @@ export function hexToHsl(hex: string): { h: number, s: number, l: number } {
     h /= 6;
   }
   return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
+export function calculateUserShare(expense: Expense): number {
+  if (expense.split) {
+    const othersOwe = expense.split.members.reduce((acc, m) => acc + m.amount, 0);
+    return expense.amount - othersOwe;
+  }
+  // If no split, and paid by someone else, user share is 0
+  if (expense.paidBy && expense.paidBy !== 'user') {
+    return 0;
+  }
+  // Otherwise, user paid full amount
+  return expense.amount;
 }

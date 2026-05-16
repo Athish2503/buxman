@@ -1,8 +1,7 @@
 import { useMemo } from 'react';
 import { Expense, BudgetGoal } from '@/types/expense';
 import { categoryService, iconMap } from '@/lib/category-service';
-import { formatCurrency } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { formatCurrency, cn, calculateUserShare } from '@/lib/utils';
 import { startOfMonth } from 'date-fns';
 import { AlertTriangle, CheckCircle2, Target } from 'lucide-react';
 
@@ -29,7 +28,7 @@ export function BudgetTracker({ expenses, budgets, onManage }: BudgetTrackerProp
         return d >= yStart;
       }).filter(e => e.category === budget.category);
 
-      const spent = periodExpenses.reduce((s, e) => s + e.amount, 0);
+      const spent = periodExpenses.reduce((s, e) => s + calculateUserShare(e), 0);
       const pct = Math.min((spent / budget.limit) * 100, 100);
 
       return { ...budget, spent, pct };

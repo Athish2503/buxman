@@ -6,7 +6,7 @@ import {
   Clock, AlertCircle, Sparkles, Briefcase, PieChart
 } from 'lucide-react';
 import { Expense, BudgetGoal } from '@/types/expense';
-import { formatCompactCurrency, cn } from '@/lib/utils';
+import { formatCompactCurrency, cn, calculateUserShare } from '@/lib/utils';
 import { mileageService, fuelService } from '@/lib/modules-storage';
 import { CategoryRings } from '@/components/category-rings';
 import { SpendingTrendChart, VehicleEfficiencyChart, FuelCostChart } from '@/components/analytics-charts';
@@ -76,10 +76,10 @@ function BalanceHeroCard({
   setTimeframe: (t: 'month' | 'all') => void;
   onNavigate: (t: any) => void;
 }) {
-  const total      = useMemo(() => filteredExpenses.reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
-  const personal   = useMemo(() => filteredExpenses.filter(e => !e.isReimbursement).reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
-  const pending    = useMemo(() => filteredExpenses.filter(e => e.isReimbursement && e.status === 'pending').reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
-  const recovered  = useMemo(() => filteredExpenses.filter(e => e.isReimbursement && e.status === 'reimbursed').reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
+  const total      = useMemo(() => filteredExpenses.reduce((s, e) => s + calculateUserShare(e), 0), [filteredExpenses]);
+  const personal   = useMemo(() => filteredExpenses.filter(e => !e.isReimbursement).reduce((s, e) => s + calculateUserShare(e), 0), [filteredExpenses]);
+  const pending    = useMemo(() => filteredExpenses.filter(e => e.isReimbursement && e.status === 'pending').reduce((s, e) => s + calculateUserShare(e), 0), [filteredExpenses]);
+  const recovered  = useMemo(() => filteredExpenses.filter(e => e.isReimbursement && e.status === 'reimbursed').reduce((s, e) => s + calculateUserShare(e), 0), [filteredExpenses]);
 
   // Percentages for the continuous breakdown bar
   const personalPct  = total > 0 ? (personal / total) * 100 : 0;
@@ -341,10 +341,10 @@ export function DashboardModule({
     });
   }, [expenses, timeframe]);
 
-  const personalAmount    = useMemo(() => filteredExpenses.filter(e => !e.isReimbursement).reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
-  const reimbursableAmt   = useMemo(() => filteredExpenses.filter(e => e.isReimbursement).reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
-  const pendingAmount     = useMemo(() => filteredExpenses.filter(e => e.isReimbursement && e.status === 'pending').reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
-  const reimbursedAmount  = useMemo(() => filteredExpenses.filter(e => e.isReimbursement && e.status === 'reimbursed').reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
+  const personalAmount    = useMemo(() => filteredExpenses.filter(e => !e.isReimbursement).reduce((s, e) => s + calculateUserShare(e), 0), [filteredExpenses]);
+  const reimbursableAmt   = useMemo(() => filteredExpenses.filter(e => e.isReimbursement).reduce((s, e) => s + calculateUserShare(e), 0), [filteredExpenses]);
+  const pendingAmount     = useMemo(() => filteredExpenses.filter(e => e.isReimbursement && e.status === 'pending').reduce((s, e) => s + calculateUserShare(e), 0), [filteredExpenses]);
+  const reimbursedAmount  = useMemo(() => filteredExpenses.filter(e => e.isReimbursement && e.status === 'reimbursed').reduce((s, e) => s + calculateUserShare(e), 0), [filteredExpenses]);
 
   const vehicleSummaries = useMemo(() => {
     const vList = mileageService.getVehicles();

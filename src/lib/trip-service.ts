@@ -98,18 +98,11 @@ export const tripService = {
           }
         });
 
-        // The payer also owes their share!
-        // We need to know the payer's share.
-        // In my current Split model, 'members' includes participants, 
-        // but does it include the payer?
-        // Let's assume the user is ALWAYS a member of the split if not specified otherwise, 
-        // or the split model should be more explicit.
-        
-        // Calculate payer's share (total - sum of others)
-        const othersOwe = expense.split.members.reduce((acc, m) => acc + m.amount, 0);
-        const payerShare = expense.amount - othersOwe;
-        if (summaries[payerId]) {
-          summaries[payerId].totalOwed += payerShare;
+        // The person missing from the split members is always the 'user'
+        const sumOthers = expense.split.members.reduce((acc, m) => acc + m.amount, 0);
+        const userShare = expense.amount - sumOthers;
+        if (summaries['user']) {
+          summaries['user'].totalOwed += userShare;
         }
       } else {
         // If no split, payer paid for themselves? 

@@ -428,6 +428,14 @@ export function DiningEntryForm({
           />
 
           <motion.div
+            drag={isMobile ? "y" : false}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.8 }}
+            onDragEnd={(_, info) => {
+              if (isMobile && info.offset.y > 100) {
+                setOpen(false);
+              }
+            }}
             initial={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.95, y: 20 }}
             animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1, y: 0 }}
             exit={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.95, y: 20 }}

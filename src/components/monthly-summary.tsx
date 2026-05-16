@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, isSameMonth, subMonths } from 'date-fns';
 import { TrendingUp, TrendingDown, ArrowRight, IndianRupee } from 'lucide-react';
 import { Expense } from '@/types/expense';
-import { formatCompactCurrency, cn } from '@/lib/utils';
+import { formatCompactCurrency, cn, calculateUserShare } from '@/lib/utils';
 import { haptics } from '@/lib/haptics';
 
 
@@ -18,11 +18,11 @@ export function MonthlySummary({ expenses, onViewAll }: MonthlySummaryProps) {
     const tm = expenses.filter(e => isSameMonth(new Date(e.date), now));
     const lm = expenses.filter(e => isSameMonth(new Date(e.date), subMonths(now, 1)));
     return {
-      thisMonth:    tm.reduce((s, e) => s + e.amount, 0),
-      lastMonth:     lm.reduce((s, e) => s + e.amount, 0),
-      personal:      tm.filter(e => !e.isReimbursement).reduce((s, e) => s + e.amount, 0),
-      reimbursable:  tm.filter(e => e.isReimbursement).reduce((s, e) => s + e.amount, 0),
-      pending:       tm.filter(e => e.isReimbursement && e.status === 'pending').reduce((s, e) => s + e.amount, 0),
+      thisMonth:    tm.reduce((s, e) => s + calculateUserShare(e), 0),
+      lastMonth:     lm.reduce((s, e) => s + calculateUserShare(e), 0),
+      personal:      tm.filter(e => !e.isReimbursement).reduce((s, e) => s + calculateUserShare(e), 0),
+      reimbursable:  tm.filter(e => e.isReimbursement).reduce((s, e) => s + calculateUserShare(e), 0),
+      pending:       tm.filter(e => e.isReimbursement && e.status === 'pending').reduce((s, e) => s + calculateUserShare(e), 0),
     };
   }, [expenses, now]);
 

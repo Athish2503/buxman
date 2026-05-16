@@ -183,6 +183,8 @@ export function TripDetailView({ trip, onBack }: TripDetailViewProps) {
         <div className="flex gap-2">
           <ExpenseForm 
             onSubmit={handleAddExpense} 
+            tripId={trip.id}
+            participants={trip.participants}
             trigger={
               <Button className="flex-1 h-12 bg-primary hover:bg-primary/90 text-white rounded-2xl shadow-glow gap-2 font-bold transition-all active:scale-95">
                 <Plus className="h-5 w-5" />
@@ -213,6 +215,8 @@ export function TripDetailView({ trip, onBack }: TripDetailViewProps) {
                 initialData={editingExpense} 
                 isEdit={true}
                 onClose={() => setEditingExpense(null)}
+                tripId={trip.id}
+                participants={trip.participants}
               />
             </div>
           </AlertDialogContent>
