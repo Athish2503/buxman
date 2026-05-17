@@ -263,93 +263,91 @@ export function DiningDashboard() {
             </Badge>
           </div>
 
-          <div className="relative rounded-[3.5rem] overflow-hidden bg-card/40 backdrop-blur-3xl border border-white/10 p-6 sm:p-10 shadow-3xl flex flex-col lg:flex-row gap-10 items-stretch">
+          <div className="relative rounded-[3rem] overflow-hidden bg-card/30 backdrop-blur-3xl border border-white/10 p-8 sm:p-12 shadow-3xl flex flex-col gap-8 justify-center text-left animate-in fade-in zoom-in duration-500">
             {/* Ambient Background Glows */}
             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] -z-10 pointer-events-none opacity-50" />
-            <div className="absolute bottom-0 left-0 w-80 h-80 bg-amber-500/5 rounded-full blur-[100px] -z-10 pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-80 h-80 bg-amber-500/10 rounded-full blur-[100px] -z-10 pointer-events-none" />
             
-            <div className="w-full lg:w-2/5 min-h-[320px] rounded-[2.5rem] overflow-hidden relative border border-white/10 shadow-2xl shrink-0 group">
-              <img 
-                src={bestExperience.dishes[0]?.images[0] || 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80'} 
-                alt="" 
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" 
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 text-[10px] font-black text-primary uppercase tracking-[0.25em]">
+                <div className="h-px w-8 bg-primary/30" />
+                Premium Highlight
+              </div>
+
+              <h3 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter leading-[0.9] text-foreground">
+                {bestExperience.restaurantName}
+              </h3>
               
-              <div className="absolute bottom-6 left-6 right-6 flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-4 text-xs font-black text-muted-foreground/60 uppercase tracking-widest pt-1">
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-primary text-white border-none text-[10px] font-black uppercase tracking-widest px-4 py-1.5 shadow-xl rounded-full">
-                    Best Choice
-                  </Badge>
+                  <Calendar className="h-4 w-4 text-primary/60" /> 
+                  {format(new Date(bestExperience.visitDate), 'MMMM d, yyyy')}
                 </div>
-                <p className="text-[10px] text-white/60 font-bold uppercase tracking-[0.2em] backdrop-blur-sm bg-black/20 px-3 py-1 rounded-full w-fit">
-                  Captured {format(new Date(bestExperience.visitDate), 'MMMM yyyy')}
-                </p>
+                {bestExperience.cuisine && (
+                  <>
+                    <div className="h-1.5 w-1.5 rounded-full bg-white/10" />
+                    <div className="flex items-center gap-2">
+                      <ChefHat className="h-4 w-4 text-primary/60" /> 
+                      {bestExperience.cuisine}
+                    </div>
+                  </>
+                )}
+                <div className="h-1.5 w-1.5 rounded-full bg-white/10" />
+                <span className="text-[10px] font-black text-primary uppercase tracking-widest bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
+                  {bestExperience.dishes.length} Items Logged
+                </span>
               </div>
             </div>
+            
+            {/* Premium Blockquote */}
+            <div className="relative py-2 pl-6 border-l-2 border-primary/30">
+              <p className="text-lg sm:text-xl text-muted-foreground/90 leading-relaxed font-semibold italic">
+                "{bestExperience.overallNotes || `Outstanding experience with highly recommended dishes. A truly premium addition to our logged dining timeline.`}"
+              </p>
+            </div>
 
-            <div className="flex-1 flex flex-col justify-center space-y-6 text-left">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 text-[10px] font-black text-primary uppercase tracking-[0.2em] opacity-80">
-                  <div className="h-px w-8 bg-primary/30" />
-                  Premium Experience
-                </div>
-
-                <h3 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter leading-[0.9] text-foreground">
-                  {bestExperience.restaurantName}
-                </h3>
-                
-                <div className="flex items-center gap-4 text-xs font-bold text-muted-foreground/60 uppercase tracking-widest pt-1">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-primary/60" /> 
-                    {format(new Date(bestExperience.visitDate), 'MMMM d, yyyy')}
-                  </div>
-                  {bestExperience.cuisine && (
-                    <>
-                      <div className="h-1.5 w-1.5 rounded-full bg-white/10" />
-                      <div className="flex items-center gap-2">
-                        <ChefHat className="h-4 w-4 text-primary/60" /> 
-                        {bestExperience.cuisine}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-              
-              <div className="relative">
-                <div className="absolute -left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-primary/40 to-transparent rounded-full" />
-                <p className="text-base sm:text-lg text-muted-foreground/90 leading-relaxed font-medium italic pl-4">
-                  "{bestExperience.overallNotes || `Outstanding encounter with sublime offerings. An ambient experience standard in the ${bestExperience.cuisine || 'dining'} landscape.`}"
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-2 pt-2">
+            {/* Dishes Showcase */}
+            <div className="space-y-3">
+              <h4 className="text-[10px] font-black text-muted-foreground/45 uppercase tracking-[0.2em]">Featured Dishes</h4>
+              <div className="flex flex-wrap gap-2.5">
                 {bestExperience.dishes.map((d, i) => (
-                  <div key={i} className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-2xl shadow-sm transition-all hover:bg-white/10 hover:scale-105 cursor-default">
-                    <Star className="h-3 w-3 text-amber-400 fill-amber-400" />
+                  <div 
+                    key={i} 
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2 rounded-2xl border shadow-sm transition-all duration-300 hover:scale-105 cursor-default",
+                      d.status === 'liked' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" :
+                      d.status === 'not-recommended' ? "bg-rose-500/10 border-rose-500/20 text-rose-400" :
+                      "bg-white/5 border-white/10 text-muted-foreground"
+                    )}
+                  >
+                    {d.status === 'liked' ? (
+                      <Star className="h-3 w-3 fill-emerald-400 text-emerald-400" />
+                    ) : (
+                      <Utensils className="h-3 w-3 opacity-60" />
+                    )}
                     <span className="text-[11px] font-black uppercase tracking-widest">
-                      {d.name}
+                      {d.name} {d.price && `(₹${d.price})`}
                     </span>
                   </div>
                 ))}
               </div>
+            </div>
 
-              <div className="pt-6 flex flex-col sm:flex-row gap-4">
-                <Button 
-                  onClick={() => triggerShare(bestExperience)}
-                  className="h-14 sm:h-16 px-10 rounded-[2rem] bg-primary text-white hover:opacity-90 font-black uppercase tracking-widest text-[11px] gap-3 shadow-glow border-none transition-all active:scale-95"
-                >
-                  <Share2 className="h-5 w-5" /> Share Cinematic Story Card
-                </Button>
-                
-                <Button 
-                  variant="outline"
-                  onClick={() => setExpandedId(bestExperience.id)}
-                  className="h-14 sm:h-16 px-8 rounded-[2rem] border-white/10 bg-white/5 text-white hover:bg-white/10 font-black uppercase tracking-widest text-[11px] transition-all"
-                >
-                  View Full Details
-                </Button>
-              </div>
+            <div className="pt-6 flex flex-col sm:flex-row gap-4 border-t border-white/5">
+              <Button 
+                onClick={() => triggerShare(bestExperience)}
+                className="h-14 sm:h-16 px-10 rounded-[2rem] bg-primary text-white hover:opacity-90 font-black uppercase tracking-widest text-[11px] gap-3 shadow-glow border-none transition-all active:scale-95"
+              >
+                <Share2 className="h-5 w-5" /> Share Cinematic Story Card
+              </Button>
+              
+              <Button 
+                variant="outline"
+                onClick={() => setExpandedId(bestExperience.id)}
+                className="h-14 sm:h-16 px-8 rounded-[2rem] border-white/10 bg-white/5 text-white hover:bg-white/10 font-black uppercase tracking-widest text-[11px] transition-all"
+              >
+                View Full Details
+              </Button>
             </div>
           </div>
         </div>
