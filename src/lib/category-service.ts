@@ -11,9 +11,24 @@ import {
   Trophy, Star, Crown, Ghost,
   Apple, Pizza, Beer, Wine, IceCream,
   Activity, Pill, Stethoscope,
-  Scissors, Brush, Palette
+  Scissors, Brush, Palette,
+  // Food & Dining
+  Cake, Soup, Popcorn, Cookie, GlassWater, Croissant, ChefHat,
+  // Travel & Commute
+  Train, Bus, Ship, MapPin, Compass, Anchor, Fuel, Luggage, Route,
+  // Supplies & Personal
+  Hammer, Paintbrush, Tag, Gem, Sparkles, Smile, Bath, Footprints, Glasses, Clock, HeartPulse,
+  // Bills & Utilities
+  Plug, ShowerHead, Trash2, Umbrella, TreePine, Flower, Trees,
+  // Finance & Business
+  PiggyBank, TrendingUp, TrendingDown, Receipt, Percent, Scale, FileText, ClipboardList, Calculator,
+  // Health & Family
+  Brain, Users, User,
+  // Entertainment & General
+  Clapperboard, Mic, Projector, Radio, Globe, Sun, Moon, Cloud, Lock, Unlock, Info
 } from 'lucide-react';
 import { ExpenseCategory } from '@/types/expense';
+import { storageEngine } from './storage-engine';
 
 export interface CategoryDefinition {
   id: string;
@@ -41,7 +56,21 @@ export const iconMap: Record<string, LucideIcon> = {
   Trophy, Star, Crown, Ghost,
   Apple, Pizza, Beer, Wine, IceCream,
   Activity, Pill, Stethoscope,
-  Scissors, Brush, Palette
+  Scissors, Brush, Palette,
+  // Food & Dining
+  Cake, Soup, Popcorn, Cookie, GlassWater, Croissant, ChefHat,
+  // Travel & Commute
+  Train, Bus, Ship, MapPin, Compass, Anchor, Fuel, Luggage, Route,
+  // Supplies & Personal
+  Hammer, Paintbrush, Tag, Gem, Sparkles, Smile, Bath, Footprints, Glasses, Clock, HeartPulse,
+  // Bills & Utilities
+  Plug, ShowerHead, Trash2, Umbrella, TreePine, Flower, Trees,
+  // Finance & Business
+  PiggyBank, TrendingUp, TrendingDown, Receipt, Percent, Scale, FileText, ClipboardList, Calculator,
+  // Health & Family
+  Brain, Users, User,
+  // Entertainment & General
+  Clapperboard, Mic, Projector, Radio, Globe, Sun, Moon, Cloud, Lock, Unlock, Info
 };
 
 const DEFAULT_CATEGORIES: CategoryDefinition[] = [
@@ -224,7 +253,7 @@ export const categoryService = {
   },
 
   save(categories: CategoryDefinition[]) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
+    storageEngine.set(STORAGE_KEY, JSON.stringify(categories));
     // Dispatch event for components to listen
     window.dispatchEvent(new CustomEvent('categories-updated'));
   },
