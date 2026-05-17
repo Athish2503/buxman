@@ -19,6 +19,15 @@ export const storageService = {
       storageEngine.set(STORAGE_KEY, JSON.stringify(expenses));
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('expenses-updated'));
+        
+        // Trigger native OS widgets redraw
+        import('@capacitor/core').then(({ Capacitor }) => {
+          if (Capacitor.isNativePlatform()) {
+            import('@/lib/financial-notifications').then(({ default: fn }) => {
+              fn.updateWidgets().catch(err => console.error('Failed updating widgets:', err));
+            });
+          }
+        });
       }
     } catch (error) {
       console.error('Error saving expenses:', error);

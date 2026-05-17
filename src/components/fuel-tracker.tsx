@@ -17,6 +17,7 @@ import { VehicleForm } from './vehicle-form';
 import { JourneyTimeline } from './vehicle/JourneyTimeline';
 import { HeroSection } from './vehicle/HeroSection';
 import { FuelActionButton } from './vehicle/FuelActionButton';
+import { GarageProDashboard } from './vehicle/GarageProDashboard';
 
 interface VehicleTrackerProps {
   vehicles: VehicleRate[];
@@ -26,7 +27,7 @@ interface VehicleTrackerProps {
 
 export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProps) {
   const [mode, setMode] = useState<'dashboard' | 'add' | 'vehicles'>('dashboard');
-  const [viewMode, setViewMode] = useState<'roadway' | 'simple'>('roadway');
+  const [viewMode, setViewMode] = useState<'roadway' | 'garage' | 'simple'>('roadway');
   
   const [activeVehId, setActiveVehId] = useState<string>(vehicles[0]?.id || '');
 
@@ -345,6 +346,23 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
             }}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
+          />
+        ) : viewMode === 'garage' ? (
+          <GarageProDashboard 
+            vehicle={activeVeh}
+            logs={activeLogs}
+            stats={stats}
+            onAddLog={() => {
+              setEditingLog(undefined);
+              setShowLogForm(true);
+            }}
+            onManage={() => {
+              setMode('vehicles');
+              haptics.selection();
+            }}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            onRefresh={reload}
           />
         ) : (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pt-4 px-4 pb-32">

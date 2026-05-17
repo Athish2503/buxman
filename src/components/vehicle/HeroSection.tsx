@@ -15,8 +15,8 @@ interface HeroSectionProps {
     totalDist: number;
     costPerKm: number;
   } | null;
-  viewMode: 'roadway' | 'simple';
-  onViewModeChange: (mode: 'roadway' | 'simple') => void;
+  viewMode: 'roadway' | 'garage' | 'simple';
+  onViewModeChange: (mode: 'roadway' | 'garage' | 'simple') => void;
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({ vehicle, logs, stats, onManage, viewMode, onViewModeChange }) => {
@@ -44,13 +44,22 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ vehicle, logs, stats, 
                 Roadway
               </button>
               <button 
+                onClick={() => { onViewModeChange('garage'); haptics.selection(); }}
+                className={cn(
+                  "px-3 py-1.5 rounded-[10px] text-[10px] font-black uppercase tracking-widest transition-all", 
+                  viewMode === 'garage' ? "bg-primary text-white shadow-glow" : "text-white/40 hover:text-white/60"
+                )}
+              >
+                Garage Pro
+              </button>
+              <button 
                 onClick={() => { onViewModeChange('simple'); haptics.selection(); }}
                 className={cn(
                   "px-3 py-1.5 rounded-[10px] text-[10px] font-black uppercase tracking-widest transition-all", 
                   viewMode === 'simple' ? "bg-primary text-white shadow-glow" : "text-white/40 hover:text-white/60"
                 )}
               >
-                Simple
+                Logs
               </button>
            </div>
 

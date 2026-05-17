@@ -34,6 +34,7 @@ export function VehicleForm({ onSuccess, trigger, editVehicle, open: externalOpe
   const [licensePlate, setLicensePlate] = useState('');
   const [insuranceExpiry, setInsuranceExpiry] = useState('');
   const [serviceInterval, setServiceInterval] = useState('');
+  const [lastServiceOdo, setLastServiceOdo] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -48,6 +49,7 @@ export function VehicleForm({ onSuccess, trigger, editVehicle, open: externalOpe
       setLicensePlate(editVehicle.licensePlate || '');
       setInsuranceExpiry(editVehicle.insuranceExpiry || '');
       setServiceInterval(editVehicle.serviceInterval?.toString() || '');
+      setLastServiceOdo(editVehicle.lastServiceOdo?.toString() || '');
     } else {
       setName('');
       setIcon('car');
@@ -57,6 +59,7 @@ export function VehicleForm({ onSuccess, trigger, editVehicle, open: externalOpe
       setLicensePlate('');
       setInsuranceExpiry('');
       setServiceInterval('');
+      setLastServiceOdo('');
     }
   }, [editVehicle, open]);
 
@@ -81,6 +84,7 @@ export function VehicleForm({ onSuccess, trigger, editVehicle, open: externalOpe
       licensePlate,
       insuranceExpiry,
       serviceInterval: Number(serviceInterval) || undefined,
+      lastServiceOdo: Number(lastServiceOdo) || undefined,
     };
 
     const vehicles = mileageService.getVehicles();
@@ -196,20 +200,29 @@ export function VehicleForm({ onSuccess, trigger, editVehicle, open: externalOpe
             />
           </div>
           <div className="space-y-1.5">
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Insurance Expiry</Label>
+            <Input 
+              type="date" value={insuranceExpiry} onChange={e => setInsuranceExpiry(e.target.value)}
+              className="h-11 bg-muted/30 border-border/40 text-sm focus:border-primary/40"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
             <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1 flex items-center gap-1.5"><Wrench className="h-3 w-3" /> Service Interval (km)</Label>
             <Input 
               type="number" placeholder="5000" value={serviceInterval} onChange={e => setServiceInterval(e.target.value)}
               className="h-11 bg-muted/30 border-border/40 text-sm focus:border-primary/40"
             />
           </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Insurance Expiry</Label>
-          <Input 
-            type="date" value={insuranceExpiry} onChange={e => setInsuranceExpiry(e.target.value)}
-            className="h-11 bg-muted/30 border-border/40 text-sm focus:border-primary/40"
-          />
+          <div className="space-y-1.5">
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1 flex items-center gap-1.5"><Wrench className="h-3 w-3" /> Last Service Odometer (km)</Label>
+            <Input 
+              type="number" placeholder="40000" value={lastServiceOdo} onChange={e => setLastServiceOdo(e.target.value)}
+              className="h-11 bg-muted/30 border-border/40 text-sm focus:border-primary/40"
+            />
+          </div>
         </div>
 
         <div className="space-y-1.5">

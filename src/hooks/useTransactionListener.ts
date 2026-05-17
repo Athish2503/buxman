@@ -133,6 +133,23 @@ export const useTransactionListener = () => {
       } catch (e) {
         console.error('Failed to attach app state change listener', e);
       }
+
+      // 6. Listen for custom deep link events dispatched from MainActivity
+      const handleNativeDeepLink = (e: any) => {
+        const url = e.detail?.url;
+        console.log('Received native deep link:', url);
+        if (url) {
+          if (url.includes('add-expense')) {
+            window.dispatchEvent(new CustomEvent('trigger-add-menu', { detail: { action: 'expense' } }));
+          } else if (url.includes('voice-log')) {
+            window.dispatchEvent(new CustomEvent('trigger-add-menu', { detail: { action: 'expense', voice: true } }));
+          } else if (url.includes('scan-receipt')) {
+            window.dispatchEvent(new CustomEvent('trigger-add-menu', { detail: { action: 'snap' } }));
+          }
+        }
+      };
+      window.addEventListener('app-deep-link', handleNativeDeepLink);
+      (window as any)._nativeDeepLinkHandler = handleNativeDeepLink;
     };
 
     setupListenersAndSync();
@@ -143,6 +160,10 @@ export const useTransactionListener = () => {
       }
       if (overlaySub && typeof overlaySub.remove === 'function') {
         overlaySub.remove();
+      }
+      if ((window as any)._nativeDeepLinkHandler) {
+        window.removeEventListener('app-deep-link', (window as any)._nativeDeepLinkHandler);
+        delete (window as any)._nativeDeepLinkHandler;
       }
     };
   }, []); // Stable listener attachment on application init

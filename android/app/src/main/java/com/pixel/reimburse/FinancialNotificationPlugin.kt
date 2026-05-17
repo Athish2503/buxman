@@ -409,6 +409,39 @@ class FinancialNotificationPlugin : Plugin() {
         call.resolve()
     }
 
+    @PluginMethod
+    fun updateWidgets(call: PluginCall) {
+        try {
+            val appWidgetManager = android.appwidget.AppWidgetManager.getInstance(context)
+            
+            // Trigger Budget Widget update
+            val budgetWidgetIntent = Intent(context, com.pixel.reimburse.widgets.BudgetWidgetProvider::class.java).apply {
+                action = android.appwidget.AppWidgetManager.ACTION_APPWIDGET_UPDATE
+            }
+            val budgetWidgetIds = appWidgetManager.getAppWidgetIds(
+                android.content.ComponentName(context, com.pixel.reimburse.widgets.BudgetWidgetProvider::class.java)
+            )
+            budgetWidgetIntent.putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_IDS, budgetWidgetIds)
+            context.sendBroadcast(budgetWidgetIntent)
+
+            // Trigger Quick Actions Widget update
+            val actionsWidgetIntent = Intent(context, com.pixel.reimburse.widgets.QuickActionsWidgetProvider::class.java).apply {
+                action = android.appwidget.AppWidgetManager.ACTION_APPWIDGET_UPDATE
+            }
+            val actionsWidgetIds = appWidgetManager.getAppWidgetIds(
+                android.content.ComponentName(context, com.pixel.reimburse.widgets.QuickActionsWidgetProvider::class.java)
+            )
+            actionsWidgetIntent.putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_IDS, actionsWidgetIds)
+            context.sendBroadcast(actionsWidgetIntent)
+
+            Log.d("FinancialNotification", "Successfully sent update broadcast to widgets.")
+            call.resolve()
+        } catch (e: Exception) {
+            Log.e("FinancialNotification", "Error forcing widget update", e)
+            call.reject("Failed to update widgets", e)
+        }
+    }
+
     private fun isNotificationServiceEnabled(): Boolean {
         val enabledListeners = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
         return enabledListeners != null && enabledListeners.contains(context.packageName)

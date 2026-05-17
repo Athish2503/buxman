@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect } from 'react';
+import { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { Plus, Receipt, Camera, X, Utensils, Fuel } from 'lucide-react';
@@ -43,6 +43,27 @@ export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange }: F
   const [showDiningForm,   setShowDiningForm]   = useState(false);
   const [fabRect,          setFabRect]          = useState<DOMRect | null>(null);
   const fabRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleGlobalTrigger = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const action = customEvent.detail?.action;
+      const voice = customEvent.detail?.voice;
+      
+      if (action) {
+        if (action === 'expense') {
+          if (voice) {
+            (window as any)._autoStartVoice = true;
+          }
+          setShowExpenseForm(true);
+        } else {
+          handleAction(action);
+        }
+      }
+    };
+    window.addEventListener('trigger-add-menu', handleGlobalTrigger);
+    return () => window.removeEventListener('trigger-add-menu', handleGlobalTrigger);
+  }, []);
 
   const updateRect = () => {
     if (fabRef.current) setFabRect(fabRef.current.getBoundingClientRect());

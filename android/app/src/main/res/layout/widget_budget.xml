@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/bg_widget_glass"
+    android:padding="16dp">
+
+    <!-- Header Row -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Buxman Hub"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true" />
+
+        <TextView
+            android:id="@+id/widget_subtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Monthly Stats"
+            android:textColor="#A1A1AA"
+            android:textSize="10sp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true" />
+    </RelativeLayout>
+
+    <!-- Main Content Divider Line -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#27272A"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Center Stats Area -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:layout_marginBottom="12dp">
+
+        <!-- Left Side: Total Month Spend -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.2"
+            android:orientation="vertical"
+            android:layout_gravity="center_vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="MONTH SPENT"
+                android:textColor="#8B5CF6"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="2dp"/>
+
+            <TextView
+                android:id="@+id/widget_total_spent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="₹0.00"
+                android:textColor="#FFFFFF"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Right Side: Budget Limits & Progress Bar -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.8"
+            android:orientation="vertical"
+            android:layout_gravity="center_vertical"
+            android:paddingStart="8dp">
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp">
+
+                <TextView
+                    android:id="@+id/widget_budget_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Budget Goal"
+                    android:textColor="#A1A1AA"
+                    android:textSize="10sp"
+                    android:layout_alignParentStart="true"/>
+
+                <TextView
+                    android:id="@+id/widget_budget_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="No Limit Set"
+                    android:textColor="#06B6D4"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:layout_alignParentEnd="true"/>
+            </RelativeLayout>
+
+            <!-- Custom Accent Colored ProgressBar -->
+            <ProgressBar
+                android:id="@+id/widget_budget_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="8dp"
+                android:max="100"
+                android:progress="0"
+                android:progressTint="#8B5CF6"
+                android:progressBackgroundTint="#27272A"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/widget_budget_remaining"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Tap to set limits"
+                android:textColor="#71717A"
+                android:textSize="9sp"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Bottom Actions Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <!-- Add Expense Primary Action Button -->
+        <LinearLayout
+            android:id="@+id/btn_widget_add"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1.6"
+            android:background="@drawable/bg_widget_btn_violet"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_marginEnd="6dp">
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_widget_add"
+                android:layout_marginEnd="4dp"
+                android:contentDescription="Add Icon" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ADD EXPENSE"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Voice Log Secondary Action Button -->
+        <LinearLayout
+            android:id="@+id/btn_widget_voice"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1.4"
+            android:background="@drawable/bg_widget_btn_dark"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_widget_mic"
+                android:layout_marginEnd="4dp"
+                android:contentDescription="Voice Icon" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="VOICE LOG"
+                android:textColor="#E4E4E7"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

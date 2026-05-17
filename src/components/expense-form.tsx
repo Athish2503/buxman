@@ -127,6 +127,14 @@ function FormBody({
     return () => window.removeEventListener('categories-updated', handleUpdate);
   }, []);
 
+  const shouldAutoStartVoice = useMemo(() => {
+    if (typeof window !== 'undefined' && (window as any)._autoStartVoice) {
+      (window as any)._autoStartVoice = false;
+      return true;
+    }
+    return false;
+  }, []);
+
   // Ensure initial category is visible even if hidden (for editing)
   const displayCategories = useMemo(() => {
     if (!initialData?.category) return categories;
@@ -344,7 +352,7 @@ function FormBody({
           <div className="relative">
             <div className="flex items-center justify-between mb-1">
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Merchant</p>
-              <VoiceInput onParse={handleVoiceParse} />
+              <VoiceInput onParse={handleVoiceParse} autoStart={shouldAutoStartVoice} />
             </div>
             <Input
               {...register('vendor')}

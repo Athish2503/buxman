@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:background="@drawable/bg_widget_glass"
+    android:gravity="center"
+    android:padding="8dp">
+
+    <!-- Action 1: Add Expense -->
+    <LinearLayout
+        android:id="@+id/btn_action_add"
+        android:layout_width="0dp"
+        android:layout_height="36dp"
+        android:layout_weight="1"
+        android:background="@drawable/bg_widget_btn_violet"
+        android:gravity="center"
+        android:clickable="true"
+        android:focusable="true"
+        android:layout_marginEnd="6dp"
+        android:contentDescription="Quick Add Expense">
+
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:src="@drawable/ic_widget_add"
+            android:contentDescription="Add icon" />
+    </LinearLayout>
+
+    <!-- Action 2: Voice Log -->
+    <LinearLayout
+        android:id="@+id/btn_action_voice"
+        android:layout_width="0dp"
+        android:layout_height="36dp"
+        android:layout_weight="1"
+        android:background="@drawable/bg_widget_btn_dark"
+        android:gravity="center"
+        android:clickable="true"
+        android:focusable="true"
+        android:layout_marginEnd="6dp"
+        android:contentDescription="Quick Voice Log">
+
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:src="@drawable/ic_widget_mic"
+            android:contentDescription="Mic icon" />
+    </LinearLayout>
+
+    <!-- Action 3: Scan Receipt -->
+    <LinearLayout
+        android:id="@+id/btn_action_scan"
+        android:layout_width="0dp"
+        android:layout_height="36dp"
+        android:layout_weight="1"
+        android:background="@drawable/bg_widget_btn_dark"
+        android:gravity="center"
+        android:clickable="true"
+        android:focusable="true"
+        android:contentDescription="Quick Scan Receipt">
+
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:src="@drawable/ic_widget_camera"
+            android:contentDescription="Camera icon" />
+    </LinearLayout>
+</LinearLayout>

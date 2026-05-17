@@ -179,14 +179,34 @@ class MainActivity : BridgeActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleIntent(intent)
     }
 
     private fun handleIntent(intent: Intent?) {
-        if (intent != null && intent.hasExtra("body")) {
+        if (intent == null) return
+        
+        val data: Uri? = intent.data
+        if (data != null && "pixelreimburse" == data.scheme) {
+            dispatchDeepLink(data.toString())
+            return
+        }
+
+        if (intent.hasExtra("body")) {
             val body = intent.getStringExtra("body")
             pendingTransaction = body
             dispatchTransaction(body)
+        }
+    }
+
+    private fun dispatchDeepLink(url: String) {
+        if (bridge == null || bridge.webView == null) return
+        bridge.webView.post {
+            val encodedUrl = Base64.encodeToString(url.toByteArray(), Base64.NO_WRAP)
+            bridge.webView.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('app-deep-link', { detail: { url: atob('$encodedUrl') } }));",
+                null
+            )
         }
     }
 

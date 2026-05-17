@@ -10,14 +10,24 @@ import { nlpEngine, ParsedNLPData } from '@/lib/nlp-engine';
 
 interface VoiceInputProps {
   onParse: (data: ParsedNLPData) => void;
+  autoStart?: boolean;
 }
 
-export function VoiceInput({ onParse }: VoiceInputProps) {
+export function VoiceInput({ onParse, autoStart }: VoiceInputProps) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (autoStart) {
+      const timer = setTimeout(() => {
+        startListening();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [autoStart]);
 
   const startListening = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;

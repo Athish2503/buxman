@@ -8,6 +8,7 @@ export interface FinancialNotificationPlugin {
   flushPendingQueue(): Promise<void>;
   requestIgnoreBatteryOptimizations(): Promise<void>;
   isIgnoringBatteryOptimizations(): Promise<{ isIgnoring: boolean }>;
+  updateWidgets(): Promise<void>;
   
   // Simulations
   simulateTransaction(options: { amount?: number; merchant?: string; appName?: string }): Promise<void>;

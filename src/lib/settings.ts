@@ -57,7 +57,18 @@ export const settingsService = {
 
   save(settings: AppSettings): void {
     storageEngine.set(SETTINGS_KEY, JSON.stringify(settings));
-    window.dispatchEvent(new CustomEvent('settings-updated'));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('settings-updated'));
+      
+      // Trigger native OS widgets redraw
+      import('@capacitor/core').then(({ Capacitor }) => {
+        if (Capacitor.isNativePlatform()) {
+          import('@/lib/financial-notifications').then(({ default: fn }) => {
+            fn.updateWidgets().catch(err => console.error('Failed updating widgets:', err));
+          });
+        }
+      });
+    }
   },
 
   updateBudget(budget: BudgetGoal): void {
