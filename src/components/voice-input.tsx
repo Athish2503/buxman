@@ -6,9 +6,10 @@ import { haptics } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { permissions } from '@/lib/permissions';
+import { nlpEngine, ParsedNLPData } from '@/lib/nlp-engine';
 
 interface VoiceInputProps {
-  onParse: (data: { amount?: number; vendor?: string; category?: string; date?: string; description?: string }) => void;
+  onParse: (data: ParsedNLPData) => void;
 }
 
 export function VoiceInput({ onParse }: VoiceInputProps) {
@@ -129,72 +130,13 @@ export function VoiceInput({ onParse }: VoiceInputProps) {
   };
 
   const parseTranscript = (text: string) => {
-    const lowerText = text.toLowerCase();
-    const data: any = {};
-
-    // --- 1. AMOUNT DETECTION ---
-    const amountMatch = lowerText.match(/(\d+(?:\.\d+)?)\s*(?:rupees|rs|inr|bucks|dollars|euro|pounds)?/i) ||
-                        lowerText.match(/(?:rupees|rs|inr|bucks|dollars|euro|pounds)\s*(\d+(?:\.\d+)?)/i);
-    
-    if (amountMatch) {
-      data.amount = parseFloat(amountMatch[1]);
+    try {
+      const data = nlpEngine.parse(text);
+      onParse(data);
+      haptics.success();
+    } catch (e) {
+      console.error('NLP Voice parsing error:', e);
     }
-
-    // --- 2. VENDOR DETECTION ---
-    const vendorPatterns = [
-      /(?:at|from|to|paid|merchant|spent at)\s+([a-z0-9\s]+?)(?=\s+(yesterday|today|for|on|in|using|with|via|$))/i,
-      /([a-z0-9\s]+?)\s+(?:bill|payment|expense)/i
-    ];
-
-    for (const pattern of vendorPatterns) {
-      const match = lowerText.match(pattern);
-      if (match && match[1]) {
-        data.vendor = match[1].trim().replace(/\b(the|a|an)\b/g, '').trim();
-        break;
-      }
-    }
-
-    // --- 3. CATEGORY DETECTION ---
-    const catMappings: Record<string, string[]> = {
-      meals: ['dinner', 'lunch', 'breakfast', 'food', 'coffee', 'starbucks', 'swiggy', 'zomato', 'restaurant', 'meal', 'pizza', 'burger', 'kfc', 'mcdonalds', 'cafe', 'tea', 'bakery'],
-      travel: ['taxi', 'uber', 'ola', 'flight', 'air', 'train', 'bus', 'auto', 'rickshaw', 'travel', 'trip', 'commute', 'metro', 'indigo', 'vistara', 'parking', 'toll'],
-      fuel: ['petrol', 'diesel', 'fuel', 'gas', 'tank', 'filling', 'shell', 'hp', 'bpcl', 'iocl', 'cng', 'refill'],
-      lodging: ['hotel', 'stay', 'accommodation', 'airbnb', 'room', 'rent', 'hostel', 'resort', 'oyo', 'makemytrip'],
-      supplies: ['grocery', 'shopping', 'amazon', 'flipkart', 'market', 'mall', 'store', 'supermarket', 'blinkit', 'zepto', 'bigbasket', 'dmart', 'stationary'],
-      communication: ['recharge', 'mobile', 'internet', 'wifi', 'data', 'phone', 'jio', 'airtel', 'vi', 'broadband', 'postpaid', 'prepaid'],
-      healthcare: ['doctor', 'medicine', 'hospital', 'clinic', 'pharmacy', 'health', 'medical', 'test', 'apollo', 'pharmeasy', 'dental', 'vision', 'physio'],
-      entertainment: ['movie', 'pvr', 'theatre', 'netflix', 'hotstar', 'gaming', 'club', 'party', 'concert', 'event', 'booking', 'show', 'prime video', 'spotify'],
-      home: ['electricity', 'water', 'gas bill', 'maintenance', 'plumber', 'electrician', 'cleaning', 'urban company', 'furniture', 'appliance', 'utility'],
-      clothing: ['shirt', 'pants', 'dress', 'clothes', 'fashion', 'zara', 'h&m', 'shopping', 'shoes', 'boots', 'jacket', 'nike', 'adidas', 'uniqlo', 'levis'],
-    };
-
-    for (const [cat, keywords] of Object.entries(catMappings)) {
-      if (keywords.some(k => lowerText.includes(k))) {
-        data.category = cat;
-        break;
-      }
-    }
-
-    // --- 4. DATE DETECTION ---
-    const date = new Date();
-    if (lowerText.includes('yesterday')) {
-      date.setDate(date.getDate() - 1);
-      data.date = date.toISOString().split('T')[0];
-    } else if (lowerText.includes('day before yesterday')) {
-      date.setDate(date.getDate() - 2);
-      data.date = date.toISOString().split('T')[0];
-    } else if (lowerText.includes('today')) {
-      data.date = date.toISOString().split('T')[0];
-    }
-
-    // --- 5. DESCRIPTION ---
-    if (lowerText.includes('for ')) {
-      const descMatch = lowerText.match(/for\s+(.+?)(?=\s+(at|on|yesterday|today|last|$))/i);
-      if (descMatch) data.description = descMatch[1].trim();
-    }
-
-    onParse(data);
-    haptics.success();
   };
 
   return (

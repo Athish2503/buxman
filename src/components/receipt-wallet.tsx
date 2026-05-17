@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera as CameraIcon, Check, Plus, Trash2, Receipt, Image as ImageIcon, ArrowRight, Eye, X } from 'lucide-react';
+import { Camera as CameraIcon, Check, Plus, Trash2, Receipt, Image as ImageIcon, ArrowRight, Eye, X, Sparkles } from 'lucide-react';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { ReceiptDraft } from '@/types/modules';
 import { walletService } from '@/lib/modules-storage';
@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { useLongPress } from '@/hooks/useLongPress';
 import { notificationService } from '@/lib/notifications';
 import { ImageViewer } from './image-viewer';
+import { ocrService, ParsedOCRData } from '@/lib/ocr-service';
 
 interface ReceiptWalletProps {
   expenses: Expense[];
@@ -25,6 +26,13 @@ export function ReceiptWallet({ expenses, onAddExpense }: ReceiptWalletProps) {
   const [longPressedId, setLongPressedId] = useState<string | null>(null);
   const [viewingReceipt, setViewingReceipt] = useState<ReceiptDraft | null>(null);
   const [showSourcePicker, setShowSourcePicker] = useState(false);
+
+  // OCR state engine
+  const [ocrStatus, setOcrStatus] = useState<string>('');
+  const [ocrProgress, setOcrProgress] = useState<number>(0);
+  const [isOcrActive, setIsOcrActive] = useState<boolean>(false);
+  const [parsedData, setParsedData] = useState<ParsedOCRData | null>(null);
+  const [ocrScanningReceipt, setOcrScanningReceipt] = useState<ReceiptDraft | null>(null);
 
   // Check for old receipts on mount
   useEffect(() => {
@@ -46,15 +54,47 @@ export function ReceiptWallet({ expenses, onAddExpense }: ReceiptWalletProps) {
           description: `Oldest is ${days} days old`,
           action: {
             label: 'Fix now',
-            onClick: () => setProcessingReceipt(oldest)
+            onClick: () => handleStartOCR(oldest)
           }
         });
       }
     }
   }, []);
 
-
   const reload = () => setReceipts(walletService.getReceipts());
+
+  const handleStartOCR = async (receipt: ReceiptDraft) => {
+    setOcrScanningReceipt(receipt);
+    setIsOcrActive(true);
+    setOcrStatus('Initializing AI worker...');
+    setOcrProgress(0);
+    haptics.medium();
+
+    try {
+      const parsed = await ocrService.scanReceipt(receipt.imageUri, (status, progress) => {
+        setOcrStatus(status);
+        setOcrProgress(progress);
+      });
+      haptics.success();
+      setParsedData(parsed);
+      setProcessingReceipt(receipt);
+    } catch (e) {
+      console.error(e);
+      toast.error('Local OCR failed, proceeding manually.');
+      haptics.warning();
+      setParsedData({
+        vendor: 'Offline Merchant',
+        amount: 0,
+        date: format(new Date(), 'yyyy-MM-dd'),
+        category: 'other',
+        rawText: ''
+      });
+      setProcessingReceipt(receipt);
+    } finally {
+      setIsOcrActive(false);
+      setOcrScanningReceipt(null);
+    }
+  };
 
   const handleCapture = (source: CameraSource) => {
     setShowSourcePicker(false);
@@ -92,12 +132,14 @@ export function ReceiptWallet({ expenses, onAddExpense }: ReceiptWalletProps) {
   if (processingReceipt) {
     const initialData: Expense = {
       id: crypto.randomUUID(),
-      vendor: '',
-      category: 'other',
-      amount: 0,
+      vendor: parsedData?.vendor || '',
+      category: parsedData?.category || 'other',
+      amount: parsedData?.amount || 0,
       currency: 'INR',
-      date: format(new Date(), 'yyyy-MM-dd'),
-      description: '',
+      date: parsedData?.date || format(new Date(), 'yyyy-MM-dd'),
+      description: parsedData?.taxAmount && parsedData.taxAmount > 0 
+        ? `[AI Parsed] Tax/GST component: ₹${parsedData.taxAmount}` 
+        : '',
       status: 'pending',
       receiptImage: processingReceipt.imageUri,
       isReimbursement: false,
@@ -139,6 +181,69 @@ export function ReceiptWallet({ expenses, onAddExpense }: ReceiptWalletProps) {
 
   return (
     <div className="space-y-4">
+      {/* Premium frosted-glass OCR loading overlay with laser scan effect */}
+      <AnimatePresence>
+        {isOcrActive && ocrScanningReceipt && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/75 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              className="relative w-full max-w-sm bg-card border border-border/40 rounded-[32px] overflow-hidden shadow-2xl p-6 flex flex-col items-center gap-6"
+            >
+              <div className="text-center">
+                <h3 className="text-lg font-black tracking-tight flex items-center justify-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+                  AI Receipt Scanner
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">Processing locally on your device via Wasm</p>
+              </div>
+
+              {/* Laser scan picture frame */}
+              <div className="relative aspect-[3/4] w-48 rounded-2xl overflow-hidden border border-white/10 bg-black/20 shadow-inner flex items-center justify-center">
+                <img 
+                  src={ocrScanningReceipt.imageUri} 
+                  alt="Receipt scanning" 
+                  className="w-full h-full object-cover blur-[0.5px]" 
+                />
+                
+                {/* Horizontal scanner beam with framer-motion */}
+                <motion.div
+                  className="absolute left-0 right-0 h-1 bg-primary shadow-[0_0_15px_#8b5cf6] z-10"
+                  animate={{ top: ['0%', '100%', '0%'] }}
+                  transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
+                />
+                
+                <div className="absolute inset-0 bg-black/10" />
+              </div>
+
+              <div className="w-full space-y-2">
+                <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider text-primary">
+                  <span>{ocrStatus}</span>
+                  <span className="font-mono">{Math.floor(ocrProgress * 100)}%</span>
+                </div>
+                
+                {/* Custom glowing progress bar */}
+                <div className="h-[6px] w-full bg-white/5 rounded-full overflow-hidden relative">
+                  <motion.div 
+                    className="absolute top-0 bottom-0 left-0 bg-gradient-primary rounded-full shadow-[0_0_8px_#8b5cf6]"
+                    animate={{ width: `${ocrProgress * 100}%` }}
+                    transition={{ duration: 0.1 }}
+                  />
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-bold text-lg">Receipt Wallet</h2>
@@ -218,7 +323,7 @@ export function ReceiptWallet({ expenses, onAddExpense }: ReceiptWalletProps) {
             >
               <ReceiptItem 
                 receipt={r} 
-                onSelect={() => setProcessingReceipt(r)}
+                onSelect={() => handleStartOCR(r)}
                 onDelete={(id) => {
                   walletService.removeReceipt(id);
                   reload();

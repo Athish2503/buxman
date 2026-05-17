@@ -32,6 +32,7 @@ import { cn, rewardBurst } from '@/lib/utils';
 import { toast } from 'sonner';
 import { VoiceInput } from './voice-input';
 import { localIntelligence } from '@/lib/intelligence';
+import { contactService } from '@/lib/contact-service';
 import { ExpenseSplit } from '@/types/split';
 import { SplitBillSection } from './split/SplitBillSection';
 
@@ -100,6 +101,7 @@ function FormBody({
   const [isProcessing, setIsProcessing] = useState(false);
   const [split, setSplit] = useState<ExpenseSplit | undefined>(initialData?.split);
   const [paidBy, setPaidBy] = useState<string | undefined>(initialData?.paidBy);
+  const [splitKey, setSplitKey] = useState(0);
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting }, reset } =
     useForm<FormData>({
       resolver: zodResolver(expenseSchema),
@@ -131,6 +133,8 @@ function FormBody({
     const exists = categories.find(c => c.id === initialData.category);
     if (exists) return categories;
     const hidden = categoryService.getById(initialData.category);
+    const hiddenExists = categories.some(c => c.id === hidden.id);
+    if (hiddenExists) return categories;
     return [...categories, hidden];
   }, [categories, initialData]);
 
@@ -147,6 +151,49 @@ function FormBody({
     if (data.description) {
       const current = watch('description') || '';
       setValue('description', current ? `${current} ${data.description}` : data.description);
+    }
+
+    // Dynamic contact creation and placeholder resolution
+    const contactMap: Record<string, string> = {};
+    if (data.newContactsToCreate && data.newContactsToCreate.length > 0) {
+      for (const name of data.newContactsToCreate) {
+        const created = contactService.addContact({ name });
+        contactMap[`NEW_CONTACT:${name}`] = created.id;
+        toast.success(`Created contact for "${name}"`, {
+          description: "Added to your local contacts directory",
+          duration: 3000,
+        });
+      }
+    }
+
+    // Map new contacts into splits & paidBy
+    let finalPaidBy = data.paidBy;
+    if (finalPaidBy && finalPaidBy.startsWith('NEW_CONTACT:')) {
+      finalPaidBy = contactMap[finalPaidBy] || 'user';
+    }
+
+    let finalSplit = data.split;
+    if (finalSplit && finalSplit.members) {
+      finalSplit = {
+        ...finalSplit,
+        members: finalSplit.members.map((m: any) => {
+          if (m.contactId && m.contactId.startsWith('NEW_CONTACT:')) {
+            return {
+              ...m,
+              contactId: contactMap[m.contactId] || m.contactId
+            };
+          }
+          return m;
+        })
+      };
+    }
+
+    if (finalPaidBy !== undefined) {
+      setPaidBy(finalPaidBy);
+    }
+    if (finalSplit !== undefined) {
+      setSplit(finalSplit);
+      setSplitKey(prev => prev + 1); // Trigger reactive update in SplitBillSection!
     }
   };
 
@@ -419,11 +466,12 @@ function FormBody({
       {/* ── Split Bill ── */}
       <div className="mb-5">
         <SplitBillSection 
+          key={splitKey}
           amount={amount || 0} 
           onSplitChange={setSplit} 
           onPaidByChange={setPaidBy}
-          initialSplit={initialData?.split}
-          initialPaidBy={initialData?.paidBy}
+          initialSplit={split}
+          initialPaidBy={paidBy}
           tripParticipants={participants}
         />
       </div>
