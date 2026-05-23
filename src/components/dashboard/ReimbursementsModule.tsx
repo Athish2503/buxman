@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { Expense } from '@/types/expense';
 import { ExpenseList } from '@/components/expense-list';
 import { ReceiptWallet } from '@/components/receipt-wallet';
+import { SentReportsList } from '@/components/sent-reports-list';
 
 interface ReimbursementsModuleProps {
   expenses: Expense[];
@@ -23,7 +24,7 @@ export function ReimbursementsModule({
   onBatchDelete,
   onBatchStatus
 }: ReimbursementsModuleProps) {
-  const [subTab, setSubTab] = useState<'all' | 'wallet'>('all');
+  const [subTab, setSubTab] = useState<'all' | 'wallet' | 'sent'>('all');
 
   return (
     <div className="animate-in fade-in duration-500 space-y-5">
@@ -35,6 +36,7 @@ export function ReimbursementsModule({
       <div className="flex bg-muted/40 p-1 rounded-xl w-full sm:w-fit">
         <button onClick={() => setSubTab('all')} className={cn("flex-1 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all", subTab === 'all' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>Log</button>
         <button onClick={() => setSubTab('wallet')} className={cn("flex-1 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all", subTab === 'wallet' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>Wallet</button>
+        <button onClick={() => setSubTab('sent')} className={cn("flex-1 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all", subTab === 'sent' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>Sent Reports</button>
       </div>
 
       {subTab === 'all' && (
@@ -56,6 +58,12 @@ export function ReimbursementsModule({
       {subTab === 'wallet' && (
         <div className="rounded-2xl border border-border/60 bg-card/40 p-4">
           <ReceiptWallet expenses={expenses} onAddExpense={onAddExpense} />
+        </div>
+      )}
+
+      {subTab === 'sent' && (
+        <div className="space-y-6">
+          <SentReportsList expenses={expenses} />
         </div>
       )}
     </div>

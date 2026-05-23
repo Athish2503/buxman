@@ -177,12 +177,26 @@ export function ExpenseList({
         count: dataToExport.length,
       } : summary;
 
-      await generateExpensesPDF(dataToExport, exportSummary, {
+      const { invoiceNo } = await generateExpensesPDF(dataToExport, exportSummary, {
         title: 'Expense Reimbursement Invoice',
         billedTo: settings.billedTo,
         billedFrom: settings.billedFrom,
         shareMessage,
       });
+
+      try {
+        const { reimbursementService } = await import('@/lib/reimbursement-service');
+        reimbursementService.addReport({
+          invoiceNo,
+          title: 'Reimbursement Claim',
+          expenseIds: dataToExport.map(e => e.id),
+          totalAmount: exportSummary.total,
+          count: dataToExport.length,
+        });
+      } catch (err) {
+        console.error('Failed to save reimbursement report:', err);
+      }
+
       toast.success('Report generated successfully', { id: toastId });
     } catch (error) {
       console.error(error);

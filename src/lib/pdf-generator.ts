@@ -17,6 +17,7 @@ interface PDFOptions {
   billedTo?: PartyInfo;
   billedFrom?: PartyInfo;
   shareMessage?: string;
+  invoiceNo?: string;
 }
 
 // Refined professional palette — neutral with a single accent
@@ -99,13 +100,13 @@ export const generateExpensesPDF = async (
   expenses: Expense[],
   summary: ExpenseSummary,
   options: PDFOptions = {}
-): Promise<void> => {
+): Promise<{ invoiceNo: string; fileName: string }> => {
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = pdf.internal.pageSize.getWidth();
   const H = pdf.internal.pageSize.getHeight();
   const M = 20; // 2cm margins for a balanced look
 
-  const invoiceNo = `INV-${format(new Date(), 'yyyyMMdd-HHmm')}`;
+  const invoiceNo = options.invoiceNo || `INV-${format(new Date(), 'yyyyMMdd-HHmm')}`;
   const issueDate = format(new Date(), 'dd MMM yyyy');
 
   const billedTo = options.billedTo || { name: 'Company Name', line2: 'Accounts Payable Dept.' };
@@ -392,4 +393,5 @@ export const generateExpensesPDF = async (
   } else {
     pdf.save(fileName);
   }
+  return { invoiceNo, fileName };
 };

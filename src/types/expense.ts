@@ -22,6 +22,17 @@ export interface Expense {
   updatedAt: string;
 }
 
+export interface ReimbursementReport {
+  id: string;
+  invoiceNo: string;
+  title: string;
+  date: string;
+  expenseIds: string[];
+  totalAmount: number;
+  status: 'pending' | 'reimbursed';
+  count: number;
+}
+
 export interface ExpenseSummary {
   total: number;
   pending: number;
