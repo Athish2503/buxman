@@ -124,6 +124,26 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
     ).slice(0, 3);
   }, [restaurantName, isEdit]);
 
+  const [showCuisineSuggestions, setShowCuisineSuggestions] = useState(false);
+  const cuisineValue = watch('cuisine');
+
+  const cuisineSuggestions = useMemo(() => {
+    const experiences = foodService.getExperiences();
+    const uniqueCuisines = Array.from(new Set(
+      experiences.map(e => e.cuisine?.trim()).filter(Boolean)
+    ));
+    
+    const val = (cuisineValue || '').trim();
+    if (!val) {
+      return uniqueCuisines.slice(0, 3);
+    }
+    
+    return uniqueCuisines.filter(c => 
+      c.toLowerCase().includes(val.toLowerCase()) &&
+      c.toLowerCase() !== val.toLowerCase()
+    ).slice(0, 3);
+  }, [cuisineValue]);
+
   const selectSuggestion = (s: any) => {
     setValue('restaurantName', s.restaurantName, { shouldValidate: true });
     if (s.cuisine) setValue('cuisine', s.cuisine);
@@ -181,7 +201,7 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/60 mb-3">
           {isEdit ? 'Refine Experience' : 'New Culinary Log'}
         </p>
-
+ 
         <div className="space-y-4 relative z-10">
           <div className="space-y-1.5 relative">
             <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Restaurant Name</Label>
@@ -225,13 +245,44 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 relative">
               <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Cuisine</Label>
               <Input
                 {...register('cuisine')}
+                onFocus={() => setShowCuisineSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowCuisineSuggestions(false), 200)}
                 placeholder="e.g. Italian"
                 className="h-11 bg-background/50 border-white/10 text-sm font-medium rounded-2xl"
+                autoComplete="off"
               />
+
+              <AnimatePresence>
+                {showCuisineSuggestions && cuisineSuggestions.length > 0 && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute top-full left-0 right-0 z-50 mt-2 bg-card/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden p-1 min-w-[140px]"
+                  >
+                    <p className="text-[8px] font-black uppercase tracking-widest text-muted-foreground/60 px-3 py-1.5 border-b border-white/5">Cuisines</p>
+                    {cuisineSuggestions.map((c, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setValue('cuisine', c, { shouldValidate: true });
+                          setShowCuisineSuggestions(false);
+                          haptics.selection();
+                        }}
+                        className="w-full px-3 py-2 text-left hover:bg-primary/10 transition-colors flex items-center justify-between group text-xs rounded-xl"
+                      >
+                        <span className="font-bold group-hover:text-primary transition-colors">{c}</span>
+                        <Plus className="h-3 w-3 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
             <div className="space-y-1.5">
               <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Date</Label>
