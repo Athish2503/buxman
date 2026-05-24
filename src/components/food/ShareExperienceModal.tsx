@@ -46,6 +46,76 @@ const formatDateSafe = (dateStr: string | null | undefined, formatTemplate: stri
   }
 };
 
+const RenderFormattedNotes = ({ text, isLightBg = false }: { text: string; isLightBg?: boolean }) => {
+  if (!text) return null;
+  const lines = text.split('\n');
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      {lines.map((line, i) => {
+        let content: React.ReactNode = line;
+        let isBullet = false;
+        let isQuote = false;
+        let isHeading = false;
+
+        if (line.startsWith('## ')) {
+          isHeading = true;
+          content = line.substring(3);
+        } else if (line.startsWith('- ')) {
+          isBullet = true;
+          content = line.substring(2);
+        } else if (line.startsWith('> ')) {
+          isQuote = true;
+          content = line.substring(2);
+        }
+
+        // Parse inline elements (only if it's a string)
+        if (typeof content === 'string') {
+          let parts: React.ReactNode[] = [content];
+
+          // 1. Highlight: ==text==
+          parts = parts.flatMap((part, idx) => {
+            if (typeof part !== 'string') return part;
+            if (!part.includes('==')) return part;
+            const split = part.split('==');
+            return split.map((sub, j) => (j % 2 === 1 ? (
+              <mark key={`h-${idx}-${j}`} style={{ backgroundColor: isLightBg ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.3)', color: isLightBg ? '#2563EB' : '#60A5FA', padding: '0 4px', borderRadius: '4px' }}>{sub}</mark>
+            ) : sub));
+          });
+
+          // 2. Bold: **text**
+          parts = parts.flatMap((part, idx) => {
+            if (typeof part !== 'string') return part;
+            if (!part.includes('**')) return part;
+            const split = part.split('**');
+            return split.map((sub, j) => (j % 2 === 1 ? <strong key={`b-${idx}-${j}`} style={{ fontWeight: 'bold' }}>{sub}</strong> : sub));
+          });
+
+          // 3. Italic: *text*
+          parts = parts.flatMap((part, idx) => {
+            if (typeof part !== 'string') return part;
+            if (!part.includes('*')) return part;
+            const split = part.split('*');
+            return split.map((sub, j) => (j % 2 === 1 ? <em key={`i-${idx}-${j}`} style={{ fontStyle: 'italic' }}>{sub}</em> : sub));
+          });
+
+          content = <>{parts}</>;
+        }
+
+        if (isHeading) {
+          return <h4 key={i} style={{ fontSize: '13px', fontWeight: 'bold', margin: '6px 0 2px 0' }}>{content}</h4>;
+        }
+        if (isBullet) {
+          return <div key={i} style={{ paddingLeft: '12px', position: 'relative', fontSize: '12px' }}><span style={{ position: 'absolute', left: 0 }}>•</span>{content}</div>;
+        }
+        if (isQuote) {
+          return <div key={i} style={{ borderLeft: '3px solid rgba(255,255,255,0.3)', paddingLeft: '8px', fontStyle: 'italic', fontSize: '12px', margin: '4px 0' }}>{content}</div>;
+        }
+        return <div key={i} style={{ fontSize: '12px', lineHeight: '16px' }}>{content}</div>;
+      })}
+    </div>
+  );
+};
+
 export function ShareExperienceModal({ experience, open, onOpenChange }: ShareExperienceModalProps) {
   const [selectedTheme, setSelectedTheme] = useState<PremiumThemeId>('obsidian');
   const [aspectRatio, setAspectRatio] = useState<'standard' | 'story'>('standard');
@@ -187,8 +257,8 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
                       </div>
 
                       {dish.notes && dish.notes.trim() && (
-                        <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: '12.5px', lineHeight: '18px', color: 'rgba(255,255,255,0.8)', fontStyle: 'italic' }}>
-                          "{dish.notes.trim()}"
+                        <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.8)', fontStyle: 'italic' }}>
+                          <RenderFormattedNotes text={dish.notes.trim()} isLightBg={false} />
                         </div>
                       )}
                     </div>
@@ -249,8 +319,8 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
                     </div>
 
                     {dish.notes && dish.notes.trim() && (
-                      <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #F3F4F6', fontSize: '12.5px', lineHeight: '18px', color: '#374151', fontStyle: 'italic', fontFamily: 'serif' }}>
-                        "{dish.notes.trim()}"
+                      <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #F3F4F6', color: '#374151', fontStyle: 'italic', fontFamily: 'serif' }}>
+                        <RenderFormattedNotes text={dish.notes.trim()} isLightBg={true} />
                       </div>
                     )}
                   </div>
@@ -310,8 +380,8 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
                       </div>
 
                       {dish.notes && dish.notes.trim() && (
-                        <div style={{ marginTop: '6px', fontSize: '12.5px', lineHeight: '18px', color: 'rgba(255,255,255,0.8)' }}>
-                          "{dish.notes.trim()}"
+                        <div style={{ marginTop: '6px', color: 'rgba(255,255,255,0.8)' }}>
+                          <RenderFormattedNotes text={dish.notes.trim()} isLightBg={false} />
                         </div>
                       )}
                     </div>
@@ -369,8 +439,8 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
                     </div>
 
                     {dish.notes && dish.notes.trim() && (
-                      <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(16,185,129,0.1)', fontSize: '12.5px', lineHeight: '18px', color: '#D1FAE5', fontStyle: 'italic' }}>
-                        "{dish.notes.trim()}"
+                      <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(16,185,129,0.1)', color: '#D1FAE5', fontStyle: 'italic' }}>
+                        <RenderFormattedNotes text={dish.notes.trim()} isLightBg={false} />
                       </div>
                     )}
                   </div>
@@ -421,9 +491,9 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
                 <div style={{ fontSize: '9px', fontWeight: 'black', color: '#F59E0B', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '8px' }}>
                   Overall Verdict
                 </div>
-                <p style={{ fontSize: '13.5px', lineHeight: '20px', color: '#E2E8F0', fontStyle: 'italic', margin: 0, fontWeight: 'medium' }}>
-                  "{experience.overallNotes || `Outstanding culinary destination. Each dish reflects careful preparation and vibrant flavor profiles. Highly recommended.`}"
-                </p>
+                <div style={{ color: '#E2E8F0', fontStyle: 'italic', margin: 0 }}>
+                  <RenderFormattedNotes text={experience.overallNotes || `Outstanding culinary destination. Each dish reflects careful preparation and vibrant flavor profiles. Highly recommended.`} isLightBg={false} />
+                </div>
               </div>
 
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -440,7 +510,7 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
                         </span>
                         {dish.notes && (
                           <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontStyle: 'italic' }}>
-                            {dish.notes.length > 50 ? `${dish.notes.substring(0, 47)}...` : dish.notes}
+                            <RenderFormattedNotes text={dish.notes.length > 50 ? `${dish.notes.substring(0, 47)}...` : dish.notes} isLightBg={false} />
                           </span>
                         )}
                       </div>

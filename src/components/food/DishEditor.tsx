@@ -2,7 +2,8 @@ import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Camera, Image as ImageIcon, Trash2, Star, 
-  ThumbsUp, ThumbsDown, Minus, X, Plus 
+  ThumbsUp, ThumbsDown, Minus, X, Plus,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Dish, DishStatus } from '@/types/food';
@@ -10,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { RichTextToolbar } from './RichTextToolbar';
+import { FormattedText } from './FormattedText';
 import { cn } from '@/lib/utils';
 import { haptics } from '@/lib/haptics';
 import { toast } from 'sonner';
@@ -24,6 +26,7 @@ interface DishEditorProps {
 
 export function DishEditor({ dish, isExpanded = true, onToggle, onChange, onRemove }: DishEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
 
   const handleAction = (action: string) => {
     if (!textareaRef.current) return;
@@ -91,18 +94,6 @@ export function DishEditor({ dish, isExpanded = true, onToggle, onChange, onRemo
       "relative rounded-2xl bg-card/40 border border-border/40 transition-all duration-300 overflow-hidden",
       isExpanded ? "p-4 space-y-4" : "p-3 hover:bg-card/60"
     )}>
-      {/* Remove Button (always visible but smaller when collapsed) */}
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); onRemove(); }}
-        className={cn(
-          "absolute rounded-full bg-destructive/90 text-white flex items-center justify-center shadow-lg active:scale-90 transition-all z-10",
-          isExpanded ? "-top-2 -right-2 h-8 w-8" : "top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100"
-        )}
-      >
-        <X className="h-3.5 w-3.5" />
-      </button>
-
       {/* Header/Compact View */}
       <div 
         className={cn("flex items-center gap-3 cursor-pointer", !isExpanded && "group")}
@@ -120,7 +111,7 @@ export function DishEditor({ dish, isExpanded = true, onToggle, onChange, onRemo
               value={dish.name}
               onChange={(e) => onChange({ ...dish, name: e.target.value })}
               placeholder="Dish Name (e.g. Truffle Pasta)"
-              className="bg-background/50 border-border/40 font-bold h-10"
+              className="bg-background/50 border-border/40 font-bold h-10 w-full"
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
@@ -160,40 +151,24 @@ export function DishEditor({ dish, isExpanded = true, onToggle, onChange, onRemo
           )}
         </div>
 
-        {isExpanded && (
-          <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-            <div className="relative w-24">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 font-bold text-sm">₹</span>
-              <Input
-                type="number"
-                value={dish.price || ''}
-                onChange={(e) => onChange({ ...dish, price: e.target.value ? Number(e.target.value) : undefined })}
-                placeholder="Price"
-                className="bg-background/50 border-border/40 font-bold h-10 pl-7 text-sm"
-              />
-            </div>
-            <div className="flex items-center gap-1 bg-muted/30 p-1 rounded-lg border border-border/40">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                key={star}
-                type="button"
-                onClick={() => {
-                  haptics.light();
-                  onChange({ ...dish, rating: star });
-                }}
-                className="p-0.5 transition-all active:scale-125"
-              >
-                <Star 
-                  className={cn(
-                    "h-4 w-4", 
-                    (dish.rating || 0) >= star ? "text-amber-400 fill-amber-400" : "text-muted-foreground/30"
-                  )} 
-                />
-              </button>
-            ))}
-            </div>
-          </div>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            className="h-8 w-8 rounded-full flex items-center justify-center bg-destructive/10 hover:bg-destructive hover:text-white text-destructive transition-all active:scale-90"
+            title="Remove Item"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+          
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onToggle?.(); }}
+            className="h-8 w-8 rounded-full flex items-center justify-center bg-muted/40 hover:bg-muted text-muted-foreground shrink-0 transition-colors"
+          >
+            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
 
       {/* Expanded Content */}
@@ -206,6 +181,45 @@ export function DishEditor({ dish, isExpanded = true, onToggle, onChange, onRemo
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className="space-y-4 pt-2"
           >
+            {/* Price & Rating Input Row (stacked on mobile, side-by-side on desktop) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" onClick={(e) => e.stopPropagation()}>
+              {/* Price Input */}
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 font-bold text-sm">₹</span>
+                <Input
+                  type="number"
+                  value={dish.price || ''}
+                  onChange={(e) => onChange({ ...dish, price: e.target.value ? Number(e.target.value) : undefined })}
+                  placeholder="Price"
+                  className="bg-background/50 border-border/40 font-bold h-10 pl-7 text-sm w-full"
+                />
+              </div>
+
+              {/* Rating Star Selector */}
+              <div className="flex items-center justify-between sm:justify-end gap-2 bg-background/30 p-1 px-3 rounded-lg border border-border/40 h-10">
+                <span className="text-xs text-muted-foreground font-bold sm:hidden">Rating:</span>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => {
+                        haptics.light();
+                        onChange({ ...dish, rating: star });
+                      }}
+                      className="p-0.5 transition-all active:scale-125"
+                    >
+                      <Star 
+                        className={cn(
+                          "h-4 w-4", 
+                          (dish.rating || 0) >= star ? "text-amber-400 fill-amber-400" : "text-muted-foreground/30"
+                        )} 
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
             <div className="grid grid-cols-3 gap-2">
               {statusOptions.map((opt) => (
                 <button
@@ -231,14 +245,58 @@ export function DishEditor({ dish, isExpanded = true, onToggle, onChange, onRemo
             </div>
 
             <div className="space-y-2">
-              <RichTextToolbar onAction={handleAction} />
-              <Textarea
-                ref={textareaRef}
-                value={dish.notes}
-                onChange={(e) => onChange({ ...dish, notes: e.target.value })}
-                placeholder="What did you love (or hate) about it? Mention spices, texture, etc."
-                className="bg-background/30 border-border/40 min-h-[80px] text-sm resize-none focus:border-primary/40"
-              />
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <RichTextToolbar onAction={handleAction} className={cn(activeTab === 'preview' && "opacity-50 pointer-events-none")} />
+                
+                {/* Edit / Preview Tabs */}
+                <div className="flex bg-muted/40 p-0.5 rounded-lg border border-border/40 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('edit')}
+                    className={cn(
+                      "px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all",
+                      activeTab === 'edit' 
+                        ? "bg-background text-foreground shadow-sm" 
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('preview')}
+                    className={cn(
+                      "px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all",
+                      activeTab === 'preview' 
+                        ? "bg-background text-foreground shadow-sm" 
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Preview
+                  </button>
+                </div>
+              </div>
+
+              {activeTab === 'edit' ? (
+                <Textarea
+                  ref={textareaRef}
+                  value={dish.notes}
+                  onChange={(e) => onChange({ ...dish, notes: e.target.value })}
+                  placeholder="What did you love (or hate) about it? Mention spices, texture, etc."
+                  className="bg-background/30 border-border/40 min-h-[80px] text-sm resize-none focus:border-primary/40 w-full"
+                />
+              ) : (
+                <div 
+                  onClick={() => setActiveTab('edit')}
+                  className="bg-background/30 border border-border/40 rounded-lg p-3 min-h-[80px] text-sm cursor-pointer hover:bg-background/40 transition-colors"
+                >
+                  {dish.notes && dish.notes.trim() ? (
+                    <FormattedText text={dish.notes.trim()} />
+                  ) : (
+                    <span className="text-muted-foreground/40 italic text-xs">Nothing to preview yet. Tap 'Edit' to write notes.</span>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">

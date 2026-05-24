@@ -287,9 +287,9 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
                 
                 {overallNotes && (
                   <div className="relative pl-5 border-l-2 border-primary/30">
-                    <p className="text-base sm:text-lg text-muted-foreground/90 leading-relaxed font-semibold italic">
-                      "{overallNotes}"
-                    </p>
+                    <div className="text-base sm:text-lg text-muted-foreground/90 leading-relaxed font-semibold italic">
+                      <FormattedText text={overallNotes} />
+                    </div>
                   </div>
                 )}
               </div>
