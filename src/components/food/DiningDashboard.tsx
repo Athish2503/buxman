@@ -10,6 +10,7 @@ import { foodService } from '@/lib/food-service';
 import { ExperienceCard } from './ExperienceCard';
 import { DiningEntryForm } from './DiningEntryForm';
 import { ShareExperienceModal } from './ShareExperienceModal';
+import { CulinaryMap } from './CulinaryMap';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,7 +41,7 @@ export function DiningDashboard() {
   
   // Advanced Shared Card Engine Integration state
   const [sharingExperience, setSharingExperience] = useState<DiningExperience | null>(null);
-  const [viewMode, setViewMode] = useState<'overview' | 'highlights' | 'favorites' | 'timeline'>('overview');
+  const [viewMode, setViewMode] = useState<'overview' | 'highlights' | 'favorites' | 'timeline' | 'map'>('overview');
 
   const handleRefresh = () => {
     setExperiences(foodService.getExperiences());
@@ -180,7 +181,8 @@ export function DiningDashboard() {
           { id: 'overview', label: 'Overview', icon: Utensils },
           { id: 'highlights', label: 'Highlights', icon: Sparkles },
           { id: 'favorites', label: 'Favorites', icon: Heart },
-          { id: 'timeline', label: 'Timeline', icon: History }
+          { id: 'timeline', label: 'Timeline', icon: History },
+          { id: 'map', label: 'Culinary Map', icon: MapIcon }
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = viewMode === tab.id;
@@ -353,7 +355,12 @@ export function DiningDashboard() {
         </div>
       )}
 
-      {viewMode === 'timeline' ? (
+      {viewMode === 'map' ? (
+        <CulinaryMap 
+          experiences={experiences} 
+          onSelectExperience={(id) => setExpandedId(id)}
+        />
+      ) : viewMode === 'timeline' ? (
         <div className="relative pl-6 sm:pl-10 space-y-10 py-6 before:absolute before:left-2 sm:before:left-4 before:top-2 before:bottom-2 before:w-px before:bg-gradient-to-b before:from-primary before:via-white/10 before:to-transparent animate-in fade-in-50 duration-700">
           {filtered.map((exp, idx) => (
             <div key={exp.id} className="relative group">

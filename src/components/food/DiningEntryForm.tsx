@@ -20,6 +20,7 @@ import { DishEditor } from './DishEditor';
 import { cn } from '@/lib/utils';
 import { haptics } from '@/lib/haptics';
 import { toast } from 'sonner';
+import { geocoder } from '@/lib/geocoder';
 
 const experienceSchema = z.object({
   restaurantName: z.string().min(1, 'Restaurant name is required'),
@@ -159,6 +160,19 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
     setIsProcessing(true);
 
     try {
+      let lat = isEdit ? initialData?.location?.lat : undefined;
+      let lng = isEdit ? initialData?.location?.lng : undefined;
+
+      if (data.address && (!isEdit || initialData?.location?.address !== data.address)) {
+        try {
+          const coords = await geocoder.geocode(data.address);
+          lat = coords.lat;
+          lng = coords.lng;
+        } catch (e) {
+          console.error("Geocoding failed", e);
+        }
+      }
+
       const experience: DiningExperience = {
         id: (isEdit && initialData?.id) ? initialData.id : crypto.randomUUID(),
         restaurantName: data.restaurantName,
@@ -167,6 +181,8 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
         priceRange: data.priceRange,
         location: {
           address: data.address || '',
+          lat,
+          lng,
         },
         dishes,
         createdAt: initialData?.createdAt || new Date().toISOString(),

@@ -18,7 +18,7 @@ interface ShareExperienceModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type PremiumThemeId = 'obsidian' | 'ivory' | 'crimson' | 'emerald';
+type PremiumThemeId = 'obsidian' | 'ivory' | 'crimson' | 'emerald' | 'critic';
 
 interface ThemeOption {
   id: PremiumThemeId;
@@ -32,6 +32,7 @@ const THEMES: ThemeOption[] = [
   { id: 'ivory', name: 'Editorial Ivory', badge: 'Minimalist', desc: 'Warm fine paper texture with sharp high-contrast layouts' },
   { id: 'crimson', name: 'Crimson Reserve', badge: 'Classic', desc: 'Sleek luxury styling with a bold upper crimson statement strip' },
   { id: 'emerald', name: 'Royal Emerald', badge: 'Vibrant', desc: 'Deep forest shades accenting mint typography and soft borders' },
+  { id: 'critic', name: 'Critic Highlight', badge: 'Spotlight', desc: 'Minimalist editorial spotlight style focusing on top-rated dishes and overall notes' },
 ];
 
 export function ShareExperienceModal({ experience, open, onOpenChange }: ShareExperienceModalProps) {
@@ -41,7 +42,7 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
 
   if (!experience) return null;
 
-  const { restaurantName, visitDate, location, dishes = [] } = experience;
+  const { restaurantName, visitDate, location, cuisine, dishes = [] } = experience;
 
   // Extract a background image fallback to provide beautiful ambient backdrops
   const allImages = dishes.flatMap(d => d.images).filter(Boolean);
@@ -368,6 +369,96 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
 
             <div style={{ marginTop: '32px', paddingTop: '12px', borderTop: '1px solid rgba(16,185,129,0.1)', textAlign: 'center', fontSize: '9px', fontWeight: 'bold', color: '#059669', letterSpacing: '1px' }}>
               BUXMAN EMERALD
+            </div>
+          </div>
+        );
+
+      case 'critic':
+        const highestRating = Math.max(...dishes.map(d => d.rating || 0), 0);
+        const bestDishes = dishes.filter(d => (d.rating || 0) === highestRating || d.status === 'liked');
+        
+        return (
+          <div id={targetId} style={{ ...wrapperStyle, backgroundColor: '#090B11', color: '#E2E8F0', padding: '36px', borderRadius: '28px', border: '1px solid rgba(245,158,11,0.2)', boxShadow: '0 20px 50px rgba(245,158,11,0.08)' }}>
+            <div style={{ position: 'absolute', top: 0, right: 0, width: '180px', height: '180px', borderRadius: '100px', backgroundColor: 'rgba(245,158,11,0.06)', filter: 'blur(50px)', pointerEvents: 'none' }} />
+
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, position: 'relative', zIndex: 2 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '12px' }}>
+                <span style={{ fontSize: '9px', fontWeight: 'black', color: '#F59E0B', letterSpacing: '2px', textTransform: 'uppercase' }}>
+                  ★ THE CRITIC'S CHOICE
+                </span>
+                <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontWeight: 'bold' }}>
+                  {format(new Date(visitDate), 'MMM yyyy')}
+                </span>
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <h2 style={{ fontSize: '32px', fontWeight: 'black', letterSpacing: '-1px', lineHeight: '36px', margin: '0 0 4px 0', color: '#FFFFFF' }}>
+                  {restaurantName}
+                </h2>
+                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', display: 'flex', gap: '8px', alignItems: 'center', fontWeight: 'bold' }}>
+                  <span>{cuisine || 'Fine Dining'}</span>
+                  {location?.address && (
+                    <>
+                      <span style={{ width: '4px', height: '4px', borderRadius: '2px', backgroundColor: 'rgba(255,255,255,0.2)' }} />
+                      <span>📍 {location.address.split(',')[0]}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: 'rgba(245,158,11,0.03)', border: '1px solid rgba(245,158,11,0.1)', padding: '20px', borderRadius: '18px', marginBottom: '24px' }}>
+                <div style={{ fontSize: '9px', fontWeight: 'black', color: '#F59E0B', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '8px' }}>
+                  Overall Verdict
+                </div>
+                <p style={{ fontSize: '13.5px', lineHeight: '20px', color: '#E2E8F0', fontStyle: 'italic', margin: 0, fontWeight: 'medium' }}>
+                  "{experience.overallNotes || `Outstanding culinary destination. Each dish reflects careful preparation and vibrant flavor profiles. Highly recommended.`}"
+                </p>
+              </div>
+
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ fontSize: '9px', fontWeight: 'black', color: 'rgba(255,255,255,0.4)', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                  Standout Selections
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {bestDishes.map((dish, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', padding: '12px 16px', borderRadius: '14px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#FFFFFF' }}>
+                          🏆 {dish.name}
+                        </span>
+                        {dish.notes && (
+                          <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontStyle: 'italic' }}>
+                            {dish.notes.length > 50 ? `${dish.notes.substring(0, 47)}...` : dish.notes}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                        {dish.price && (
+                          <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.1)', padding: '2px 6px', borderRadius: '6px' }}>
+                            ₹{dish.price}
+                          </span>
+                        )}
+                        {dish.rating && (
+                          <span style={{ fontSize: '12px', fontWeight: 'black', color: '#F59E0B' }}>
+                            ★ {dish.rating}.0
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {bestDishes.length === 0 && (
+                    <div style={{ textAlign: 'center', fontSize: '12px', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>
+                      No dishes logged yet
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ marginTop: '32px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', fontSize: '9px', fontWeight: 'black', color: 'rgba(255,255,255,0.3)', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                <span>Buxman Critic Review</span>
+                <span>Fidelity Checked</span>
+              </div>
             </div>
           </div>
         );
