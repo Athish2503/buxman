@@ -250,7 +250,7 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
       </div>
 
       {/* Details Section */}
-      <div className="px-8 py-10 space-y-12 flex-1 pb-48">
+      <div className="px-8 py-10 space-y-12 flex-1 pb-32">
         {/* Overall Experience Review Section */}
         {(overallNotes || overallRating) && (
           <div className="space-y-6 animate-in fade-in-50 duration-500">
@@ -399,53 +399,49 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
         )}
 
         {/* Integrated Floating Actions for Expanded View */}
-        <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background via-background/95 to-transparent border-t border-white/5 backdrop-blur-md z-50">
-          <div className="max-w-3xl mx-auto flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 flex gap-4">
-              <Button 
-                onClick={(e) => { e.stopPropagation(); onEdit?.(); }}
-                className="flex-1 h-14 rounded-2xl bg-primary text-white hover:opacity-95 font-black uppercase tracking-widest text-[10px] shadow-glow gap-2.5 border-none transition-all active:scale-95"
-              >
-                <Edit className="h-5 w-5" /> Edit
-              </Button>
+        <div className="fixed bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-background via-background/95 to-transparent border-t border-white/5 backdrop-blur-md z-50">
+          <div className="max-w-3xl mx-auto flex flex-row items-center gap-2.5 w-full">
+            <Button 
+              onClick={(e) => { e.stopPropagation(); onEdit?.(); }}
+              className="flex-1 h-12 rounded-xl bg-primary text-white hover:opacity-95 font-bold uppercase tracking-wider text-[10px] shadow-glow gap-1.5 border-none transition-all active:scale-95"
+            >
+              <Edit className="h-4 w-4" /> Edit
+            </Button>
 
-              <DiningEntryForm 
-                trigger={
-                  <Button 
-                    variant="outline"
-                    className="flex-1 h-14 rounded-2xl border border-white/10 bg-white/5 text-white hover:bg-white/10 font-black uppercase tracking-widest text-[10px] gap-2.5 transition-all active:scale-95"
-                  >
-                    <Utensils className="h-5 w-5" /> Revisit
-                  </Button>
-                }
-                initialData={{
-                  ...experience,
-                  id: '', // New ID
-                  visitDate: new Date().toISOString(),
-                  dishes: [], // Start fresh with dishes
-                  overallNotes: '',
-                  overallRating: undefined,
-                }}
-              />
-            </div>
-            
-            <div className="flex gap-4">
-              <Button 
-                variant="outline"
-                onClick={(e) => { e.stopPropagation(); handleCopyText(); }}
-                className="h-14 w-14 rounded-2xl bg-card border border-white/10 text-white hover:bg-white/5 shrink-0 shadow-2xl transition-all active:scale-90 flex items-center justify-center"
-              >
-                {copied ? <Check className="h-5.5 w-5.5 text-emerald-400" /> : <Copy className="h-5.5 w-5.5" />}
-              </Button>
+            <DiningEntryForm 
+              trigger={
+                <Button 
+                  variant="outline"
+                  className="flex-1 h-12 rounded-xl border border-white/10 bg-white/5 text-white hover:bg-white/10 font-bold uppercase tracking-wider text-[10px] gap-1.5 transition-all active:scale-95"
+                >
+                  <Utensils className="h-4 w-4" /> Revisit
+                </Button>
+              }
+              initialData={{
+                ...experience,
+                id: '', // New ID
+                visitDate: new Date().toISOString(),
+                dishes: [], // Start fresh with dishes
+                overallNotes: '',
+                overallRating: undefined,
+              }}
+            />
 
-              <Button 
-                variant="outline"
-                onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
-                className="h-14 w-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white transition-all shrink-0 shadow-2xl active:scale-90 flex items-center justify-center"
-              >
-                <Trash2 className="h-5.5 w-5.5" />
-              </Button>
-            </div>
+            <Button 
+              variant="outline"
+              onClick={(e) => { e.stopPropagation(); handleCopyText(); }}
+              className="h-12 w-12 rounded-xl bg-card border border-white/10 text-white hover:bg-white/5 shrink-0 transition-all active:scale-90 flex items-center justify-center"
+            >
+              {copied ? <Check className="h-4.5 w-4.5 text-emerald-400" /> : <Copy className="h-4.5 w-4.5" />}
+            </Button>
+
+            <Button 
+              variant="outline"
+              onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
+              className="h-12 w-12 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white transition-all shrink-0 active:scale-90 flex items-center justify-center"
+            >
+              <Trash2 className="h-4.5 w-4.5" />
+            </Button>
           </div>
         </div>
       </div>
