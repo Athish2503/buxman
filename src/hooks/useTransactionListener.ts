@@ -78,7 +78,7 @@ export const useTransactionListener = () => {
               currency: 'INR',
               description: data.notes || (pendingTx ? pendingTx.rawText : 'Captured via Smart Overlay'),
               status: 'approved',
-              isReimbursement: false,
+              isReimbursement: !!data.isReimbursement,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             } as any);

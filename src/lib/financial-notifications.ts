@@ -46,6 +46,7 @@ export interface FinancialNotificationPlugin {
     category?: string;
     notes?: string;
     persistedNatively?: boolean;
+    isReimbursement?: boolean;
   }) => void): Promise<any>;
 }
 

@@ -9,23 +9,23 @@
         android:id="@+id/card_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardBackgroundColor="#12131A"
-        app:cardCornerRadius="32dp"
-        app:cardElevation="20dp"
-        app:strokeColor="#26FFFFFF"
+        app:cardBackgroundColor="#0D0E12"
+        app:cardCornerRadius="30dp"
+        app:cardElevation="24dp"
+        app:strokeColor="#20FFFFFF"
         app:strokeWidth="1dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="24dp">
+            android:padding="20dp">
 
             <!-- Top Header -->
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="18dp">
+                android:layout_marginBottom="16dp">
 
                 <LinearLayout
                     android:layout_width="wrap_content"
@@ -34,9 +34,9 @@
                     android:orientation="horizontal">
 
                     <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:src="@android:drawable/ic_dialog_info"
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:src="@android:drawable/presence_online"
                         app:tint="#A855F7" />
 
                     <TextView
@@ -44,113 +44,146 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
-                        android:fontFamily="sans-serif-medium"
-                        android:letterSpacing="0.1"
-                        android:text="BUXMAN DETECTED"
+                        android:fontFamily="sans-serif-black"
+                        android:letterSpacing="0.15"
+                        android:text="TRANSACTION CAPTURED"
                         android:textColor="#A855F7"
-                        android:textSize="12sp" />
+                        android:textSize="10sp" />
                 </LinearLayout>
 
                 <ImageButton
                     android:id="@+id/btn_close_overlay"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
                     android:layout_alignParentEnd="true"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:src="@android:drawable/ic_menu_close_clear_cancel"
-                    app:tint="#88FFFFFF" />
+                    app:tint="#66FFFFFF" />
             </RelativeLayout>
 
-            <!-- Amount Display -->
-            <TextView
-                android:id="@+id/tv_overlay_amount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-black"
-                android:text="₹0"
-                android:textColor="#FFFFFF"
-                android:textSize="42sp" />
-
-            <!-- Merchant Display -->
+            <!-- Amount & Merchant Modern Group -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:layout_marginBottom="22dp"
-                android:gravity="center_vertical">
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@drawable/bg_overlay_input"
+                android:paddingVertical="18dp"
+                android:paddingHorizontal="16dp"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="AMOUNT DETECTED"
+                    android:textColor="#55FFFFFF"
+                    android:textSize="9sp"
+                    android:letterSpacing="0.1"
+                    android:layout_marginBottom="4dp"/>
+
+                <TextView
+                    android:id="@+id/tv_overlay_amount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-black"
+                    android:text="₹0.00"
+                    android:textColor="#FFFFFF"
+                    android:textSize="36sp"
+                    android:lineSpacingMultiplier="0.9" />
 
                 <TextView
                     android:id="@+id/tv_overlay_merchant"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
                     android:fontFamily="sans-serif-medium"
                     android:text="MERCHANT"
-                    android:textColor="#B3FFFFFF"
-                    android:textSize="16sp"
-                    android:textAllCaps="true" />
+                    android:textColor="#CCFFFFFF"
+                    android:textSize="14sp"
+                    android:gravity="center" />
             </LinearLayout>
 
             <!-- Category Section -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:fontFamily="sans-serif-medium"
+                android:layout_marginBottom="6dp"
+                android:fontFamily="sans-serif-bold"
                 android:letterSpacing="0.1"
-                android:text="SELECT CATEGORY"
-                android:textColor="#88FFFFFF"
-                android:textSize="11sp" />
+                android:text="ASSIGN CATEGORY"
+                android:textColor="#55FFFFFF"
+                android:textSize="10sp"
+                android:layout_marginStart="2dp" />
 
             <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="18dp"
-                android:scrollbars="none">
+                android:layout_marginBottom="16dp"
+                android:scrollbars="none"
+                android:overScrollMode="never">
 
                 <com.google.android.material.chip.ChipGroup
                     android:id="@+id/chip_group_overlay_categories"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    app:singleSelection="true" />
+                    app:singleSelection="true"
+                    app:chipSpacingHorizontal="6dp"/>
             </HorizontalScrollView>
 
             <!-- Notes Input -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:fontFamily="sans-serif-medium"
+                android:layout_marginBottom="6dp"
+                android:fontFamily="sans-serif-bold"
                 android:letterSpacing="0.1"
-                android:text="OPTIONAL NOTE"
-                android:textColor="#88FFFFFF"
-                android:textSize="11sp" />
+                android:text="OPTIONAL MEMO"
+                android:textColor="#55FFFFFF"
+                android:textSize="10sp"
+                android:layout_marginStart="2dp" />
 
             <EditText
                 android:id="@+id/et_overlay_notes"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="22dp"
+                android:layout_marginBottom="16dp"
                 android:background="@drawable/bg_overlay_input"
-                android:fontFamily="sans-serif"
-                android:hint="Purpose of deduction..."
-                android:padding="16dp"
+                android:fontFamily="sans-serif-medium"
+                android:hint="What was this expense for?"
+                android:padding="14dp"
                 android:textColor="#FFFFFF"
-                android:textColorHint="#55FFFFFF"
-                android:textSize="14sp"
+                android:textColorHint="#33FFFFFF"
+                android:textSize="13sp"
                 android:inputType="textCapSentences" />
+
+            <!-- Reimbursable Switch -->
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switch_reimbursable"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                android:text="Reimbursable Expense"
+                android:textColor="#CCFFFFFF"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-medium"
+                app:thumbTint="#A855F7"
+                app:trackTint="#33A855F7"
+                android:layout_marginStart="2dp" />
 
             <!-- Action Buttons -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_overlay_save"
                 android:layout_width="match_parent"
-                android:layout_height="60dp"
-                android:backgroundTint="#8B5CF6"
-                android:fontFamily="sans-serif-bold"
-                android:text="Save Transaction"
+                android:layout_height="54dp"
+                android:backgroundTint="#A855F7"
+                android:fontFamily="sans-serif-black"
+                android:text="Approve Log"
                 android:textColor="#FFFFFF"
-                android:textAllCaps="false"
-                android:textSize="16sp"
-                app:cornerRadius="20dp"
+                android:textAllCaps="true"
+                android:textSize="13sp"
+                android:letterSpacing="0.1"
+                app:cornerRadius="16dp"
                 app:rippleColor="#33FFFFFF" />
 
             <com.google.android.material.button.MaterialButton
@@ -158,9 +191,11 @@
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="Ignore Deduction"
-                android:textColor="#88FFFFFF"
+                android:layout_marginTop="4dp"
+                android:fontFamily="sans-serif-bold"
+                android:text="Ignore Transaction"
+                android:textColor="#55FFFFFF"
+                android:textSize="12sp"
                 android:textAllCaps="false" />
 
         </LinearLayout>
@@ -170,7 +205,7 @@
             android:id="@+id/layout_success_animation"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#E60D0E15"
+            android:background="#F20D0E12"
             android:clickable="true"
             android:focusable="true"
             android:alpha="0"

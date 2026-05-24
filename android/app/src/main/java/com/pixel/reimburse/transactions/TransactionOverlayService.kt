@@ -167,9 +167,13 @@ class TransactionOverlayService : Service() {
         b.btnOverlaySave.backgroundTintList = android.content.res.ColorStateList.valueOf(accentColor)
         b.btnOverlaySave.text = if (isCredit) "Record Income" else "Record Expense"
 
+        // Reimbursable switch visibility & default state
+        b.switchReimbursable.visibility = if (isCredit) View.GONE else View.VISIBLE
+        b.switchReimbursable.isChecked = false
+
         // Dynamic category chips
         b.chipGroupOverlayCategories.removeAllViews()
-        val currentCategories = if (isCredit) listOf("Salary", "Refund", "Cash Deposit", "Gift", "Other") else categories
+        val currentCategories = if (isCredit) listOf("Salary", "Refund", "Cash Deposit", "Gift", "Other") else loadCategoriesFromStorage()
         
         currentCategories.forEach { category ->
             val themedContext = ContextThemeWrapper(this, R.style.AppTheme)
@@ -205,12 +209,13 @@ class TransactionOverlayService : Service() {
             b.btnOverlaySave.isEnabled = false
             val notes = b.etOverlayNotes.text.toString()
             val category = selectedCategory ?: if (isCredit) "Income" else "Other"
+            val isReimbursement = if (isCredit) false else b.switchReimbursable.isChecked
 
-            Log.d(TAG, "Saving transaction: $merchant | $amount")
-            val success = persistTransactionNatively(amount, merchant, category, notes, type)
+            Log.d(TAG, "Saving transaction: $merchant | $amount | Reimbursable: $isReimbursement")
+            val success = persistTransactionNatively(amount, merchant, category, notes, type, isReimbursement)
             
             if (success) {
-                FinancialNotificationPlugin.onOverlayAction(this, "save", amount, merchant, category, notes, true)
+                FinancialNotificationPlugin.onOverlayAction(this, "save", amount, merchant, category, notes, true, isReimbursement)
                 playSuccessAnimationAndDismiss()
             } else {
                 b.btnOverlaySave.isEnabled = true
@@ -300,7 +305,29 @@ class TransactionOverlayService : Service() {
             ?.start() ?: stopSelf()
     }
 
-    private fun persistTransactionNatively(amount: Double, merchant: String, category: String, notes: String, type: String): Boolean {
+    private fun loadCategoriesFromStorage(): List<String> {
+        try {
+            val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+            val categoryKey = "reimburse_categories_v1"
+            val jsonStr = prefs.getString(categoryKey, null)
+            if (jsonStr != null) {
+                val array = org.json.JSONArray(jsonStr)
+                val list = mutableListOf<String>()
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    if (obj.optBoolean("isVisible", true)) {
+                        list.add(obj.getString("label"))
+                    }
+                }
+                if (list.isNotEmpty()) return list
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load categories from CapacitorStorage", e)
+        }
+        return categories
+    }
+
+    private fun persistTransactionNatively(amount: Double, merchant: String, category: String, notes: String, type: String, isReimbursement: Boolean): Boolean {
         try {
             val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
             val storageKey = "reimburse_expenses_v2"
@@ -323,7 +350,7 @@ class TransactionOverlayService : Service() {
                 put("description", notes.ifBlank { "Captured via Smart Overlay" })
                 put("status", "approved")
                 put("type", type)
-                put("isReimbursement", false)
+                put("isReimbursement", isReimbursement)
                 put("createdAt", isoTimeStr)
                 put("updatedAt", isoTimeStr)
             }

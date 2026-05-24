@@ -109,7 +109,7 @@ class FinancialNotificationPlugin : Plugin() {
             addToDiagnostics(context, data)
         }
 
-        fun onOverlayAction(context: Context, action: String, amount: Double, merchant: String, category: String? = null, notes: String? = null, persistedNatively: Boolean = false) {
+        fun onOverlayAction(context: Context, action: String, amount: Double, merchant: String, category: String? = null, notes: String? = null, persistedNatively: Boolean = false, isReimbursement: Boolean = false) {
             val eventId = "ACT_" + System.currentTimeMillis() + "_" + (1000..9999).random()
             val data = JSObject().apply {
                 put("eventId", eventId)
@@ -119,6 +119,7 @@ class FinancialNotificationPlugin : Plugin() {
                 put("category", category)
                 put("notes", notes)
                 put("persistedNatively", persistedNatively)
+                put("isReimbursement", isReimbursement)
             }
             
             // Always save to persistent queue
