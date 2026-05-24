@@ -24,7 +24,7 @@ import { geocoder } from '@/lib/geocoder';
 
 const experienceSchema = z.object({
   restaurantName: z.string().min(1, 'Restaurant name is required'),
-  visitDate: z.string().min(1, 'Date is required'),
+  visitDate: z.string().optional().nullable(),
   cuisine: z.string().optional(),
   priceRange: z.enum(['budget', 'mid', 'premium', 'luxury']).optional(),
   address: z.string().optional(),
@@ -56,12 +56,16 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
   );
   const [success, setSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [resolvedCoords, setResolvedCoords] = useState<{ lat?: number; lng?: number }>(() => ({
+    lat: initialData?.location?.lat,
+    lng: initialData?.location?.lng,
+  }));
   
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting }, reset } = useForm<FormData>({
     resolver: zodResolver(experienceSchema),
     defaultValues: initialData ? {
       restaurantName: initialData.restaurantName,
-      visitDate: format(new Date(initialData.visitDate), 'yyyy-MM-dd'),
+      visitDate: initialData.visitDate ? format(new Date(initialData.visitDate), 'yyyy-MM-dd') : '',
       cuisine: initialData.cuisine || '',
       priceRange: initialData.priceRange || 'mid',
       address: initialData.location?.address || '',
@@ -75,9 +79,13 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
     if (initialData) {
       setDishes(initialData.dishes || []);
       setExpandedDishId(initialData.dishes && initialData.dishes.length > 0 ? initialData.dishes[0].id : null);
+      setResolvedCoords({
+        lat: initialData.location?.lat,
+        lng: initialData.location?.lng,
+      });
       reset({
         restaurantName: initialData.restaurantName,
-        visitDate: format(new Date(initialData.visitDate), 'yyyy-MM-dd'),
+        visitDate: initialData.visitDate ? format(new Date(initialData.visitDate), 'yyyy-MM-dd') : '',
         cuisine: initialData.cuisine || '',
         priceRange: initialData.priceRange || 'mid',
         address: initialData.location?.address || '',
@@ -150,9 +158,35 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
     if (s.cuisine) setValue('cuisine', s.cuisine);
     if (s.location?.address) setValue('address', s.location.address);
     if (s.priceRange) setValue('priceRange', s.priceRange);
+    if (s.location?.lat !== undefined && s.location?.lng !== undefined) {
+      setResolvedCoords({ lat: s.location.lat, lng: s.location.lng });
+    }
     setShowSuggestions(false);
     haptics.selection();
     toast.info(`Pre-filled details for ${s.restaurantName}`);
+  };
+
+  const handleAddressBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
+    const val = e.target.value.trim();
+    if (!val) return;
+
+    const parsed = geocoder.parseCoordinates(val);
+    if (parsed) {
+      toast.promise(
+        async () => {
+          const resolved = await geocoder.reverseGeocode(parsed.lat, parsed.lng);
+          const cleanAddr = resolved || `Pin: ${parsed.lat.toFixed(5)}, ${parsed.lng.toFixed(5)}`;
+          setValue('address', cleanAddr, { shouldValidate: true });
+          setResolvedCoords({ lat: parsed.lat, lng: parsed.lng });
+          return cleanAddr;
+        },
+        {
+          loading: 'Decoding location coordinates...',
+          success: (addr) => `Location pinned: ${addr.split(',')[0]}`,
+          error: 'Failed to reverse-geocode location.',
+        }
+      );
+    }
   };
 
   const onFormSubmit = async (data: FormData) => {
@@ -160,14 +194,20 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
     setIsProcessing(true);
 
     try {
-      let lat = isEdit ? initialData?.location?.lat : undefined;
-      let lng = isEdit ? initialData?.location?.lng : undefined;
+      let lat = resolvedCoords.lat;
+      let lng = resolvedCoords.lng;
+      let finalAddress = data.address || '';
 
-      if (data.address && (!isEdit || initialData?.location?.address !== data.address)) {
+      const hasAddressChanged = !isEdit || initialData?.location?.address !== data.address;
+
+      if (data.address && (hasAddressChanged || lat === undefined || lng === undefined)) {
         try {
           const coords = await geocoder.geocode(data.address);
           lat = coords.lat;
           lng = coords.lng;
+          if (coords.address) {
+            finalAddress = coords.address;
+          }
         } catch (e) {
           console.error("Geocoding failed", e);
         }
@@ -176,11 +216,11 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
       const experience: DiningExperience = {
         id: (isEdit && initialData?.id) ? initialData.id : crypto.randomUUID(),
         restaurantName: data.restaurantName,
-        visitDate: data.visitDate,
+        visitDate: data.visitDate || null,
         cuisine: data.cuisine,
         priceRange: data.priceRange,
         location: {
-          address: data.address || '',
+          address: finalAddress,
           lat,
           lng,
         },
@@ -207,6 +247,8 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
     }
   };
 
+  const addressRegister = register('address');
+
   return (
     <form className="flex flex-col pb-20 sm:pb-0">
       <div className="relative rounded-3xl mb-6 p-6 overflow-hidden bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10">
@@ -214,9 +256,32 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
           <Utensils className="h-20 w-20 rotate-12" />
         </div>
         
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/60 mb-3">
-          {isEdit ? 'Refine Experience' : 'New Culinary Log'}
-        </p>
+        <div className="flex items-center justify-between mb-3 relative z-10">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/60">
+            {isEdit ? 'Refine Experience' : 'New Culinary Log'}
+          </p>
+          {!isEdit && (
+            <button
+              type="button"
+              onClick={() => {
+                reset({
+                  restaurantName: '',
+                  visitDate: format(new Date(), 'yyyy-MM-dd'),
+                  cuisine: '',
+                  priceRange: 'mid',
+                  address: '',
+                });
+                setDishes([]);
+                setResolvedCoords({});
+                haptics.medium();
+                toast.info('Form cleared');
+              }}
+              className="text-[9px] font-black uppercase tracking-wider text-muted-foreground/60 hover:text-primary hover:underline transition-all"
+            >
+              Clear Form
+            </button>
+          )}
+        </div>
  
         <div className="space-y-4 relative z-10">
           <div className="space-y-1.5 relative">
@@ -301,7 +366,21 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
               </AnimatePresence>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Date</Label>
+              <div className="flex items-center justify-between ml-1">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Date</Label>
+                {watch('visitDate') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setValue('visitDate', '', { shouldValidate: true });
+                      haptics.light();
+                    }}
+                    className="text-[9px] font-bold uppercase text-primary hover:underline"
+                  >
+                    Set Undated
+                  </button>
+                )}
+              </div>
               <div className="relative">
                 <Input
                   type="date"
@@ -317,7 +396,11 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
             <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Location / Address</Label>
             <div className="relative">
               <Input
-                {...register('address')}
+                {...addressRegister}
+                onBlur={(e) => {
+                  addressRegister.onBlur(e);
+                  handleAddressBlur(e);
+                }}
                 placeholder="City or Full Address"
                 className="h-11 bg-background/50 border-white/10 text-sm font-medium rounded-2xl pl-10"
               />

@@ -48,7 +48,11 @@ export const foodService = {
     const map = new Map<string, { restaurantName: string, cuisine?: string, location?: any, priceRange?: string }>();
     
     // Sort by date descending so we get the most recent metadata
-    const sorted = [...experiences].sort((a, b) => new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime());
+    const sorted = [...experiences].sort((a, b) => {
+      const aTime = a.visitDate ? new Date(a.visitDate).getTime() : new Date(a.createdAt).getTime();
+      const bTime = b.visitDate ? new Date(b.visitDate).getTime() : new Date(b.createdAt).getTime();
+      return bTime - aTime;
+    });
     
     sorted.forEach(e => {
       if (!map.has(e.restaurantName.toLowerCase())) {

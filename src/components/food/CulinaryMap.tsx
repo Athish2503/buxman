@@ -114,7 +114,7 @@ export function CulinaryMap({ experiences, onSelectExperience }: CulinaryMapProp
           <div class="space-y-2 relative z-10">
             <div class="flex items-center justify-between text-[8px] font-black uppercase tracking-widest text-muted-foreground/60">
               <span style="color: ${glowColor};">${exp.cuisine || 'Dining'}</span>
-              <span>${new Date(exp.visitDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+              <span>${exp.visitDate ? new Date(exp.visitDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Undated'}</span>
             </div>
             <h4 class="font-black text-[13px] text-white tracking-tight leading-tight">${exp.restaurantName}</h4>
             <div class="flex items-center gap-1 text-[9px] text-white/50">
@@ -161,7 +161,7 @@ export function CulinaryMap({ experiences, onSelectExperience }: CulinaryMapProp
     };
 
     drawMarkers();
-  }, [mapLoaded, experiencesWithCoords.length]);
+  }, [mapLoaded, experiences]);
 
   return (
     <div className="space-y-4 animate-in fade-in-50 duration-500">

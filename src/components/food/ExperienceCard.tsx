@@ -56,7 +56,8 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
       return `${statusIcon} *${d.name}* ${priceTag} ${ratingStars}\n${d.notes.replace(/[*#=]/g, '')}`;
     }).join('\n\n');
 
-    const text = `🍽️ *${restaurantName}*\n📅 ${format(new Date(visitDate), 'MMM d, yyyy')}\n📍 ${location?.address || 'N/A'}\n\n*Items:*\n${dishList}\n\n_Logged via Buxman_`;
+    const dateFormatted = visitDate ? format(new Date(visitDate), 'MMM d, yyyy') : 'Undated';
+    const text = `🍽️ *${restaurantName}*\n📅 ${dateFormatted}\n📍 ${location?.address || 'N/A'}\n\n*Items:*\n${dishList}\n\n_Logged via Buxman_`;
 
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -78,12 +79,25 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
         <div className="relative z-10 h-full flex items-center p-5 gap-5">
           {/* Vertical Calendar Date Badge */}
           <div className="relative z-10 flex flex-col items-center justify-center shrink-0 w-16 h-20 rounded-2xl bg-white/5 border border-white/5 group-hover:bg-primary/10 group-hover:border-primary/20 transition-all duration-300 shadow-sm">
-            <span className="text-[9px] font-black text-muted-foreground/60 uppercase tracking-widest leading-none mb-1">
-              {format(new Date(visitDate), 'MMM')}
-            </span>
-            <span className="text-2xl font-black text-foreground tracking-tighter leading-none">
-              {format(new Date(visitDate), 'd')}
-            </span>
+            {visitDate ? (
+              <>
+                <span className="text-[9px] font-black text-muted-foreground/60 uppercase tracking-widest leading-none mb-1">
+                  {format(new Date(visitDate), 'MMM')}
+                </span>
+                <span className="text-2xl font-black text-foreground tracking-tighter leading-none">
+                  {format(new Date(visitDate), 'd')}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-[9px] font-black text-primary uppercase tracking-widest leading-none mb-1 animate-pulse">
+                  TBD
+                </span>
+                <span className="text-sm font-black text-muted-foreground tracking-tighter leading-none mt-1">
+                  Undated
+                </span>
+              </>
+            )}
           </div>
           
           <div className="flex-1 min-w-0 flex flex-col justify-center py-1">
@@ -219,7 +233,7 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
             <div className="flex flex-wrap items-center gap-4 mt-4 text-white/60 text-[10px] font-black uppercase tracking-wider">
               <div className="flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5 text-primary/80" />
-                {format(new Date(visitDate), 'MMMM d, yyyy')}
+                {visitDate ? format(new Date(visitDate), 'MMMM d, yyyy') : 'Undated Visit'}
               </div>
               {location?.address && (
                 <>

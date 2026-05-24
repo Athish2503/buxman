@@ -35,6 +35,17 @@ const THEMES: ThemeOption[] = [
   { id: 'critic', name: 'Critic Highlight', badge: 'Spotlight', desc: 'Minimalist editorial spotlight style focusing on top-rated dishes and overall notes' },
 ];
 
+const formatDateSafe = (dateStr: string | null | undefined, formatTemplate: string = 'MMMM d, yyyy') => {
+  if (!dateStr) return 'Undated';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'Undated';
+    return format(d, formatTemplate);
+  } catch (e) {
+    return 'Undated';
+  }
+};
+
 export function ShareExperienceModal({ experience, open, onOpenChange }: ShareExperienceModalProps) {
   const [selectedTheme, setSelectedTheme] = useState<PremiumThemeId>('obsidian');
   const [aspectRatio, setAspectRatio] = useState<'standard' | 'story'>('standard');
@@ -57,7 +68,7 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
     const lines = [
       `🍽️ ${restaurantName}`,
       location?.address ? `📍 ${location.address.split(',')[0]}` : null,
-      `📅 ${format(new Date(visitDate), 'MMMM d, yyyy')}`,
+      `📅 ${formatDateSafe(visitDate, 'MMMM d, yyyy')}`,
       ``,
       `✨ ORDERED ITEMS:`
     ];
@@ -143,7 +154,7 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
                     </div>
                   )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#34D399' }}>
-                    📅 {format(new Date(visitDate), 'MMMM d, yyyy')}
+                    📅 {formatDateSafe(visitDate, 'MMMM d, yyyy')}
                   </div>
                 </div>
               </div>
@@ -207,7 +218,7 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
               
               <div style={{ fontSize: '12px', color: '#4B5563', fontWeight: 'bold', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {location?.address && <div>📍 {location.address.split(',')[0]}</div>}
-                <div style={{ color: '#059669' }}>📅 {format(new Date(visitDate), 'MMMM d, yyyy')}</div>
+                <div style={{ color: '#059669' }}>📅 {formatDateSafe(visitDate, 'MMMM d, yyyy')}</div>
               </div>
             </div>
 
@@ -269,7 +280,7 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
             <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', flex: 1 }}>
               <div style={{ marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.08)', fontSize: '12px', color: 'rgba(255,255,255,0.7)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {location?.address && <div>📍 {location.address.split(',')[0]}</div>}
-                <div style={{ color: '#FCA5A5', fontWeight: 'bold' }}>📅 {format(new Date(visitDate), 'MMMM d, yyyy')}</div>
+                <div style={{ color: '#FCA5A5', fontWeight: 'bold' }}>📅 {formatDateSafe(visitDate, 'MMMM d, yyyy')}</div>
               </div>
 
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -327,7 +338,7 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
               </h2>
               <div style={{ fontSize: '12px', color: '#A7F3D0', fontWeight: 'bold', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {location?.address && <div>📍 {location.address.split(',')[0]}</div>}
-                <div>📅 {format(new Date(visitDate), 'MMMM d, yyyy')}</div>
+                <div>📅 {formatDateSafe(visitDate, 'MMMM d, yyyy')}</div>
               </div>
             </div>
 
@@ -387,7 +398,7 @@ export function ShareExperienceModal({ experience, open, onOpenChange }: ShareEx
                   ★ THE CRITIC'S CHOICE
                 </span>
                 <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontWeight: 'bold' }}>
-                  {format(new Date(visitDate), 'MMM yyyy')}
+                  {formatDateSafe(visitDate, 'MMM yyyy')}
                 </span>
               </div>
 

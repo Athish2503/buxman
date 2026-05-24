@@ -62,7 +62,9 @@ export function DiningDashboard() {
   const filtered = useMemo(() => {
     const list = experiences.filter(e => {
       const matchSearch = e.restaurantName.toLowerCase().includes(search.toLowerCase()) || 
-                          e.cuisine?.toLowerCase().includes(search.toLowerCase());
+                          e.cuisine?.toLowerCase().includes(search.toLowerCase()) ||
+                          (e.location?.address || '').toLowerCase().includes(search.toLowerCase()) ||
+                          e.dishes.some(d => d.name.toLowerCase().includes(search.toLowerCase()));
       const matchCuisine = !selectedCuisine || e.cuisine === selectedCuisine;
       
       if (viewMode === 'favorites') {
@@ -89,10 +91,13 @@ export function DiningDashboard() {
             }
           });
           
+          const eTime = e.visitDate ? new Date(e.visitDate).getTime() : new Date(e.createdAt).getTime();
+          const existingTime = existing.visitDate ? new Date(existing.visitDate).getTime() : new Date(existing.createdAt).getTime();
+          
           groups.set(key, {
             ...existing,
             dishes: mergedDishes,
-            visitDate: new Date(e.visitDate) > new Date(existing.visitDate) ? e.visitDate : existing.visitDate,
+            visitDate: eTime > existingTime ? e.visitDate : existing.visitDate,
             _visitCount: (existing._visitCount || 1) + 1
           });
         }
@@ -214,7 +219,7 @@ export function DiningDashboard() {
         <div className="relative group">
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground/20 group-focus-within:text-primary transition-all duration-300" />
           <Input 
-            placeholder="Search restaurants, cuisines..."
+            placeholder="Search by restaurant, cuisine, dish, or location..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-20 pl-16 rounded-[2.5rem] bg-black/30 backdrop-blur-3xl border-white/5 shadow-2xl focus:border-primary/30 transition-all text-lg placeholder:text-muted-foreground/20 font-medium"
@@ -283,7 +288,7 @@ export function DiningDashboard() {
               <div className="flex flex-wrap items-center gap-4 text-xs font-black text-muted-foreground/60 uppercase tracking-widest pt-1">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-primary/60" /> 
-                  {format(new Date(bestExperience.visitDate), 'MMMM d, yyyy')}
+                  {bestExperience.visitDate ? format(new Date(bestExperience.visitDate), 'MMMM d, yyyy') : 'Undated Visit'}
                 </div>
                 {bestExperience.cuisine && (
                   <>
@@ -369,17 +374,15 @@ export function DiningDashboard() {
               
               <div className="bg-card/30 backdrop-blur-2xl border border-white/5 rounded-[2.5rem] p-8 shadow-xl hover:border-primary/20 transition-all duration-500 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 group-hover:shadow-primary/5">
                 <div className="space-y-2 flex-1">
-                  <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/5">
-                      <Calendar className="h-3 w-3 text-primary/60" />
+                      <Calendar className="h-3.5 w-3.5 text-primary/60" />
                       <span className="text-[10px] font-black text-primary uppercase tracking-widest">
-                        {format(new Date(exp.visitDate), 'MMM d, yyyy')}
+                        {exp.visitDate ? format(new Date(exp.visitDate), 'MMM d, yyyy') : 'Undated'}
                       </span>
                     </div>
                     {exp.cuisine && (
                       <span className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.2em]">{exp.cuisine}</span>
                     )}
-                  </div>
                   
                   <h3 className="text-2xl font-black tracking-tight text-foreground group-hover:text-primary transition-colors">{exp.restaurantName}</h3>
                   

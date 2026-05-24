@@ -23,7 +23,7 @@ export interface DiningExperience {
   };
   cuisine?: string;
   priceRange?: PriceRange;
-  visitDate: string;
+  visitDate?: string | null;
   dishes: Dish[];
   overallNotes?: string;
   overallRating?: number;
