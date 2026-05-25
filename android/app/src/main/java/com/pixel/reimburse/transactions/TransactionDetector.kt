@@ -64,8 +64,8 @@ object TransactionDetector {
 
     private fun triggerOverlay(context: Context, info: ParsedTransactionInfo) {
         if (Settings.canDrawOverlays(context)) {
-            Log.d(TAG, "Triggering TransactionOverlayService instantly for ${info.merchant}")
-            val intent = Intent(context, TransactionOverlayService::class.java).apply {
+            Log.d(TAG, "Triggering OverlayActivity to launch overlay service for ${info.merchant}")
+            val intent = Intent(context, OverlayActivity::class.java).apply {
                 putExtra("amount", info.amount)
                 putExtra("merchant", info.merchant)
                 putExtra("appName", info.sourceApp)
@@ -73,12 +73,27 @@ object TransactionDetector {
                 putExtra("type", info.type)
                 putExtra("confidenceScore", info.confidenceScore)
                 putExtra("account", info.account)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             }
             try {
-                context.startService(intent)
+                context.startActivity(intent)
             } catch (e: Exception) {
-                Log.e(TAG, "Failed launching TransactionOverlayService", e)
+                Log.e(TAG, "Failed launching OverlayActivity, attempting fallback directly to TransactionOverlayService", e)
+                try {
+                    val fallbackIntent = Intent(context, TransactionOverlayService::class.java).apply {
+                        putExtra("amount", info.amount)
+                        putExtra("merchant", info.merchant)
+                        putExtra("appName", info.sourceApp)
+                        putExtra("rawText", info.rawText)
+                        putExtra("type", info.type)
+                        putExtra("confidenceScore", info.confidenceScore)
+                        putExtra("account", info.account)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startService(fallbackIntent)
+                } catch (ex: Exception) {
+                    Log.e(TAG, "Fallback startService failed", ex)
+                }
             }
         } else {
             Log.w(TAG, "Overlay trigger skipped: SYSTEM_ALERT_WINDOW permission not granted.")

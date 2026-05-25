@@ -224,14 +224,35 @@ class TransactionOverlayService : Service() {
             }
         }
 
-        b.etOverlayNotes.setOnFocusChangeListener { _, hasFocus ->
-            params?.let { p ->
-                p.flags = if (hasFocus) {
-                    p.flags and LayoutParams.FLAG_NOT_FOCUSABLE.inv()
-                } else {
-                    p.flags or LayoutParams.FLAG_NOT_FOCUSABLE
+        b.etOverlayNotes.setOnTouchListener { v, event ->
+            if (event.action == MotionEvent.ACTION_UP) {
+                params?.let { p ->
+                    if ((p.flags and LayoutParams.FLAG_NOT_FOCUSABLE) != 0) {
+                        p.flags = p.flags and LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+                        try {
+                            windowManager.updateViewLayout(b.root, p)
+                            v.requestFocus()
+                            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                            imm.showSoftInput(v, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to update overlay focus", e)
+                        }
+                    }
                 }
-                try { windowManager.updateViewLayout(b.root, p) } catch (e: Exception) {}
+            }
+            false
+        }
+
+        b.etOverlayNotes.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                params?.let { p ->
+                    p.flags = p.flags or LayoutParams.FLAG_NOT_FOCUSABLE
+                    try {
+                        windowManager.updateViewLayout(b.root, p)
+                        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                        imm.hideSoftInputFromWindow(b.etOverlayNotes.windowToken, 0)
+                    } catch (e: Exception) {}
+                }
             }
         }
 

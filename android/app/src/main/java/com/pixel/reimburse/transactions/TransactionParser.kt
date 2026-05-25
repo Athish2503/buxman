@@ -28,7 +28,7 @@ object TransactionParser {
     private const val THRESHOLD_MIN_CONFIDENCE = 65
 
     // Keywords
-    private val DEBIT_KEYWORDS = listOf("debited", "debit", "paid", "withdrawn", "spent", "trf to", "sent to", "purchase", "payment made")
+    private val DEBIT_KEYWORDS = listOf("debited", "debit", "deducted", "deduction", "charged", "transferred", "paid", "withdrawn", "spent", "trf to", "sent to", "purchase", "payment made")
     private val CREDIT_KEYWORDS = listOf("credited", "credit", "received", "deposited", "refund received", "salary credited", "cash deposit", "received from", "credited by")
     private val UPI_KEYWORDS = listOf("upi", "vpa", "bhim", "phonepe", "gpay", "paytm")
     private val ACCOUNT_KEYWORDS = listOf("a/c", "account", "acc ", "acct")

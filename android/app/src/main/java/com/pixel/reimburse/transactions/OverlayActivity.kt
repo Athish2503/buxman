@@ -19,6 +19,9 @@ class OverlayActivity : Activity() {
         val merchant = intent.getStringExtra("merchant") ?: "Unknown Merchant"
         val appName = intent.getStringExtra("appName") ?: "System"
         val rawText = intent.getStringExtra("rawText") ?: ""
+        val type = intent.getStringExtra("type") ?: "debit"
+        val confidenceScore = intent.getIntExtra("confidenceScore", 0)
+        val account = intent.getStringExtra("account") ?: ""
 
         if (Settings.canDrawOverlays(this)) {
             val serviceIntent = Intent(this, TransactionOverlayService::class.java).apply {
@@ -26,6 +29,9 @@ class OverlayActivity : Activity() {
                 putExtra("merchant", merchant)
                 putExtra("appName", appName)
                 putExtra("rawText", rawText)
+                putExtra("type", type)
+                putExtra("confidenceScore", confidenceScore)
+                putExtra("account", account)
             }
             startService(serviceIntent)
         } else {
