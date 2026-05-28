@@ -93,6 +93,65 @@ export const geocoder = {
       }
     }
 
+    // 4. !3d!4d pattern in Google Maps URLs (exact POI location)
+    const bangMatch = trimmed.match(/!3d(-?\d+(?:\.\d+)?).*?!4d(-?\d+(?:\.\d+)?)/);
+    if (bangMatch) {
+      const lat = parseFloat(bangMatch[1]);
+      const lng = parseFloat(bangMatch[2]);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        return { lat, lng };
+      }
+    }
+
+    // 5. /maps/search/lat,lng in URL (e.g. /maps/search/12.9716,77.5946 or /maps/search/12.9716+77.5946)
+    const searchCoordsMatch = trimmed.match(/\/maps\/search\/(-?\d+(?:\.\d+)?)[,+](-?\d+(?:\.\d+)?)/);
+    if (searchCoordsMatch) {
+      const lat = parseFloat(searchCoordsMatch[1]);
+      const lng = parseFloat(searchCoordsMatch[2]);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        return { lat, lng };
+      }
+    }
+
+    return null;
+  },
+
+  /**
+   * Extract restaurant name / search keywords from a Google Maps URL path or query
+   */
+  extractQueryFromUrl(input: string): string | null {
+    const trimmed = input.trim();
+    if (!trimmed.startsWith('http')) return null;
+
+    // Try to extract place name from /place/Restaurant+Name/
+    const placeMatch = trimmed.match(/\/maps\/place\/([^/]+)/);
+    if (placeMatch) {
+      try {
+        return decodeURIComponent(placeMatch[1].replace(/\+/g, ' '));
+      } catch (e) {
+        return placeMatch[1].replace(/\+/g, ' ');
+      }
+    }
+    
+    // Try to extract search term from /search/Restaurant+Name/
+    const searchMatch = trimmed.match(/\/maps\/search\/([^/]+)/);
+    if (searchMatch && !searchMatch[1].match(/^-?\d/)) {
+      try {
+        return decodeURIComponent(searchMatch[1].replace(/\+/g, ' '));
+      } catch (e) {
+        return searchMatch[1].replace(/\+/g, ' ');
+      }
+    }
+
+    const qMatch = trimmed.match(/[?&]q=([^&"'>\s]+)/);
+    if (qMatch) {
+      try {
+        return decodeURIComponent(qMatch[1].replace(/\+/g, ' '));
+      } catch (e) {
+        return qMatch[1].replace(/\+/g, ' ');
+      }
+    }
+
     return null;
   },
 
@@ -100,32 +159,57 @@ export const geocoder = {
    * Expand shortened URLs via a CORS-free proxy to inspect redirects.
    */
   async expandShortUrl(url: string): Promise<string | null> {
-    try {
-      const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`;
-      const response = await fetch(proxyUrl);
-      if (response.ok) {
-        const html = await response.text();
-        
-        // 1. Search for full google search URL patterns in redirect payload or captcha title
-        const urlMatches = html.match(/(https?:\/\/www\.google\.[a-z.]+\/search?[^\s"'`>]+)/i);
-        if (urlMatches && urlMatches[0]) {
-          return decodeURIComponent(urlMatches[0].replace(/&amp;/g, '&'));
-        }
-        
-        // 2. Search for search paths in redirects
-        const searchMatches = html.match(/\/search\?[^\s"'`>]+/i);
-        if (searchMatches && searchMatches[0]) {
-          return decodeURIComponent(`https://www.google.com${searchMatches[0]}`.replace(/&amp;/g, '&'));
-        }
-
-        // 3. Search for maps urls in redirect content
-        const mapMatches = html.match(/(https?:\/\/www\.google\.[a-z.]+\/maps\/[^\s"'`>]+)/i);
-        if (mapMatches && mapMatches[0]) {
-          return decodeURIComponent(mapMatches[0].replace(/&amp;/g, '&'));
+    const proxies = [
+      {
+        url: (target: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(target)}`,
+        parse: (text: string) => text
+      },
+      {
+        url: (target: string) => `https://corsproxy.io/?${encodeURIComponent(target)}`,
+        parse: (text: string) => text
+      },
+      {
+        url: (target: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(target)}`,
+        parse: (text: string) => {
+          try {
+            const json = JSON.parse(text);
+            return json.contents || '';
+          } catch {
+            return '';
+          }
         }
       }
-    } catch (e) {
-      console.warn('Failed to expand short URL', e);
+    ];
+
+    for (const proxy of proxies) {
+      try {
+        const response = await fetch(proxy.url(url));
+        if (response.ok) {
+          const rawText = await response.text();
+          const html = proxy.parse(rawText);
+          if (!html) continue;
+
+          // 1. Search for maps urls in redirect content
+          const mapMatches = html.match(/(https?:\/\/www\.google\.[a-z.]+\/maps\/[^\s"'`>]+)/i);
+          if (mapMatches && mapMatches[0]) {
+            return decodeURIComponent(mapMatches[0].replace(/&amp;/g, '&'));
+          }
+
+          // 2. Search for full google search URL patterns in redirect payload or captcha title
+          const urlMatches = html.match(/(https?:\/\/www\.google\.[a-z.]+\/search?[^\s"'`>]+)/i);
+          if (urlMatches && urlMatches[0]) {
+            return decodeURIComponent(urlMatches[0].replace(/&amp;/g, '&'));
+          }
+          
+          // 3. Search for search paths in redirects
+          const searchMatches = html.match(/\/search\?[^\s"'`>]+/i);
+          if (searchMatches && searchMatches[0]) {
+            return decodeURIComponent(`https://www.google.com${searchMatches[0]}`.replace(/&amp;/g, '&'));
+          }
+        }
+      } catch (e) {
+        console.warn(`Proxy failed: ${proxy.url(url)}`, e);
+      }
     }
     return null;
   },
@@ -189,9 +273,12 @@ export const geocoder = {
       };
     }
 
-    // 3. Extract text search query if the cleanAddress is a redirect search URL (e.g. q=k.k+corner)
+    // 3. Extract text search query if the cleanAddress is a redirect search URL or google maps URL
     let searchQuery = cleanAddress;
-    if (cleanAddress.includes('google.com/search') || cleanAddress.includes('q=')) {
+    const extractedQuery = this.extractQueryFromUrl(cleanAddress);
+    if (extractedQuery) {
+      searchQuery = extractedQuery;
+    } else if (cleanAddress.includes('google.com/search') || cleanAddress.includes('q=')) {
       const qMatch = cleanAddress.match(/[?&]q=([^&"'>\s]+)/);
       if (qMatch) {
         searchQuery = decodeURIComponent(qMatch[1].replace(/\+/g, ' '));

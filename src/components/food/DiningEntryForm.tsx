@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { haptics } from '@/lib/haptics';
 import { toast } from 'sonner';
 import { geocoder } from '@/lib/geocoder';
+import { LocationPicker } from './LocationPicker';
 
 const experienceSchema = z.object({
   restaurantName: z.string().min(1, 'Restaurant name is required'),
@@ -166,29 +167,6 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
     toast.info(`Pre-filled details for ${s.restaurantName}`);
   };
 
-  const handleAddressBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
-    const val = e.target.value.trim();
-    if (!val) return;
-
-    const parsed = geocoder.parseCoordinates(val);
-    if (parsed) {
-      toast.promise(
-        async () => {
-          const resolved = await geocoder.reverseGeocode(parsed.lat, parsed.lng);
-          const cleanAddr = resolved || `Pin: ${parsed.lat.toFixed(5)}, ${parsed.lng.toFixed(5)}`;
-          setValue('address', cleanAddr, { shouldValidate: true });
-          setResolvedCoords({ lat: parsed.lat, lng: parsed.lng });
-          return cleanAddr;
-        },
-        {
-          loading: 'Decoding location coordinates...',
-          success: (addr) => `Location pinned: ${addr.split(',')[0]}`,
-          error: 'Failed to reverse-geocode location.',
-        }
-      );
-    }
-  };
-
   const onFormSubmit = async (data: FormData) => {
     if (isProcessing) return;
     setIsProcessing(true);
@@ -198,14 +176,13 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
       let lng = resolvedCoords.lng;
       let finalAddress = data.address || '';
 
-      const hasAddressChanged = !isEdit || initialData?.location?.address !== data.address;
-
-      if (data.address && (hasAddressChanged || lat === undefined || lng === undefined)) {
+      // Fallback geocoding if lat/lng are still unresolved
+      if (finalAddress && (lat === undefined || lng === undefined)) {
         try {
-          const coords = await geocoder.geocode(data.address);
+          const coords = await geocoder.geocode(finalAddress);
           lat = coords.lat;
           lng = coords.lng;
-          if (coords.address) {
+          if (coords.address && !finalAddress) {
             finalAddress = coords.address;
           }
         } catch (e) {
@@ -247,7 +224,7 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
     }
   };
 
-  const addressRegister = register('address');
+  // Address is managed via controlled LocationPicker component
 
   return (
     <form className="flex flex-col pb-20 sm:pb-0">
@@ -394,18 +371,13 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
 
           <div className="space-y-1.5">
             <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Location / Address</Label>
-            <div className="relative">
-              <Input
-                {...addressRegister}
-                onBlur={(e) => {
-                  addressRegister.onBlur(e);
-                  handleAddressBlur(e);
-                }}
-                placeholder="City or Full Address"
-                className="h-11 bg-background/50 border-white/10 text-sm font-medium rounded-2xl pl-10"
-              />
-              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
-            </div>
+            <LocationPicker
+              address={watch('address') || ''}
+              onChangeAddress={(addr) => setValue('address', addr, { shouldValidate: true })}
+              lat={resolvedCoords.lat}
+              lng={resolvedCoords.lng}
+              onChangeCoords={(coords) => setResolvedCoords(coords)}
+            />
           </div>
         </div>
       </div>
