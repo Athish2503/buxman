@@ -16,7 +16,22 @@ export interface FullExportData {
   dining: any[];
   contacts: any[];
   trips: any[];
+  reports?: any[];
+  recurring?: any[];
+  templates?: any[];
+  meta?: any;
+  theme?: string;
 }
+
+const safeParse = (key: string, fallback: any) => {
+  try {
+    const val = localStorage.getItem(key);
+    return val ? JSON.parse(val) : fallback;
+  } catch (e) {
+    console.error(`[Data Migration] Failed to parse key ${key}:`, e);
+    return fallback;
+  }
+};
 
 export const dataMigrationService = {
   /**
@@ -26,16 +41,21 @@ export const dataMigrationService = {
     const data: FullExportData = {
       version: DATA_VERSION,
       timestamp: new Date().toISOString(),
-      expenses: JSON.parse(localStorage.getItem('reimburse_expenses_v2') || '[]'),
-      settings: JSON.parse(localStorage.getItem('reimburse_settings_v2') || '{}'),
-      categories: JSON.parse(localStorage.getItem('reimburse_categories_v1') || '[]'),
-      vehicles: JSON.parse(localStorage.getItem('reimburse_vehicles_v1') || '[]'),
-      mileage: JSON.parse(localStorage.getItem('reimburse_mileage_v1') || '[]'),
-      fuel: JSON.parse(localStorage.getItem('reimburse_fuel_v1') || '[]'),
-      wallet: JSON.parse(localStorage.getItem('reimburse_wallet_v1') || '[]'),
-      dining: JSON.parse(localStorage.getItem('reimburse_food_v1') || '[]'),
-      contacts: JSON.parse(localStorage.getItem('reimburse_contacts') || '[]'),
-      trips: JSON.parse(localStorage.getItem('reimburse_trips') || '[]'),
+      expenses: safeParse('reimburse_expenses_v2', []),
+      settings: safeParse('reimburse_settings_v2', {}),
+      categories: safeParse('reimburse_categories_v1', []),
+      vehicles: safeParse('reimburse_vehicles_v1', []),
+      mileage: safeParse('reimburse_mileage_v1', []),
+      fuel: safeParse('reimburse_fuel_v1', []),
+      wallet: safeParse('reimburse_wallet_v1', []),
+      dining: safeParse('reimburse_food_v1', []),
+      contacts: safeParse('reimburse_contacts', []),
+      trips: safeParse('reimburse_trips', []),
+      reports: safeParse('reimburse_reports_v1', []),
+      recurring: safeParse('reimburse_recurring_v1', []),
+      templates: safeParse('reimburse_templates_v1', []),
+      meta: safeParse('reimburse_meta_v1', null),
+      theme: localStorage.getItem('reimburse_theme') || 'dark',
     };
     return data;
   },
@@ -80,6 +100,11 @@ export const dataMigrationService = {
     addEntities('DINING', data.dining);
     addEntities('CONTACTS', data.contacts);
     addEntities('TRIPS', data.trips);
+    addEntities('REPORTS', data.reports || []);
+    addEntities('RECURRING', data.recurring || []);
+    addEntities('TEMPLATES', data.templates || []);
+    if (data.meta) addEntities('META', [data.meta]);
+    if (data.theme) addEntities('THEME', [{ value: data.theme }]);
 
     return lines.join('\n');
   },
@@ -101,7 +126,12 @@ export const dataMigrationService = {
       wallet: [],
       dining: [],
       contacts: [],
-      trips: []
+      trips: [],
+      reports: [],
+      recurring: [],
+      templates: [],
+      meta: null,
+      theme: 'dark'
     };
 
     let currentHeaders: string[] = [];
@@ -183,6 +213,11 @@ export const dataMigrationService = {
         else if (currentType === 'DINING') data.dining.push(rowData);
         else if (currentType === 'CONTACTS') data.contacts.push(rowData);
         else if (currentType === 'TRIPS') data.trips.push(rowData);
+        else if (currentType === 'REPORTS') data.reports?.push(rowData);
+        else if (currentType === 'RECURRING') data.recurring?.push(rowData);
+        else if (currentType === 'TEMPLATES') data.templates?.push(rowData);
+        else if (currentType === 'META') data.meta = rowData;
+        else if (currentType === 'THEME') data.theme = rowData.value;
       }
     });
 
@@ -212,7 +247,8 @@ export const dataMigrationService = {
       const syncKey = async (key: string, value: any) => {
         if (value !== undefined && value !== null) {
           console.log(`[Data Migration] Syncing ${key}...`);
-          await storageEngine.set(key, JSON.stringify(value));
+          const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+          await storageEngine.set(key, stringValue);
         }
       };
 
@@ -226,6 +262,11 @@ export const dataMigrationService = {
       await syncKey('reimburse_food_v1', data.dining);
       await syncKey('reimburse_contacts', data.contacts);
       await syncKey('reimburse_trips', data.trips);
+      await syncKey('reimburse_reports_v1', data.reports);
+      await syncKey('reimburse_recurring_v1', data.recurring);
+      await syncKey('reimburse_templates_v1', data.templates);
+      await syncKey('reimburse_meta_v1', data.meta);
+      await syncKey('reimburse_theme', data.theme);
 
       console.log('[Data Migration] Import successful');
       return true;

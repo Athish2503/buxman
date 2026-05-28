@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { permissions, PermissionStatus } from '@/lib/permissions';
 import { haptics } from '@/lib/haptics';
+import { metaService } from '@/lib/recurring';
 
 interface PermissionGuardProps {
   children: React.ReactNode;
@@ -14,6 +15,12 @@ export function PermissionGuard({ children }: PermissionGuardProps) {
   const [loading, setLoading] = useState(true);
 
   const check = async () => {
+    // If onboarding is completed, bypass hard-blocking guards
+    if (metaService.get().onboardingDone) {
+      setStatus({ allGranted: true } as any);
+      setLoading(false);
+      return;
+    }
     const s = await permissions.checkStatus();
     setStatus(s);
     setLoading(false);

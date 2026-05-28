@@ -15,14 +15,16 @@ import { useTransactionListener } from "./hooks/useTransactionListener";
 import { FinancialPermissionGuidance } from "./components/financial-permission-guidance";
 import { permissions } from "./lib/permissions";
 import { ThemeEngine } from "./components/ThemeEngine";
-
 import { walletService } from "./lib/modules-storage";
+import { Onboarding } from "./components/onboarding";
+import { metaService } from "./lib/recurring";
 
 const queryClient = new QueryClient();
 
 const App = () => {
   const [isReady, setIsReady]   = useState(false);
   const [showSplash, setShowSplash] = useState(true); // always show splash on mount
+  const [onboardingDone, setOnboardingDone] = useState(true);
   const [permissionsNeeded, setPermissionsNeeded] = useState(false);
 
   useTransactionListener();
@@ -33,8 +35,11 @@ const App = () => {
       // Sync wallet reminders
       walletService.syncReminders();
 
+      const onboarded = metaService.get().onboardingDone;
+      setOnboardingDone(onboarded);
       setIsReady(true);
-      if (Capacitor.isNativePlatform()) {
+      
+      if (onboarded && Capacitor.isNativePlatform()) {
         const status = await permissions.checkStatus();
         if (!status.financialNotifications || !status.overlay) {
           setPermissionsNeeded(true);
@@ -73,6 +78,11 @@ const App = () => {
         </div>
       </div>
     );
+  }
+
+  // Show revamped onboarding if not complete
+  if (!onboardingDone) {
+    return <Onboarding onComplete={() => setOnboardingDone(true)} />;
   }
 
   if (permissionsNeeded) {

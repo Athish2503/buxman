@@ -20,8 +20,6 @@ import { permissions } from '@/lib/permissions';
 
 import { ExpenseForm } from '@/components/expense-form';
 import { SettingsPage } from '@/components/settings-page';
-import { Onboarding } from '@/components/onboarding';
-import { metaService } from '@/lib/recurring';
 import { BiometricLock } from '@/components/biometric-lock';
 import { SMSExpenseNudge } from '@/components/sms-expense-nudge';
 import { PermissionGuard } from '@/components/permission-guard';
@@ -64,7 +62,6 @@ const Index = () => {
   const [vehicles, setVehicles]     = useState(() => mileageService.getVehicles());
   const [isFabOpen, setIsFabOpen]   = useState(false);
   const [activeTab, setActiveTab]   = useState<Tab>('dashboard');
-  const [onboarded, setOnboarded]   = useState(true);
   const { theme, toggle: toggleTheme } = useTheme();
   const [navOrder, setNavOrder] = useState<Tab[]>(() => {
     const settings = settingsService.get();
@@ -73,9 +70,7 @@ const Index = () => {
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
 
   useEffect(() => {
-    setOnboarded(metaService.get().onboardingDone);
     audio.unlock();
-    permissions.requestAll();
     
     const handleSettingsUpdate = () => {
       const settings = settingsService.get();
@@ -235,7 +230,6 @@ const Index = () => {
         <SMSExpenseNudge onAdd={handleAddExpense} />
 
         <div className="min-h-dvh bg-background bg-aurora">
-          {!onboarded && <Onboarding onComplete={() => setOnboarded(true)} />}
 
           {/* ── Desktop Sidebar ── */}
           <aside className="hidden sm:flex fixed left-0 top-0 bottom-0 w-60 flex-col glass border-r border-border/30 z-30">
