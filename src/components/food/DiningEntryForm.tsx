@@ -61,6 +61,19 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
     lat: initialData?.location?.lat,
     lng: initialData?.location?.lng,
   }));
+
+  // Auto-scroll to expanded dish editor
+  useEffect(() => {
+    if (expandedDishId) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById(`dish-editor-${expandedDishId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [expandedDishId]);
   
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting }, reset } = useForm<FormData>({
     resolver: zodResolver(experienceSchema),
@@ -466,6 +479,7 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
             {dishes.map((dish, index) => (
               <motion.div
                 key={dish.id}
+                id={`dish-editor-${dish.id}`}
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: -20 }}
@@ -487,6 +501,20 @@ function FormBody({ onSubmit, initialData, isEdit = false, onClose, onDone }: Di
               </motion.div>
             ))}
           </AnimatePresence>
+
+          {dishes.length > 0 && (
+            <div className="flex justify-center pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addDish}
+                className="w-full rounded-2xl border-dashed border-primary/30 text-primary hover:bg-primary/5 hover:border-primary/50 gap-2 font-bold h-11 transition-all"
+              >
+                <Plus className="h-4 w-4" />
+                Add Another Item
+              </Button>
+            </div>
+          )}
 
           {dishes.length === 0 && (
             <div 
