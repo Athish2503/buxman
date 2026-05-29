@@ -45,15 +45,22 @@ class TestBroadcastReceiver : BroadcastReceiver() {
                 val amount = intent.getStringExtra("amount")?.toDoubleOrNull() ?: 1250.0
                 val merchant = intent.getStringExtra("merchant") ?: "STARBUCKS"
                 val appName = intent.getStringExtra("appName") ?: "GPay"
+                val type = intent.getStringExtra("type") ?: "debit"
                 
-                Log.d(TAG, "Simulating Overlay for $merchant")
-                val overlayIntent = Intent(context, TransactionOverlayService::class.java).apply {
+                Log.d(TAG, "Simulating Overlay for $merchant via OverlayActivity")
+                val overlayIntent = Intent(context, OverlayActivity::class.java).apply {
                     putExtra("amount", amount)
                     putExtra("merchant", merchant)
                     putExtra("appName", appName)
+                    putExtra("type", type)
                     putExtra("rawText", "Simulated via ADB")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 }
-                context.startService(overlayIntent)
+                try {
+                    context.startActivity(overlayIntent)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed launching OverlayActivity from TestBroadcastReceiver", e)
+                }
             }
         }
     }

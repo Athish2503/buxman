@@ -46,20 +46,24 @@ class TransactionOverlayService : Service() {
         val type = intent?.getStringExtra("type") ?: "debit"
         val account = intent?.getStringExtra("account") ?: "Account ending ****"
 
-        Log.d(TAG, "[OverlayService] Request: $merchant | Amt: $amount | Type: $type")
+        Log.d(TAG, "[OverlayService] Redirecting to OverlayActivity: $merchant")
 
-        if (!Settings.canDrawOverlays(this)) {
-            Log.e(TAG, "Cannot show overlay: SYSTEM_ALERT_WINDOW permission missing.")
-            stopSelf()
-            return START_NOT_STICKY
+        try {
+            val activityIntent = Intent(this, OverlayActivity::class.java).apply {
+                putExtra("amount", amount)
+                putExtra("merchant", merchant)
+                putExtra("appName", appName)
+                putExtra("rawText", rawText)
+                putExtra("type", type)
+                putExtra("account", account)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            startActivity(activityIntent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed redirecting to OverlayActivity from service", e)
         }
 
-        if (binding == null) {
-            showOverlay(amount, merchant, appName, rawText, type, account)
-        } else {
-            updateOverlay(amount, merchant, appName, type, account)
-        }
-
+        stopSelf()
         return START_NOT_STICKY
     }
 

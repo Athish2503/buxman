@@ -99,7 +99,9 @@
 
         <activity
             android:name=".transactions.OverlayActivity"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:theme="@style/TranslucentDialogTheme"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize"
             android:exported="false" />
 
         <!-- AppWidget: Budget and Summary Widget -->

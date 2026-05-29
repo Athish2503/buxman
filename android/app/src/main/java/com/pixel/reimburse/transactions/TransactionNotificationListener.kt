@@ -44,13 +44,25 @@ class TransactionNotificationListener : NotificationListenerService() {
         val combinedPayload = "$title $text $bigText $subText".trim()
         if (combinedPayload.isBlank()) return
 
-        // Hard restrict allowed package names as per security requirements
-        val isTarget = packageName == "com.google.android.apps.messaging" ||
-                packageName == "com.android.messaging" ||
-                packageName == "com.google.android.apps.sms"
+        // Dynamically allow default SMS app, messaging services, and banking/UPI apps
+        val lowerPkg = packageName.lowercase()
+        val defaultSmsApp = android.provider.Settings.Secure.getString(contentResolver, "sms_default_application")
+        val isSmsApp = packageName == defaultSmsApp ||
+                lowerPkg.contains("messaging") ||
+                lowerPkg.contains("sms") ||
+                lowerPkg == "com.google.android.apps.messaging" ||
+                lowerPkg == "com.android.messaging"
 
-        if (!isTarget) {
-            Log.d(TAG, "[$eventType] Ignored package: $packageName (not an allowed SMS app)")
+        val isFinanceApp = lowerPkg.contains("paisa") || // GPay
+                lowerPkg.contains("phonepe") ||
+                lowerPkg.contains("paytm") ||
+                lowerPkg.contains("upi") ||
+                lowerPkg.contains("bank") ||
+                lowerPkg.contains("card") ||
+                lowerPkg.contains("wallet")
+
+        if (!isSmsApp && !isFinanceApp) {
+            Log.d(TAG, "[$eventType] Ignored package: $packageName (not a target SMS or finance app)")
             return
         }
 

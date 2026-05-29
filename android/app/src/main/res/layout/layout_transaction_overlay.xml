@@ -1,31 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/overlay_root"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:padding="16dp">
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:padding="20dp">
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/card_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardBackgroundColor="#0D0E12"
-        app:cardCornerRadius="30dp"
+        android:layout_centerInParent="true"
+        android:maxWidth="400dp"
+        app:cardBackgroundColor="#0D0E14"
+        app:cardCornerRadius="28dp"
         app:cardElevation="24dp"
-        app:strokeColor="#20FFFFFF"
+        app:strokeColor="#25FFFFFF"
         app:strokeWidth="1dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="20dp">
+            android:padding="24dp">
 
-            <!-- Top Header -->
+            <!-- Header Title Row -->
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp">
+                android:layout_marginBottom="20dp">
 
                 <LinearLayout
                     android:layout_width="wrap_content"
@@ -33,11 +37,13 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
+                    <!-- Small Pulsing Indicator Dot -->
                     <ImageView
-                        android:layout_width="14dp"
-                        android:layout_height="14dp"
+                        android:id="@+id/iv_header_dot"
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
                         android:src="@android:drawable/presence_online"
-                        app:tint="#A855F7" />
+                        app:tint="#7C3AED" />
 
                     <TextView
                         android:id="@+id/tv_source_app"
@@ -45,12 +51,13 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
                         android:fontFamily="sans-serif-black"
-                        android:letterSpacing="0.15"
-                        android:text="TRANSACTION CAPTURED"
-                        android:textColor="#A855F7"
+                        android:letterSpacing="0.2"
+                        android:text="FINANCE AUTOPILOT"
+                        android:textColor="#7C3AED"
                         android:textSize="10sp" />
                 </LinearLayout>
 
+                <!-- Close Button -->
                 <ImageButton
                     android:id="@+id/btn_close_overlay"
                     android:layout_width="28dp"
@@ -58,28 +65,29 @@
                     android:layout_alignParentEnd="true"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:src="@android:drawable/ic_menu_close_clear_cancel"
-                    app:tint="#66FFFFFF" />
+                    app:tint="#50FFFFFF" />
             </RelativeLayout>
 
-            <!-- Amount & Merchant Modern Group -->
+            <!-- Amount Block (Neo-banking focus) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:gravity="center"
                 android:background="@drawable/bg_overlay_input"
-                android:paddingVertical="18dp"
+                android:paddingVertical="20dp"
                 android:paddingHorizontal="16dp"
-                android:layout_marginBottom="16dp">
+                android:layout_marginBottom="20dp">
 
                 <TextView
+                    android:id="@+id/tv_amount_label"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:fontFamily="sans-serif-medium"
-                    android:text="AMOUNT DETECTED"
-                    android:textColor="#55FFFFFF"
+                    android:fontFamily="sans-serif-black"
+                    android:text="TRANSACTION VALUE"
+                    android:textColor="#66FFFFFF"
                     android:textSize="9sp"
-                    android:letterSpacing="0.1"
+                    android:letterSpacing="0.15"
                     android:layout_marginBottom="4dp"/>
 
                 <TextView
@@ -89,7 +97,7 @@
                     android:fontFamily="sans-serif-black"
                     android:text="₹0.00"
                     android:textColor="#FFFFFF"
-                    android:textSize="36sp"
+                    android:textSize="38sp"
                     android:lineSpacingMultiplier="0.9" />
 
                 <TextView
@@ -97,10 +105,10 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:fontFamily="sans-serif-medium"
+                    android:fontFamily="sans-serif-bold"
                     android:text="MERCHANT"
-                    android:textColor="#CCFFFFFF"
-                    android:textSize="14sp"
+                    android:textColor="#E2E8F0"
+                    android:textSize="15sp"
                     android:gravity="center" />
             </LinearLayout>
 
@@ -108,18 +116,18 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="6dp"
-                android:fontFamily="sans-serif-bold"
-                android:letterSpacing="0.1"
+                android:layout_marginBottom="8dp"
+                android:fontFamily="sans-serif-black"
+                android:letterSpacing="0.15"
                 android:text="ASSIGN CATEGORY"
-                android:textColor="#55FFFFFF"
-                android:textSize="10sp"
+                android:textColor="#66FFFFFF"
+                android:textSize="9sp"
                 android:layout_marginStart="2dp" />
 
             <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
+                android:layout_marginBottom="20dp"
                 android:scrollbars="none"
                 android:overScrollMode="never">
 
@@ -131,58 +139,58 @@
                     app:chipSpacingHorizontal="6dp"/>
             </HorizontalScrollView>
 
-            <!-- Notes Input -->
+            <!-- Notes Memo Box -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="6dp"
-                android:fontFamily="sans-serif-bold"
-                android:letterSpacing="0.1"
-                android:text="OPTIONAL MEMO"
-                android:textColor="#55FFFFFF"
-                android:textSize="10sp"
+                android:layout_marginBottom="8dp"
+                android:fontFamily="sans-serif-black"
+                android:letterSpacing="0.15"
+                android:text="MEMO &amp; NOTES"
+                android:textColor="#66FFFFFF"
+                android:textSize="9sp"
                 android:layout_marginStart="2dp" />
 
             <EditText
                 android:id="@+id/et_overlay_notes"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
+                android:layout_marginBottom="20dp"
                 android:background="@drawable/bg_overlay_input"
                 android:fontFamily="sans-serif-medium"
                 android:hint="What was this expense for?"
                 android:padding="14dp"
                 android:textColor="#FFFFFF"
-                android:textColorHint="#33FFFFFF"
+                android:textColorHint="#44FFFFFF"
                 android:textSize="13sp"
                 android:inputType="textCapSentences" />
 
-            <!-- Reimbursable Switch -->
+            <!-- Reimbursable Toggle Switch -->
             <com.google.android.material.switchmaterial.SwitchMaterial
                 android:id="@+id/switch_reimbursable"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="20dp"
-                android:text="Reimbursable Expense"
-                android:textColor="#CCFFFFFF"
+                android:layout_marginBottom="24dp"
+                android:text="Mark as reimbursable expense"
+                android:textColor="#CCCCCC"
                 android:textSize="13sp"
                 android:fontFamily="sans-serif-medium"
-                app:thumbTint="#A855F7"
-                app:trackTint="#33A855F7"
+                app:thumbTint="#7C3AED"
+                app:trackTint="#407C3AED"
                 android:layout_marginStart="2dp" />
 
-            <!-- Action Buttons -->
+            <!-- Actions buttons layout -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_overlay_save"
                 android:layout_width="match_parent"
                 android:layout_height="54dp"
-                android:backgroundTint="#A855F7"
+                android:backgroundTint="#7C3AED"
                 android:fontFamily="sans-serif-black"
-                android:text="Approve Log"
+                android:text="APPROVE LOG"
                 android:textColor="#FFFFFF"
                 android:textAllCaps="true"
                 android:textSize="13sp"
-                android:letterSpacing="0.1"
+                android:letterSpacing="0.15"
                 app:cornerRadius="16dp"
                 app:rippleColor="#33FFFFFF" />
 
@@ -191,7 +199,7 @@
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="6dp"
                 android:fontFamily="sans-serif-bold"
                 android:text="Ignore Transaction"
                 android:textColor="#55FFFFFF"
@@ -200,18 +208,18 @@
 
         </LinearLayout>
 
-        <!-- Success Animation Overlay Layer -->
+        <!-- Success Animation Layer (Centred, expanding) -->
         <FrameLayout
             android:id="@+id/layout_success_animation"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#F20D0E12"
+            android:background="#F90D0E14"
             android:clickable="true"
             android:focusable="true"
             android:alpha="0"
             android:visibility="gone">
 
-            <!-- Outward expanding aura burst ring -->
+            <!-- Expand aura ring -->
             <View
                 android:id="@+id/view_burst_ring"
                 android:layout_width="160dp"
@@ -222,15 +230,15 @@
                 android:scaleY="0.2"
                 android:alpha="0" />
 
-            <!-- Center popping green tick -->
+            <!-- Center Green Success Circle & Tick -->
             <ImageView
                 android:id="@+id/iv_success_tick"
-                android:layout_width="84dp"
-                android:layout_height="84dp"
+                android:layout_width="88dp"
+                android:layout_height="88dp"
                 android:layout_gravity="center"
                 android:src="@drawable/ic_success_tick"
                 android:scaleX="0"
                 android:scaleY="0" />
         </FrameLayout>
     </com.google.android.material.card.MaterialCardView>
-</FrameLayout>
+</RelativeLayout>

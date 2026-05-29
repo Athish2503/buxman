@@ -1,19 +1,40 @@
 package com.pixel.reimburse.transactions
 
-import android.app.Activity
-import android.content.Intent
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.content.Context
+import android.content.res.ColorStateList
 import android.os.Bundle
-import android.provider.Settings
 import android.util.Log
+import android.view.MotionEvent
+import android.view.View
+import android.view.animation.AccelerateInterpolator
+import android.view.animation.DecelerateInterpolator
+import android.view.animation.OvershootInterpolator
+import android.animation.ValueAnimator
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.view.ContextThemeWrapper
+import com.google.android.material.chip.Chip
+import com.pixel.reimburse.R
+import com.pixel.reimburse.FinancialNotificationPlugin
+import com.pixel.reimburse.databinding.LayoutTransactionOverlayBinding
 
-class OverlayActivity : Activity() {
+class OverlayActivity : AppCompatActivity() {
+
+    private lateinit var binding: LayoutTransactionOverlayBinding
+    private var selectedCategory: String? = null
+    private var isSavingOrDismissing = false
+
+    // Default categories if loading from storage fails
+    private var categories: List<String> = listOf("Meals", "Travel", "Shopping", "Health", "Other")
+
     companion object {
         private const val TAG = "TRANSACTION_DEBUG"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d(TAG, "OverlayActivity created to dispatch transaction overlay dialog seamlessly.")
+        Log.d(TAG, "OverlayActivity created and initializing UI components directly.")
 
         val amount = intent.getDoubleExtra("amount", 0.0)
         val merchant = intent.getStringExtra("merchant") ?: "Unknown Merchant"
@@ -23,21 +44,306 @@ class OverlayActivity : Activity() {
         val confidenceScore = intent.getIntExtra("confidenceScore", 0)
         val account = intent.getStringExtra("account") ?: ""
 
-        if (Settings.canDrawOverlays(this)) {
-            val serviceIntent = Intent(this, TransactionOverlayService::class.java).apply {
-                putExtra("amount", amount)
-                putExtra("merchant", merchant)
-                putExtra("appName", appName)
-                putExtra("rawText", rawText)
-                putExtra("type", type)
-                putExtra("confidenceScore", confidenceScore)
-                putExtra("account", account)
-            }
-            startService(serviceIntent)
-        } else {
-            Log.w(TAG, "Overlay permission not granted. Cannot start TransactionOverlayService.")
+        // Inflate using view binding
+        try {
+            binding = LayoutTransactionOverlayBinding.inflate(layoutInflater)
+            setContentView(binding.root)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to inflate overlay layout inside activity", e)
+            finish()
+            return
         }
 
-        finish()
+        setupUI(amount, merchant, appName, type, account)
+        setupAnimations()
+    }
+
+    private fun setupUI(amount: Double, merchant: String, appName: String, type: String, account: String) {
+        val isCredit = type == "credit"
+        val accentColor = if (isCredit) 0xFF10B981.toInt() else 0xFFEF4444.toInt() // Emerald Green vs Rose Red
+        val displayMerchant = if (merchant.isBlank() || merchant == "UNKNOWN MERCHANT") "Unknown Merchant" else merchant
+        val displayAccount = if (account.isBlank()) "Account ending ****" else account
+
+        // Value Hierarchy
+        binding.tvOverlayAmount.text = "₹${"%,.2f".format(amount)}"
+        binding.tvOverlayAmount.setTextColor(accentColor)
+        binding.tvOverlayMerchant.text = "$displayMerchant • $displayAccount"
+
+        // Dot Pulsar & Badge Name
+        binding.tvSourceApp.text = if (isCredit) "CREDIT DETECTED" else "DEBIT DETECTED"
+        binding.tvSourceApp.setTextColor(accentColor)
+        binding.ivHeaderDot.setColorFilter(accentColor)
+
+        // Adjust Action buttons & text tint
+        binding.btnOverlaySave.backgroundTintList = ColorStateList.valueOf(accentColor)
+        binding.btnOverlaySave.text = if (isCredit) "Record Income" else "Record Expense"
+
+        // Hide reimbursable switch for credit alerts
+        binding.switchReimbursable.visibility = if (isCredit) View.GONE else View.VISIBLE
+        binding.switchReimbursable.isChecked = false
+
+        // Load and setup dynamic category chips
+        binding.chipGroupOverlayCategories.removeAllViews()
+        val currentCategories = if (isCredit) {
+            listOf("Salary", "Refund", "Cash Deposit", "Gift", "Other")
+        } else {
+            loadCategoriesFromStorage()
+        }
+
+        currentCategories.forEach { category ->
+            // Wrap in themed wrapper for Chip widget styling consistency
+            val themedCtx = ContextThemeWrapper(this, R.style.AppTheme)
+            val chip = Chip(themedCtx, null, com.google.android.material.R.attr.chipStyle)
+            chip.text = category
+            chip.isCheckable = true
+            chip.setTextColor(0xFFFFFFFF.toInt())
+            chip.chipBackgroundColor = ColorStateList.valueOf(0x1AFFFFFF)
+            chip.chipStrokeColor = ColorStateList.valueOf(0x33FFFFFF)
+            chip.chipStrokeWidth = 1f
+
+            chip.setOnCheckedChangeListener { _, isChecked ->
+                if (isChecked) {
+                    selectedCategory = category
+                    chip.chipBackgroundColor = ColorStateList.valueOf(accentColor)
+                    chip.chipStrokeWidth = 0f
+                } else {
+                    if (selectedCategory == category) selectedCategory = null
+                    chip.chipBackgroundColor = ColorStateList.valueOf(0x1AFFFFFF)
+                    chip.chipStrokeWidth = 1f
+                }
+            }
+            binding.chipGroupOverlayCategories.addView(chip)
+        }
+
+        // Close/Dismiss buttons
+        binding.btnCloseOverlay.setOnClickListener { dismissWithAnimation() }
+        binding.btnOverlayDismiss.setOnClickListener {
+            FinancialNotificationPlugin.onOverlayAction(this, "dismiss", amount, merchant)
+            dismissWithAnimation()
+        }
+
+        binding.btnOverlaySave.setOnClickListener {
+            if (isSavingOrDismissing) return@setOnClickListener
+            binding.btnOverlaySave.isEnabled = false
+            
+            val notes = binding.etOverlayNotes.text.toString()
+            val category = selectedCategory ?: if (isCredit) "Income" else "Other"
+            val isReimbursement = if (isCredit) false else binding.switchReimbursable.isChecked
+
+            Log.d(TAG, "Saving transaction details natively: $merchant | $amount | Category: $category")
+            val success = persistTransactionNatively(amount, merchant, category, notes, type, isReimbursement)
+
+            if (success) {
+                FinancialNotificationPlugin.onOverlayAction(this, "save", amount, merchant, category, notes, true, isReimbursement)
+                playSuccessAnimationAndDismiss()
+            } else {
+                binding.btnOverlaySave.isEnabled = true
+                binding.btnOverlaySave.text = "Retry Save"
+                binding.btnOverlaySave.backgroundTintList = ColorStateList.valueOf(0xFFF59E0B.toInt()) // Amber yellow fallback tint
+            }
+        }
+
+        // Setup touch-outside layout clicks to dismiss
+        binding.overlayRoot.setOnClickListener {
+            dismissWithAnimation()
+        }
+        binding.cardContainer.setOnClickListener {
+            // Consume event to block touches from dismissing activity
+        }
+
+        // Drag to dismiss swipe gesture setup
+        setupDragBehavior()
+    }
+
+    private fun setupAnimations() {
+        binding.cardContainer.apply {
+            alpha = 0f
+            scaleX = 0.85f
+            scaleY = 0.85f
+            translationY = 150f
+            animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .translationY(0f)
+                .setDuration(450)
+                .setInterpolator(OvershootInterpolator(1.1f))
+                .start()
+        }
+    }
+
+    private fun setupDragBehavior() {
+        binding.cardContainer.setOnTouchListener(object : View.OnTouchListener {
+            private var initialTouchY = 0f
+            private var initialY = 0f
+
+            override fun onTouch(v: View, event: MotionEvent): Boolean {
+                if (isSavingOrDismissing) return false
+
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        initialTouchY = event.rawY
+                        initialY = binding.cardContainer.translationY
+                        return true
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        val deltaY = event.rawY - initialTouchY
+                        // Only allow dragging upwards or slightly downwards
+                        if (deltaY < 0) {
+                            binding.cardContainer.translationY = initialY + deltaY
+                            binding.cardContainer.alpha = (1f + deltaY / 600f).coerceIn(0.3f, 1f)
+                        } else {
+                            binding.cardContainer.translationY = initialY + (deltaY * 0.5f) // drag resistance
+                        }
+                        return true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        val deltaY = event.rawY - initialTouchY
+                        if (deltaY < -200) {
+                            dismissWithAnimation()
+                        } else {
+                            // Snap back
+                            binding.cardContainer.animate()
+                                .translationY(0f)
+                                .alpha(1f)
+                                .setDuration(250)
+                                .setInterpolator(OvershootInterpolator())
+                                .start()
+                        }
+                        return true
+                    }
+                }
+                return false
+            }
+        })
+    }
+
+    private fun dismissWithAnimation() {
+        if (isSavingOrDismissing) return
+        isSavingOrDismissing = true
+
+        binding.cardContainer.animate()
+            .alpha(0f)
+            .scaleX(0.9f)
+            .scaleY(0.9f)
+            .translationY(-150f)
+            .setDuration(300)
+            .setInterpolator(AccelerateInterpolator())
+            .setListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    finish()
+                    overridePendingTransition(0, 0)
+                }
+            })
+            .start()
+    }
+
+    private fun playSuccessAnimationAndDismiss() {
+        isSavingOrDismissing = true
+        binding.etOverlayNotes.clearFocus()
+
+        // Reveal the success animation layer overlay inside the card
+        binding.layoutSuccessAnimation.apply {
+            visibility = View.VISIBLE
+            alpha = 0f
+            animate().alpha(1f).setDuration(200).start()
+        }
+
+        // Scale animate the checkmark tick
+        binding.ivSuccessTick.apply {
+            scaleX = 0f
+            scaleY = 0f
+            animate()
+                .scaleX(1.1f)
+                .scaleY(1.1f)
+                .setDuration(400)
+                .setInterpolator(OvershootInterpolator(2f))
+                .withEndAction {
+                    animate().scaleX(1f).scaleY(1f).setDuration(150).start()
+                }
+                .start()
+        }
+
+        // Expand burst outer ring aura
+        binding.viewBurstRing.apply {
+            scaleX = 0.1f
+            scaleY = 0.1f
+            alpha = 1f
+            animate()
+                .scaleX(3.5f)
+                .scaleY(3.5f)
+                .alpha(0f)
+                .setDuration(600)
+                .setInterpolator(DecelerateInterpolator())
+                .start()
+        }
+
+        // Delayed finish execution after animations finish
+        binding.root.postDelayed({
+            finish()
+            overridePendingTransition(0, 0)
+        }, 1100)
+    }
+
+    private fun loadCategoriesFromStorage(): List<String> {
+        try {
+            val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+            val categoryKey = "reimburse_categories_v1"
+            val jsonStr = prefs.getString(categoryKey, null)
+            if (jsonStr != null) {
+                val array = org.json.JSONArray(jsonStr)
+                val list = mutableListOf<String>()
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    if (obj.optBoolean("isVisible", true)) {
+                        list.add(obj.getString("label"))
+                    }
+                }
+                if (list.isNotEmpty()) return list
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load categories from CapacitorStorage", e)
+        }
+        return categories
+    }
+
+    private fun persistTransactionNatively(amount: Double, merchant: String, category: String, notes: String, type: String, isReimbursement: Boolean): Boolean {
+        try {
+            val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+            val storageKey = "reimburse_expenses_v2"
+            val existingJsonStr = prefs.getString(storageKey, "[]") ?: "[]"
+            val jsonArray = org.json.JSONArray(existingJsonStr)
+
+            val now = System.currentTimeMillis()
+            val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date(now))
+            val isoTimeStr = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
+                timeZone = java.util.TimeZone.getTimeZone("UTC")
+            }.format(java.util.Date(now))
+
+            val newExpense = org.json.JSONObject().apply {
+                put("id", "TXN_" + java.util.UUID.randomUUID().toString().substring(0, 8))
+                put("date", dateStr)
+                put("vendor", merchant)
+                put("category", category)
+                put("amount", amount)
+                put("currency", "INR")
+                put("description", notes.ifBlank { "Captured via Smart Overlay" })
+                put("status", "approved")
+                put("type", type)
+                put("isReimbursement", isReimbursement)
+                put("createdAt", isoTimeStr)
+                put("updatedAt", isoTimeStr)
+            }
+
+            val updatedArray = org.json.JSONArray().apply {
+                put(newExpense)
+                for (i in 0 until jsonArray.length()) put(jsonArray.getJSONObject(i))
+            }
+
+            return prefs.edit().putString(storageKey, updatedArray.toString()).commit()
+        } catch (e: Exception) {
+            Log.e(TAG, "Persistence failure", e)
+            return false
+        }
     }
 }
