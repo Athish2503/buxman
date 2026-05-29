@@ -63,8 +63,9 @@ object TransactionDetector {
     }
 
     private fun triggerOverlay(context: Context, info: ParsedTransactionInfo) {
-        if (Settings.canDrawOverlays(context)) {
-            Log.d(TAG, "Triggering OverlayActivity to display transaction popup for ${info.merchant}")
+        val isSimulated = info.extractionSource.startsWith("Simulated")
+        if (isSimulated || Settings.canDrawOverlays(context)) {
+            Log.d(TAG, "Triggering OverlayActivity to display transaction popup for ${info.merchant} (Simulated: $isSimulated)")
             val intent = Intent(context, OverlayActivity::class.java).apply {
                 putExtra("amount", info.amount)
                 putExtra("merchant", info.merchant)

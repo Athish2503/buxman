@@ -21,6 +21,7 @@ export interface ExpenseSplit {
   totalAmount: number;
   members: SplitMember[];
   splitType: SplitType;
+  userPaid?: boolean;
 }
 
 export interface Trip {

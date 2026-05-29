@@ -9,6 +9,8 @@ export interface FinancialNotificationPlugin {
   requestIgnoreBatteryOptimizations(): Promise<void>;
   isIgnoringBatteryOptimizations(): Promise<{ isIgnoring: boolean }>;
   updateWidgets(): Promise<void>;
+  scheduleReminder(options: { id: string; title: string; body: string; delaySeconds: number }): Promise<void>;
+  cancelReminder(options: { id: string }): Promise<void>;
   
   // Simulations
   simulateTransaction(options: { amount?: number; merchant?: string; appName?: string }): Promise<void>;

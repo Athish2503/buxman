@@ -95,6 +95,11 @@ export const tripService = {
         expense.split.members.forEach(member => {
           if (summaries[member.contactId]) {
             summaries[member.contactId].totalOwed += member.amount;
+            if (member.paid) {
+              // Member paid the lender back
+              summaries[member.contactId].totalPaid += member.amount;
+              summaries[payerId].totalPaid -= member.amount;
+            }
           }
         });
 
@@ -103,6 +108,11 @@ export const tripService = {
         const userShare = expense.amount - sumOthers;
         if (summaries['user']) {
           summaries['user'].totalOwed += userShare;
+          if (payerId !== 'user' && expense.split.userPaid) {
+            // User paid the lender back
+            summaries['user'].totalPaid += userShare;
+            summaries[payerId].totalPaid -= userShare;
+          }
         }
       } else {
         // If no split, payer paid for themselves? 

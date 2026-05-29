@@ -35,6 +35,7 @@ import { localIntelligence } from '@/lib/intelligence';
 import { contactService } from '@/lib/contact-service';
 import { ExpenseSplit } from '@/types/split';
 import { SplitBillSection } from './split/SplitBillSection';
+import { scheduleSplitReminders } from '@/lib/split-reminders';
 
 /* ─── schema ─────────────────────────────────────────────────────── */
 const expenseSchema = z.object({
@@ -283,6 +284,7 @@ function FormBody({
       };
       
       onSubmit(expense);
+      scheduleSplitReminders(expense);
       
       setSuccess(true);
       await new Promise(r => setTimeout(r, 850));

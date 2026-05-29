@@ -14,12 +14,14 @@ import { Badge } from '@/components/ui/badge';
 import { haptics } from '@/lib/haptics';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { contactService } from '@/lib/contact-service';
+import { scheduleSplitReminders } from '@/lib/split-reminders';
 
 interface ExpenseDetailViewProps {
   expense: Expense | null;
   onClose: () => void;
   onEdit: (expense: Expense) => void;
   onDelete: (id: string) => void;
+  onUpdateExpense?: (expense: Expense) => void;
 }
 
 const STATUS_CONFIG: Record<ExpenseStatus, { label: string; icon: string; color: string; bg: string }> = {
@@ -29,7 +31,7 @@ const STATUS_CONFIG: Record<ExpenseStatus, { label: string; icon: string; color:
   rejected: { label: 'Rejected', icon: '❌', color: 'text-rose-400', bg: 'bg-rose-500/10 border-rose-500/20' },
 };
 
-export function ExpenseDetailView({ expense, onClose, onEdit, onDelete }: ExpenseDetailViewProps) {
+export function ExpenseDetailView({ expense, onClose, onEdit, onDelete, onUpdateExpense }: ExpenseDetailViewProps) {
   const isMobile = useIsMobile();
   const contacts = contactService.getContacts();
 
@@ -163,6 +165,59 @@ export function ExpenseDetailView({ expense, onClose, onEdit, onDelete }: Expens
             {expense.split && (
               <div className="space-y-3">
                 <div className="space-y-2">
+                  {/* User (Owner) Share Row */}
+                  {(() => {
+                    const sumOthers = expense.split.members.reduce((acc, m) => acc + m.amount, 0);
+                    const userShare = expense.amount - sumOthers;
+                    if (userShare <= 0) return null;
+                    return (
+                      <div className="flex items-center justify-between bg-white/5 p-3 rounded-2xl border border-white/5">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary uppercase">
+                            ME
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-foreground">You (Owner)</span>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {expense.paidBy === 'user' || !expense.paidBy ? (
+                                <span className="text-[8px] bg-primary/10 border border-primary/20 text-primary px-1.5 py-0.2 rounded-full font-bold uppercase tracking-wider">Lender</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onUpdateExpense && expense.split) {
+                                      haptics.light();
+                                      const updatedExpense = {
+                                        ...expense,
+                                        split: {
+                                          ...expense.split,
+                                          userPaid: !expense.split.userPaid
+                                        },
+                                        updatedAt: new Date().toISOString()
+                                      };
+                                      onUpdateExpense(updatedExpense);
+                                      scheduleSplitReminders(updatedExpense);
+                                    }
+                                  }}
+                                  className={cn(
+                                    "text-[8px] px-1.5 py-0.2 rounded-full font-bold uppercase tracking-wider border active:scale-95 transition-transform cursor-pointer",
+                                    expense.split.userPaid
+                                      ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                                      : "bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20"
+                                  )}
+                                >
+                                  {expense.split.userPaid ? "Paid" : "Pending"}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-sm font-mono font-black">₹{userShare.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    );
+                  })()}
+
                   {expense.split.members.map(member => {
                     const isUser = member.contactId === 'user';
                     const contact = isUser ? { name: 'You (Owner)' } : contacts.find(c => c.id === member.contactId);
@@ -172,7 +227,50 @@ export function ExpenseDetailView({ expense, onClose, onEdit, onDelete }: Expens
                           <div className="h-8 w-8 rounded-full bg-muted/20 flex items-center justify-center text-[10px] font-black text-muted-foreground uppercase">
                             {contact?.name?.substring(0, 2) || '??'}
                           </div>
-                          <span className="text-xs font-bold">{contact?.name || 'Unknown'}</span>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold">{contact?.name || 'Unknown'}</span>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {expense.paidBy === member.contactId ? (
+                                <span className="text-[8px] bg-primary/10 border border-primary/20 text-primary px-1.5 py-0.2 rounded-full font-bold uppercase tracking-wider">Lender</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onUpdateExpense && expense.split) {
+                                      haptics.light();
+                                      const updatedMembers = expense.split.members.map(m => {
+                                        if (m.contactId === member.contactId) {
+                                          return { ...m, paid: !m.paid };
+                                        }
+                                        return m;
+                                      });
+                                      
+                                      const updatedExpense = {
+                                        ...expense,
+                                        split: {
+                                          ...expense.split,
+                                          members: updatedMembers
+                                        },
+                                        updatedAt: new Date().toISOString()
+                                      };
+                                      
+                                      onUpdateExpense(updatedExpense);
+                                      scheduleSplitReminders(updatedExpense);
+                                    }
+                                  }}
+                                  className={cn(
+                                    "text-[8px] px-1.5 py-0.2 rounded-full font-bold uppercase tracking-wider border active:scale-95 transition-transform cursor-pointer",
+                                    member.paid
+                                      ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                                      : "bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20"
+                                  )}
+                                >
+                                  {member.paid ? "Paid" : "Pending"}
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         </div>
                         <span className="text-sm font-mono font-black">₹{member.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                       </div>

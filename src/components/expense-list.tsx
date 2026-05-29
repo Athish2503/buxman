@@ -472,6 +472,12 @@ export function ExpenseList({
           onDeleteExpense(id);
           setSelectedExpense(null);
         }}
+        onUpdateExpense={(updated) => {
+          onUpdateExpense(updated);
+          if (selectedExpense && selectedExpense.id === updated.id) {
+            setSelectedExpense(updated);
+          }
+        }}
       />
 
       <ImageViewer src={viewingReceipt || ''} isOpen={!!viewingReceipt} onClose={() => setViewingReceipt(null)} title="Receipt" />

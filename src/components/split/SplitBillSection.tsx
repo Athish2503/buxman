@@ -34,6 +34,25 @@ export function SplitBillSection({
   const [customAmounts, setCustomAmounts] = useState<Record<string, number>>(
     initialSplit?.members.reduce((acc, m) => ({ ...acc, [m.contactId]: m.amount }), {}) || {}
   );
+  const [paidMembers, setPaidMembers] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    initialSplit?.members.forEach(m => {
+      initial[m.contactId] = m.paid;
+    });
+    return initial;
+  });
+  const [userPaid, setUserPaid] = useState<boolean>(initialSplit?.userPaid || false);
+
+  const handleTogglePaid = (contactId: string) => {
+    setPaidMembers(prev => ({
+      ...prev,
+      [contactId]: !prev[contactId]
+    }));
+  };
+
+  const handleToggleUserPaid = () => {
+    setUserPaid(prev => !prev);
+  };
 
   useEffect(() => {
     if (!isEnabled) {
@@ -48,22 +67,23 @@ export function SplitBillSection({
       members = selectedContactIds.map(id => ({
         contactId: id,
         amount: share,
-        paid: false
+        paid: paidMembers[id] || false
       }));
     } else if (splitType === 'exact') {
       members = selectedContactIds.map(id => ({
         contactId: id,
         amount: customAmounts[id] || 0,
-        paid: false
+        paid: paidMembers[id] || false
       }));
     }
 
     onSplitChange({
       totalAmount: amount,
       splitType,
-      members
+      members,
+      userPaid: paidBy === 'user' ? true : userPaid
     });
-  }, [isEnabled, splitType, selectedContactIds, customAmounts, amount]);
+  }, [isEnabled, splitType, selectedContactIds, customAmounts, paidMembers, userPaid, paidBy, amount]);
   
   // Auto-initialize exact amounts to equal shares when participants are added or if all are zero
   useEffect(() => {
@@ -218,9 +238,25 @@ export function SplitBillSection({
               </div>
               
               <div className="flex items-center justify-between gap-4">
-                <span className="text-sm font-medium text-foreground">
-                  You (Owner) {paidBy === 'user' && <span className="text-[10px] text-primary font-bold">(Paid)</span>}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">You (Owner)</span>
+                  {paidBy === 'user' ? (
+                    <span className="text-[10px] bg-primary/10 border border-primary/20 text-primary px-1.5 py-0.5 rounded-full font-bold">Lender</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleToggleUserPaid}
+                      className={cn(
+                        "px-2 py-0.5 rounded-full text-[9px] font-bold border transition-all active:scale-95",
+                        userPaid
+                          ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                          : "bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20"
+                      )}
+                    >
+                      {userPaid ? "Paid" : "Unpaid"}
+                    </button>
+                  )}
+                </div>
                 {splitType === 'equal' ? (
                   <span className="font-mono text-sm">₹{(amount / (selectedContactIds.length + 1)).toFixed(2)}</span>
                 ) : (
@@ -244,9 +280,25 @@ export function SplitBillSection({
                 
                 return (
                   <div key={id} className="flex items-center justify-between gap-4">
-                    <span className="text-sm text-muted-foreground">
-                      {contact.name} {paidBy === contact.id && <span className="text-[10px] text-primary font-bold">(Paid)</span>}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">{contact.name}</span>
+                      {paidBy === contact.id ? (
+                        <span className="text-[10px] bg-primary/10 border border-primary/20 text-primary px-1.5 py-0.5 rounded-full font-bold">Lender</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePaid(id)}
+                          className={cn(
+                            "px-2 py-0.5 rounded-full text-[9px] font-bold border transition-all active:scale-95",
+                            paidMembers[id]
+                              ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                              : "bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20"
+                          )}
+                        >
+                          {paidMembers[id] ? "Paid" : "Unpaid"}
+                        </button>
+                      )}
+                    </div>
                     {splitType === 'equal' ? (
                       <span className="font-mono text-sm">₹{share.toFixed(2)}</span>
                     ) : (

@@ -20,6 +20,16 @@ class FinancialNotificationPlugin : Plugin() {
 
     companion object {
         private var instance: FinancialNotificationPlugin? = null
+        private val scheduledRunnables = java.util.concurrent.ConcurrentHashMap<String, Runnable>()
+        private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
+        fun cancelScheduledReminder(id: String) {
+            val runnable = scheduledRunnables.remove(id)
+            if (runnable != null) {
+                handler.removeCallbacks(runnable)
+                Log.d("FinancialNotification", "Successfully cancelled reminder: $id")
+            }
+        }
 
         fun onTransactionCaptured(context: Context, info: ParsedTransactionInfo) {
             val eventId = "TX_" + System.currentTimeMillis() + "_" + (1000..9999).random()
@@ -441,6 +451,40 @@ class FinancialNotificationPlugin : Plugin() {
             Log.e("FinancialNotification", "Error forcing widget update", e)
             call.reject("Failed to update widgets", e)
         }
+    }
+
+    @PluginMethod
+    fun scheduleReminder(call: PluginCall) {
+        val id = call.getString("id") ?: return call.reject("ID is required")
+        val title = call.getString("title") ?: "Split Bill Reminder"
+        val body = call.getString("body") ?: "Pending payment reminder"
+        val delaySeconds = call.getInt("delaySeconds") ?: 10
+
+        Log.d("FinancialNotification", "Scheduling reminder ($id): '$title' - '$body' in $delaySeconds seconds")
+
+        cancelScheduledReminder(id)
+
+        val runnable = Runnable {
+            try {
+                NotificationHelper.showSplitReminderNotification(context, title, body)
+                scheduledRunnables.remove(id)
+                Log.d("FinancialNotification", "Reminder notification posted successfully for $id")
+            } catch (e: Exception) {
+                Log.e("FinancialNotification", "Failed to post reminder notification for $id", e)
+            }
+        }
+
+        scheduledRunnables[id] = runnable
+        handler.postDelayed(runnable, delaySeconds * 1000L)
+
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun cancelReminder(call: PluginCall) {
+        val id = call.getString("id") ?: return call.reject("ID is required")
+        cancelScheduledReminder(id)
+        call.resolve()
     }
 
     private fun isNotificationServiceEnabled(): Boolean {
