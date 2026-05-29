@@ -41,7 +41,13 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
   
   const [odometer, setOdometer] = useState(editLog?.odometer.toString() || '');
   const [liters, setLiters] = useState(editLog?.liters.toString() || '');
-  const [price, setPrice] = useState(editLog?.pricePerLiter.toString() || '');
+  const [price, setPrice] = useState(() => {
+    if (editLog) return editLog.pricePerLiter.toString();
+    const initialVehId = defaultVehicleId || vehicles[0]?.id || '';
+    const v = mileageService.getVehicles().find(veh => veh.id === initialVehId);
+    return v?.defaultFuelPrice?.toString() || '';
+  });
+  const [totalCost, setTotalCost] = useState(editLog ? (editLog.totalCost || (editLog.liters * editLog.pricePerLiter)).toString() : '');
   const [isFullTank, setIsFullTank] = useState(editLog?.isFullTank ?? true);
   const [station, setStation] = useState(editLog?.station || 'IndianOil');
   const [date, setDate] = useState(editLog?.date || format(new Date(), 'yyyy-MM-dd'));
@@ -56,24 +62,72 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
       setOdometer(editLog.odometer.toString());
       setLiters(editLog.liters.toString());
       setPrice(editLog.pricePerLiter.toString());
+      setTotalCost(editLog.totalCost ? editLog.totalCost.toString() : (editLog.liters * editLog.pricePerLiter).toString());
       setIsFullTank(editLog.isFullTank);
       setStation(editLog.station || 'IndianOil');
       setDate(editLog.date);
     }
   }, [editLog]);
 
-  // Auto-fill price when vehicle changes (only for new logs)
-  useEffect(() => {
-    if (!editLog) {
-      const v = vehicles.find(v => v.id === activeVehId);
-      if (v?.defaultFuelPrice) {
-        setPrice(v.defaultFuelPrice.toString());
+  const handleLitersChange = (val: string) => {
+    setLiters(val);
+    if (!val) {
+      setTotalCost('');
+      return;
+    }
+    const l = parseFloat(val);
+    const p = parseFloat(price);
+    const tc = parseFloat(totalCost);
+
+    if (!isNaN(l) && l > 0) {
+      if (!isNaN(p) && p > 0) {
+        setTotalCost((l * p).toFixed(2));
+      } else if (!isNaN(tc) && tc > 0) {
+        setPrice((tc / l).toFixed(2));
       }
     }
-  }, [activeVehId, vehicles, editLog]);
+  };
+
+  const handlePriceChange = (val: string) => {
+    setPrice(val);
+    if (!val) {
+      setTotalCost('');
+      return;
+    }
+    const p = parseFloat(val);
+    const l = parseFloat(liters);
+    const tc = parseFloat(totalCost);
+
+    if (!isNaN(p) && p > 0) {
+      if (!isNaN(l) && l > 0) {
+        setTotalCost((l * p).toFixed(2));
+      } else if (!isNaN(tc) && tc > 0) {
+        setLiters((tc / p).toFixed(2));
+      }
+    }
+  };
+
+  const handleTotalCostChange = (val: string) => {
+    setTotalCost(val);
+    if (!val) {
+      setLiters('');
+      return;
+    }
+    const tc = parseFloat(val);
+    const p = parseFloat(price);
+    const l = parseFloat(liters);
+
+    if (!isNaN(tc) && tc > 0) {
+      if (!isNaN(p) && p > 0) {
+        setLiters((tc / p).toFixed(2));
+      } else if (!isNaN(l) && l > 0) {
+        setPrice((tc / l).toFixed(2));
+      }
+    }
+  };
 
   const handleSave = async () => {
-    if (!odometer || !liters || !price) {
+    if (!odometer || !liters || !price || !totalCost) {
       toast.error('Please fill in all fields');
       return;
     }
@@ -91,7 +145,7 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
       odometer: Number(odometer),
       liters: Number(liters),
       pricePerLiter: Number(price),
-      totalCost: Number(liters) * Number(price),
+      totalCost: Number(totalCost),
       isFullTank,
       station,
       createdAt: editLog?.createdAt || new Date().toISOString()
@@ -114,6 +168,7 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
       if (!editLog) {
         setOdometer('');
         setLiters('');
+        setTotalCost('');
       }
       onSuccess();
     }, 1200);
@@ -197,7 +252,28 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
             {vehicles.map(v => (
               <button
                 key={v.id}
-                onClick={() => { setActiveVehId(v.id); haptics.selection(); }}
+                onClick={() => {
+                  setActiveVehId(v.id);
+                  haptics.selection();
+                  if (!editLog) {
+                    if (v.defaultFuelPrice) {
+                      const newPrice = v.defaultFuelPrice.toString();
+                      setPrice(newPrice);
+                      const p = parseFloat(newPrice);
+                      const l = parseFloat(liters);
+                      const tc = parseFloat(totalCost);
+                      if (!isNaN(p) && p > 0) {
+                        if (!isNaN(l) && l > 0) {
+                          setTotalCost((l * p).toFixed(2));
+                        } else if (!isNaN(tc) && tc > 0) {
+                          setLiters((tc / p).toFixed(2));
+                        }
+                      }
+                    } else {
+                      setPrice('');
+                    }
+                  }
+                }}
                 className={cn(
                   "relative flex flex-col items-center gap-2 px-6 py-3 rounded-2xl border transition-all duration-300 min-w-[100px]",
                   activeVehId === v.id ? 'border-primary/30 text-primary' : 'border-border/40 bg-muted/10 text-muted-foreground opacity-60'
@@ -236,7 +312,7 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
               <Fuel className="h-3 w-3" /> Liters
             </Label>
             <Input 
-              type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="0.00"
+              type="number" value={liters} onChange={e => handleLitersChange(e.target.value)} placeholder="0.00"
               className="h-12 bg-muted/30 border-border/40 text-lg font-mono focus:border-primary/50"
             />
           </div>
@@ -245,10 +321,20 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
               <IndianRupee className="h-3 w-3" /> Price / Liter
             </Label>
             <Input 
-              type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00"
+              type="number" value={price} onChange={e => handlePriceChange(e.target.value)} placeholder="0.00"
               className="h-12 bg-muted/30 border-border/40 text-lg font-mono focus:border-primary/50"
             />
           </div>
+        </div>
+
+        <div>
+          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
+            <IndianRupee className="h-3 w-3" /> Total Cost
+          </Label>
+          <Input 
+            type="number" value={totalCost} onChange={e => handleTotalCostChange(e.target.value)} placeholder="0.00"
+            className="h-12 bg-muted/30 border-border/40 text-lg font-mono focus:border-primary/50 text-primary font-bold"
+          />
         </div>
 
         {/* Fuel Station Selector */}
@@ -307,9 +393,9 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
 
         <div className="pt-4 border-t border-border/30 mt-2">
           <div className="flex justify-between items-center mb-6 px-1">
-            <span className="text-sm font-semibold opacity-70">Total Cost</span>
+            <span className="text-sm font-semibold opacity-70">Summary Cost</span>
             <span className="text-2xl font-black font-mono text-primary">
-              {formatCurrency(Number(liters || 0) * Number(price || 0))}
+              {formatCurrency(Number(totalCost || 0))}
             </span>
           </div>
           <SwipeToAdd 
