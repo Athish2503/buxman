@@ -7,6 +7,8 @@ import { Expense } from '@/types/expense';
 import { haptics } from '@/lib/haptics';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { SplitBillSection } from '@/components/split';
+import { ExpenseSplit } from '@/types/split';
 
 interface PendingTransactionsModalProps {
   onAddExpense: (expense: Expense) => void;
@@ -24,6 +26,8 @@ export function PendingTransactionsModal({ onAddExpense }: PendingTransactionsMo
   const [category, setCategory] = useState('Personal');
   const [notes, setNotes] = useState('');
   const [isSuccessAnimating, setIsSuccessAnimating] = useState(false);
+  const [split, setSplit] = useState<ExpenseSplit | undefined>(undefined);
+  const [paidBy, setPaidBy] = useState<string | undefined>(undefined);
 
   // Synchronize internal form state when active pending transaction switches
   useEffect(() => {
@@ -56,6 +60,8 @@ export function PendingTransactionsModal({ onAddExpense }: PendingTransactionsMo
         status: 'approved',
         currency: 'INR',
         isReimbursement: false,
+        paidBy: paidBy,
+        split: split,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -83,12 +89,12 @@ export function PendingTransactionsModal({ onAddExpense }: PendingTransactionsMo
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.93, y: 20 }}
           transition={{ type: 'spring', damping: 26, stiffness: 350 }}
-          className="relative w-full max-w-[420px] overflow-hidden rounded-[2.5rem] border border-white/10 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] bg-zinc-950/80 backdrop-blur-3xl"
+          className="relative w-full max-w-[420px] rounded-[2.5rem] border border-white/10 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] bg-zinc-950/80 backdrop-blur-3xl"
         >
           {/* Top Neon Gradient Glow Strip */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-purple-500 to-rose-400 opacity-80" />
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-purple-500 to-rose-400 opacity-80 z-10" />
 
-          <div className="p-6 space-y-6">
+          <div className="max-h-[85vh] overflow-y-auto p-6 space-y-6 no-scrollbar">
             {/* Header Area */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -207,6 +213,17 @@ export function PendingTransactionsModal({ onAddExpense }: PendingTransactionsMo
                   );
                 })}
               </div>
+            </div>
+
+            {/* Split Bill Section */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+              <SplitBillSection
+                amount={parseFloat(amount) || pendingTx.amount}
+                onSplitChange={setSplit}
+                onPaidByChange={setPaidBy}
+                initialSplit={split}
+                initialPaidBy={paidBy}
+              />
             </div>
 
             {/* Raw SMS Payload */}

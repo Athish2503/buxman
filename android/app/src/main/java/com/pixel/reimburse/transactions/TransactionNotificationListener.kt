@@ -50,6 +50,8 @@ class TransactionNotificationListener : NotificationListenerService() {
         val isSmsApp = packageName == defaultSmsApp ||
                 lowerPkg.contains("messaging") ||
                 lowerPkg.contains("sms") ||
+                lowerPkg.contains("mms") ||
+                lowerPkg.contains("message") ||
                 lowerPkg == "com.google.android.apps.messaging" ||
                 lowerPkg == "com.android.messaging"
 
@@ -59,7 +61,22 @@ class TransactionNotificationListener : NotificationListenerService() {
                 lowerPkg.contains("upi") ||
                 lowerPkg.contains("bank") ||
                 lowerPkg.contains("card") ||
-                lowerPkg.contains("wallet")
+                lowerPkg.contains("wallet") ||
+                lowerPkg.contains("finance") ||
+                lowerPkg.contains("money") ||
+                lowerPkg.contains("pay") ||
+                lowerPkg.contains("dreamplug") || // Cred
+                lowerPkg.contains("slice") ||
+                lowerPkg.contains("navi") ||
+                lowerPkg.contains("hdfc") ||
+                lowerPkg.contains("icici") ||
+                lowerPkg.contains("axis") ||
+                lowerPkg.contains("sbi") ||
+                lowerPkg.contains("kotak") ||
+                lowerPkg.contains("indusind") ||
+                lowerPkg.contains("rbl") ||
+                lowerPkg.contains("idfc") ||
+                lowerPkg.contains("onecard")
 
         if (!isSmsApp && !isFinanceApp) {
             Log.d(TAG, "[$eventType] Ignored package: $packageName (not a target SMS or finance app)")

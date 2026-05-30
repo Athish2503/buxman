@@ -83,9 +83,10 @@ class FinancialNotificationPlugin : Plugin() {
             }
         }
 
-        fun logTransactionAttempt(context: Context, info: ParsedTransactionInfo) {
+        fun logTransactionAttempt(context: Context, info: ParsedTransactionInfo, accepted: Boolean) {
             val data = JSObject().apply {
                 put("type", "ATTEMPT")
+                put("accepted", accepted)
                 put("amount", info.amount)
                 put("merchant", info.merchant)
                 put("source", info.extractionSource)

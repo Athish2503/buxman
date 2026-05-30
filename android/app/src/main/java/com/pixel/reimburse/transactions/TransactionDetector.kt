@@ -18,8 +18,20 @@ object TransactionDetector {
 
         val parsedInfo = TransactionParser.parseTransaction(text, packageName, title, source)
         
+        // Reject credits and unknown types early if the user only wants deducted/debit messages
+        if (parsedInfo.type != "debit") {
+            Log.d(TAG, "[$source] REJECTED: Not a debit/deducted transaction (Type: ${parsedInfo.type})")
+            FinancialNotificationPlugin.logRejection(context, text, source, "Not a debit/deducted transaction", parsedInfo.matchedKeywords)
+            return
+        }
+
+        // Overlay is accepted if confidence is >= 50 or if we have a valid amount, confidence >= 40, and not promotional
+        val accepted = !parsedInfo.isPromotional &&
+                parsedInfo.confidenceScore >= 40 &&
+                (parsedInfo.confidenceScore >= 50 || parsedInfo.amount > 0)
+
         // Log to diagnostics regardless of score
-        FinancialNotificationPlugin.logTransactionAttempt(context, parsedInfo)
+        FinancialNotificationPlugin.logTransactionAttempt(context, parsedInfo, accepted)
 
         if (parsedInfo.isPromotional) {
             Log.d(TAG, "[$source] REJECTED: Promotional content detected (Score: ${parsedInfo.confidenceScore})")
@@ -53,12 +65,11 @@ object TransactionDetector {
         // Alert the Capacitor Bridge (for the app UI)
         FinancialNotificationPlugin.onTransactionCaptured(context, parsedInfo)
 
-        // Show Overlay if confidence is at least 65 (threshold) or if it's a clear transaction even with missing fields
-        // We allow popup even for "unknown" merchant as long as it looks like a transaction
-        if (parsedInfo.confidenceScore >= 65 || (parsedInfo.amount > 0 && parsedInfo.type != "unknown" && parsedInfo.confidenceScore >= 50)) {
+        // Show Overlay if accepted
+        if (accepted) {
             triggerOverlay(context, parsedInfo)
         } else {
-            Log.d(TAG, "[$source] FILTERED: Confidence score (${parsedInfo.confidenceScore}) below popup threshold (65).")
+            Log.d(TAG, "[$source] FILTERED: Confidence score (${parsedInfo.confidenceScore}) below popup threshold.")
         }
     }
 

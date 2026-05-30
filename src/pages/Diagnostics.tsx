@@ -94,8 +94,8 @@ const Diagnostics = () => {
 };
 
 const DiagnosticItem = ({ data }: { data: any }) => {
-  const isAccepted = data.type === 'ATTEMPT' && data.confidence >= 65;
-  const isRejected = data.type === 'REJECTION' || (data.type === 'ATTEMPT' && data.confidence < 65);
+  const isAccepted = data.type === 'ATTEMPT' && (data.accepted !== undefined ? data.accepted : data.confidence >= 65);
+  const isRejected = data.type === 'REJECTION' || (data.type === 'ATTEMPT' && !isAccepted);
   
   return (
     <Card className="p-4 bg-white/5 border-white/10 overflow-hidden">

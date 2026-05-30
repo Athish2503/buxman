@@ -82,6 +82,38 @@ class OverlayActivity : AppCompatActivity() {
         binding.switchReimbursable.visibility = if (isCredit) View.GONE else View.VISIBLE
         binding.switchReimbursable.isChecked = false
 
+        binding.switchSplit.visibility = if (isCredit) View.GONE else View.VISIBLE
+        binding.switchSplit.isChecked = false
+
+        // Load and setup contacts chip group
+        binding.switchSplit.setOnCheckedChangeListener { _, isChecked ->
+            binding.layoutSplitSection.visibility = if (isChecked) View.VISIBLE else View.GONE
+            updateSplitSummary(amount)
+        }
+
+        val contacts = loadContactsFromStorage()
+        if (contacts.isEmpty()) {
+            binding.tvSplitSummary.text = "No contacts found. Please add contacts in the main app."
+        } else {
+            binding.chipGroupSplitContacts.removeAllViews()
+            contacts.forEach { (contactId, name) ->
+                val themedCtx = ContextThemeWrapper(this, R.style.AppTheme)
+                val chip = Chip(themedCtx, null, com.google.android.material.R.attr.chipStyle)
+                chip.text = name
+                chip.isCheckable = true
+                chip.setTextColor(0xFFFFFFFF.toInt())
+                chip.chipBackgroundColor = ColorStateList.valueOf(0x1AFFFFFF)
+                chip.chipStrokeColor = ColorStateList.valueOf(0x33FFFFFF)
+                chip.chipStrokeWidth = 1f
+                chip.tag = contactId // Store contactId in tag
+
+                chip.setOnCheckedChangeListener { _, _ ->
+                    updateSplitSummary(amount)
+                }
+                binding.chipGroupSplitContacts.addView(chip)
+            }
+        }
+
         // Load and setup dynamic category chips
         binding.chipGroupOverlayCategories.removeAllViews()
         val currentCategories = if (isCredit) {
@@ -129,9 +161,10 @@ class OverlayActivity : AppCompatActivity() {
             val notes = binding.etOverlayNotes.text.toString()
             val category = selectedCategory ?: if (isCredit) "Income" else "Other"
             val isReimbursement = if (isCredit) false else binding.switchReimbursable.isChecked
+            val splitContacts = if (binding.switchSplit.isChecked) getSelectedContacts() else emptyList()
 
-            Log.d(TAG, "Saving transaction details natively: $merchant | $amount | Category: $category")
-            val success = persistTransactionNatively(amount, merchant, category, notes, type, isReimbursement)
+            Log.d(TAG, "Saving transaction details natively: $merchant | $amount | Category: $category | Split with ${splitContacts.size} contacts")
+            val success = persistTransactionNatively(amount, merchant, category, notes, type, isReimbursement, splitContacts)
 
             if (success) {
                 FinancialNotificationPlugin.onOverlayAction(this, "save", amount, merchant, category, notes, true, isReimbursement)
@@ -307,7 +340,66 @@ class OverlayActivity : AppCompatActivity() {
         return categories
     }
 
-    private fun persistTransactionNatively(amount: Double, merchant: String, category: String, notes: String, type: String, isReimbursement: Boolean): Boolean {
+    private fun loadContactsFromStorage(): List<Pair<String, String>> {
+        val list = mutableListOf<Pair<String, String>>()
+        try {
+            val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+            val contactsKey = "reimburse_contacts"
+            val jsonStr = prefs.getString(contactsKey, null)
+            if (jsonStr != null) {
+                val array = org.json.JSONArray(jsonStr)
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val id = obj.getString("id")
+                    val name = obj.getString("name")
+                    list.add(Pair(id, name))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load contacts from CapacitorStorage", e)
+        }
+        return list
+    }
+
+    private fun updateSplitSummary(totalAmount: Double) {
+        val selectedChips = getSelectedContacts()
+        if (selectedChips.isEmpty()) {
+            binding.tvSplitSummary.text = "Select contacts to see split details"
+            return
+        }
+
+        val totalPeople = selectedChips.size + 1
+        val splitAmount = totalAmount / totalPeople
+        val formattedSplit = "₹%,.2f".format(splitAmount)
+        binding.tvSplitSummary.text = "Split equally: $totalPeople people. Your share: $formattedSplit. Others owe: $formattedSplit each."
+    }
+
+    private fun getSelectedContacts(): List<Pair<String, String>> {
+        val list = mutableListOf<Pair<String, String>>()
+        try {
+            for (i in 0 until binding.chipGroupSplitContacts.childCount) {
+                val chip = binding.chipGroupSplitContacts.getChildAt(i) as? Chip
+                if (chip != null && chip.isChecked) {
+                    val contactId = chip.tag as? String ?: ""
+                    val name = chip.text.toString()
+                    list.add(Pair(contactId, name))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get selected contacts", e)
+        }
+        return list
+    }
+
+    private fun persistTransactionNatively(
+        amount: Double, 
+        merchant: String, 
+        category: String, 
+        notes: String, 
+        type: String, 
+        isReimbursement: Boolean,
+        selectedContacts: List<Pair<String, String>> = emptyList()
+    ): Boolean {
         try {
             val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
             val storageKey = "reimburse_expenses_v2"
@@ -319,6 +411,28 @@ class OverlayActivity : AppCompatActivity() {
             val isoTimeStr = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
                 timeZone = java.util.TimeZone.getTimeZone("UTC")
             }.format(java.util.Date(now))
+
+            val splitObj = if (selectedContacts.isNotEmpty()) {
+                val totalPeople = selectedContacts.size + 1
+                val splitAmount = amount / totalPeople
+                
+                val membersArray = org.json.JSONArray()
+                for (contact in selectedContacts) {
+                    val memberObj = org.json.JSONObject().apply {
+                        put("contactId", contact.first)
+                        put("amount", splitAmount)
+                        put("paid", false)
+                    }
+                    membersArray.put(memberObj)
+                }
+                
+                org.json.JSONObject().apply {
+                    put("totalAmount", amount)
+                    put("splitType", "equal")
+                    put("userPaid", true)
+                    put("members", membersArray)
+                }
+            } else null
 
             val newExpense = org.json.JSONObject().apply {
                 put("id", "TXN_" + java.util.UUID.randomUUID().toString().substring(0, 8))
@@ -333,6 +447,9 @@ class OverlayActivity : AppCompatActivity() {
                 put("isReimbursement", isReimbursement)
                 put("createdAt", isoTimeStr)
                 put("updatedAt", isoTimeStr)
+                if (splitObj != null) {
+                    put("split", splitObj)
+                }
             }
 
             val updatedArray = org.json.JSONArray().apply {

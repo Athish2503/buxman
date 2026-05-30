@@ -175,6 +175,10 @@ class TransactionOverlayService : Service() {
         b.switchReimbursable.visibility = if (isCredit) View.GONE else View.VISIBLE
         b.switchReimbursable.isChecked = false
 
+        // Hide split switch and section in TransactionOverlayService since it delegates to OverlayActivity
+        b.switchSplit.visibility = View.GONE
+        b.layoutSplitSection.visibility = View.GONE
+
         // Dynamic category chips
         b.chipGroupOverlayCategories.removeAllViews()
         val currentCategories = if (isCredit) listOf("Salary", "Refund", "Cash Deposit", "Gift", "Other") else loadCategoriesFromStorage()
@@ -352,7 +356,15 @@ class TransactionOverlayService : Service() {
         return categories
     }
 
-    private fun persistTransactionNatively(amount: Double, merchant: String, category: String, notes: String, type: String, isReimbursement: Boolean): Boolean {
+    private fun persistTransactionNatively(
+        amount: Double, 
+        merchant: String, 
+        category: String, 
+        notes: String, 
+        type: String, 
+        isReimbursement: Boolean,
+        selectedContacts: List<Pair<String, String>> = emptyList()
+    ): Boolean {
         try {
             val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
             val storageKey = "reimburse_expenses_v2"

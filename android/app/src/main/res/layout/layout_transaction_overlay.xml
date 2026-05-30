@@ -170,7 +170,7 @@
                 android:id="@+id/switch_reimbursable"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="24dp"
+                android:layout_marginBottom="12dp"
                 android:text="Mark as reimbursable expense"
                 android:textColor="#CCCCCC"
                 android:textSize="13sp"
@@ -178,6 +178,66 @@
                 app:thumbTint="#7C3AED"
                 app:trackTint="#407C3AED"
                 android:layout_marginStart="2dp" />
+
+            <!-- Split Toggle Switch -->
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switch_split"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:text="Split this expense"
+                android:textColor="#CCCCCC"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-medium"
+                app:thumbTint="#7C3AED"
+                app:trackTint="#407C3AED"
+                android:layout_marginStart="2dp" />
+
+            <!-- Split Section Container -->
+            <LinearLayout
+                android:id="@+id/layout_split_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:layout_marginBottom="24dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:fontFamily="sans-serif-black"
+                    android:letterSpacing="0.15"
+                    android:text="SELECT MEMBERS TO SPLIT WITH"
+                    android:textColor="#66FFFFFF"
+                    android:textSize="9sp"
+                    android:layout_marginStart="2dp" />
+
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:scrollbars="none"
+                    android:overScrollMode="never">
+
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/chip_group_split_contacts"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        app:singleSelection="false"
+                        app:chipSpacingHorizontal="6dp"/>
+                </HorizontalScrollView>
+
+                <TextView
+                    android:id="@+id/tv_split_summary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Select contacts to see split details"
+                    android:textColor="#94A3B8"
+                    android:textSize="12sp"
+                    android:layout_marginStart="2dp" />
+            </LinearLayout>
 
             <!-- Actions buttons layout -->
             <com.google.android.material.button.MaterialButton
