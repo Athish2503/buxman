@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Info, Check, Send, Share2, ChevronDown, ChevronUp, 
   AlertCircle, Wallet, ArrowUpRight, ArrowDownLeft, Calendar, 
-  Receipt, CheckCircle2, User, RefreshCw
+  Receipt, CheckCircle2, User, RefreshCw, QrCode
 } from 'lucide-react';
 import { Expense } from '@/types/expense';
 import { Trip } from '@/types/split';
@@ -58,8 +58,45 @@ export function SplitsModule() {
   const [isSettling, setIsSettling] = useState(false);
   const [settings, setSettings] = useState(() => settingsService.get());
   const [tempUpiId, setTempUpiId] = useState('');
+  const [settleAmount, setSettleAmount] = useState<number>(0);
+
+  // Quick QR Generator State
+  const [isQuickQrOpen, setIsQuickQrOpen] = useState(false);
+  const [quickUpiId, setQuickUpiId] = useState(settings.upiId || '');
+  const [quickAmount, setQuickAmount] = useState<number>(0);
 
   const contacts = useMemo(() => contactService.getContacts(), [expenses]);
+
+  useEffect(() => {
+    if (isQuickQrOpen) {
+      setQuickUpiId(settings.upiId || '');
+    }
+  }, [isQuickQrOpen, settings.upiId]);
+
+  useEffect(() => {
+    if (!isQuickQrOpen || !quickUpiId.trim()) return;
+
+    const name = settings.billedFrom.name || 'User';
+    const upiUrl = `upi://pay?pa=${quickUpiId.trim()}&pn=${encodeURIComponent(name)}&am=${quickAmount.toFixed(2)}&cu=INR`;
+
+    const timer = setTimeout(() => {
+      const canvas = document.getElementById('quick-upi-canvas') as HTMLCanvasElement;
+      if (canvas) {
+        QRCode.toCanvas(canvas, upiUrl, {
+          width: 144,
+          margin: 1,
+          color: {
+            dark: '#1e1b4b',
+            light: '#ffffff'
+          }
+        }, (err) => {
+          if (err) console.error('Quick QR code generation error:', err);
+        });
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [isQuickQrOpen, quickUpiId, quickAmount, settings]);
 
   useEffect(() => {
     if (!isSettling || !settlePerson) return;
@@ -82,8 +119,7 @@ export function SplitsModule() {
 
     const isOwed = settlePerson.netBalance > 0;
     const name = isOwed ? (settings.billedFrom.name || 'User') : settlePerson.contactName;
-    const amount = Math.abs(settlePerson.netBalance);
-    const upiUrl = `upi://pay?pa=${tempUpiId.trim()}&pn=${encodeURIComponent(name)}&am=${amount.toFixed(2)}&cu=INR`;
+    const upiUrl = `upi://pay?pa=${tempUpiId.trim()}&pn=${encodeURIComponent(name)}&am=${settleAmount.toFixed(2)}&cu=INR`;
 
     const timer = setTimeout(() => {
       const canvas = document.getElementById('upi-qrcode-canvas') as HTMLCanvasElement;
@@ -102,7 +138,7 @@ export function SplitsModule() {
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [isSettling, settlePerson, tempUpiId, settings]);
+  }, [isSettling, settlePerson, tempUpiId, settings, settleAmount]);
 
   // Load initial data
   const loadData = () => {
@@ -290,6 +326,7 @@ export function SplitsModule() {
   const handleSettlePerson = (person: PersonBalance) => {
     haptics.medium();
     setSettlePerson(person);
+    setSettleAmount(Math.abs(person.netBalance));
     setIsSettling(true);
   };
 
@@ -341,9 +378,20 @@ export function SplitsModule() {
           <p className="text-xs text-muted-foreground mt-1">See who owes you money and who you need to pay back</p>
         </div>
         
-        {/* Trip Filter */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider shrink-0">Trip:</span>
+        {/* Trip Filter & Quick QR */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button
+            onClick={() => {
+              haptics.selection();
+              setIsQuickQrOpen(true);
+            }}
+            className="h-9 px-4 rounded-xl text-xs font-bold gap-2 bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 animate-in fade-in zoom-in-95 duration-300"
+          >
+            <QrCode className="h-4 w-4" />
+            <span>Quick QR</span>
+          </Button>
+
+          <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider shrink-0 ml-1">Trip:</span>
           <select 
             value={selectedTripId} 
             onChange={(e) => {
@@ -653,6 +701,26 @@ export function SplitsModule() {
                 </h4>
               </div>
 
+              {/* Settle amount input (manual override) */}
+              <div className="space-y-2 text-left px-1">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  Settle Amount (INR)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-2 text-xs font-mono text-muted-foreground">₹</span>
+                  <Input
+                    type="number"
+                    value={settleAmount || ''}
+                    onChange={e => {
+                      const val = parseFloat(e.target.value);
+                      setSettleAmount(isNaN(val) ? 0 : val);
+                    }}
+                    placeholder="0.00"
+                    className="pl-7 h-9 text-xs rounded-xl bg-background/50 border-border/40 font-mono"
+                  />
+                </div>
+              </div>
+
               {/* UPI section */}
               {(() => {
                 const isOwed = settlePerson.netBalance > 0;
@@ -711,7 +779,7 @@ export function SplitsModule() {
                 }
 
                 // If UPI ID exists, show QR code & Pay link
-                const upiUrl = `upi://pay?pa=${currentUpi}&pn=${encodeURIComponent(isOwed ? (settings.billedFrom.name || 'User') : settlePerson.contactName)}&am=${Math.abs(settlePerson.netBalance).toFixed(2)}&cu=INR`;
+                const upiUrl = `upi://pay?pa=${currentUpi}&pn=${encodeURIComponent(isOwed ? (settings.billedFrom.name || 'User') : settlePerson.contactName)}&am=${settleAmount.toFixed(2)}&cu=INR`;
 
                 return (
                   <div className="p-4 rounded-2xl bg-muted/20 border border-border/20 flex flex-col items-center gap-3">
@@ -771,6 +839,96 @@ export function SplitsModule() {
             >
               Clear Balances (Mark Paid)
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Quick UPI QR Code Modal ─────────────────────────── */}
+      <AlertDialog open={isQuickQrOpen} onOpenChange={setIsQuickQrOpen}>
+        <AlertDialogContent className="rounded-3xl border-border/40 glass max-w-[90vw] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold flex items-center gap-2">
+              <QrCode className="h-6 w-6 text-primary animate-pulse" />
+              <span>Quick UPI QR Code</span>
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground text-xs">
+              Generate a scan-to-pay QR code for any amount using your UPI ID.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="py-2 space-y-4 text-left">
+            {/* UPI ID input */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Your UPI ID
+              </label>
+              <Input
+                value={quickUpiId}
+                onChange={e => setQuickUpiId(e.target.value)}
+                placeholder="yourname@upi"
+                className="h-9 text-xs rounded-xl bg-background/50 border-border/40 font-mono"
+              />
+            </div>
+
+            {/* Amount input */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Request Amount (INR)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-2 text-xs font-mono text-muted-foreground">₹</span>
+                <Input
+                  type="number"
+                  value={quickAmount || ''}
+                  onChange={e => {
+                    const val = parseFloat(e.target.value);
+                    setQuickAmount(isNaN(val) ? 0 : val);
+                  }}
+                  placeholder="0.00"
+                  className="pl-7 h-9 text-xs rounded-xl bg-background/50 border-border/40 font-mono"
+                />
+              </div>
+            </div>
+
+            {/* QR Code and Info */}
+            {quickUpiId.trim() ? (
+              <div className="p-4 rounded-2xl bg-muted/20 border border-border/20 flex flex-col items-center gap-3">
+                <div className="relative p-2 bg-white rounded-2xl shadow-md border border-white/10 shrink-0">
+                  <canvas id="quick-upi-canvas" className="rounded-lg h-36 w-36" />
+                </div>
+                
+                <p className="text-xs font-mono font-bold text-primary select-all">
+                  {quickUpiId}
+                </p>
+                {quickAmount > 0 && (
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Requesting: {formatCurrency(quickAmount)}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="p-6 text-center text-xs text-muted-foreground rounded-2xl bg-muted/20 border border-border/20">
+                Please enter your UPI ID to generate the QR Code.
+              </div>
+            )}
+          </div>
+
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-xl border-white/10 hover:bg-white/5">Close</AlertDialogCancel>
+            {quickUpiId.trim() && (
+              <Button
+                onClick={() => {
+                  const updated = { ...settings, upiId: quickUpiId.trim() };
+                  settingsService.save(updated);
+                  setSettings(updated);
+                  toast.success('Your UPI ID saved to Settings');
+                  setIsQuickQrOpen(false);
+                }}
+                className="rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white border-none text-xs font-bold"
+              >
+                Save UPI & Close
+              </Button>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
