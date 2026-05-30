@@ -21,7 +21,7 @@ const defaultSettings: AppSettings = {
   glassIntensity: 0.6,
   budgets: [],
   hapticsEnabled: true,
-  navOrder: ['dashboard', 'expenses', 'food', 'reimbursements', 'trips', 'vehicle', 'analytics', 'settings'],
+  navOrder: ['dashboard', 'expenses', 'splits', 'food', 'reimbursements', 'trips', 'vehicle', 'analytics', 'settings'],
 };
 
 export const settingsService = {
@@ -48,7 +48,11 @@ export const settingsService = {
         billedTo: { ...defaultSettings.billedTo, ...parsed.billedTo },
         billedFrom: { ...defaultSettings.billedFrom, ...parsed.billedFrom },
         budgets: parsed.budgets || [],
-        navOrder: parsed.navOrder || defaultSettings.navOrder,
+        navOrder: (() => {
+          const currentOrder = parsed.navOrder || defaultSettings.navOrder;
+          const missing = defaultSettings.navOrder.filter(t => !currentOrder.includes(t));
+          return [...currentOrder, ...missing];
+        })(),
       };
     } catch {
       return defaultSettings;

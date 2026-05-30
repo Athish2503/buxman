@@ -45,6 +45,7 @@ import {
   GarageModule,
   AnalyticsModule,
   TripsModule,
+  SplitsModule,
 } from '@/components/dashboard';
 import { Tab, NAV_ITEMS_CONFIG } from '@/lib/nav-config';
 
@@ -202,6 +203,7 @@ const Index = () => {
           />
         );
       case 'trips':    return <TripsModule />;
+      case 'splits':   return <SplitsModule />;
       case 'vehicle':
         return (
           <GarageModule

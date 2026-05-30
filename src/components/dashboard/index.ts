@@ -4,3 +4,4 @@ export * from './ExpensesModule';
 export * from './GarageModule';
 export * from './ReimbursementsModule';
 export * from './TripsModule';
+export * from './SplitsModule';
