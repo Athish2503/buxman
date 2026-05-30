@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Info, Check, Send, Share2, ChevronDown, ChevronUp, 
   AlertCircle, Wallet, ArrowUpRight, ArrowDownLeft, Calendar, 
-  Receipt, CheckCircle2, User, RefreshCw, QrCode
+  Receipt, CheckCircle2, User, RefreshCw, QrCode, Copy
 } from 'lucide-react';
 import { Expense } from '@/types/expense';
 import { Trip } from '@/types/split';
@@ -18,6 +18,8 @@ import { Input } from '@/components/ui/input';
 import { haptics } from '@/lib/haptics';
 import { toast } from 'sonner';
 import QRCode from 'qrcode';
+import confetti from 'canvas-confetti';
+import { audio } from '@/lib/audio';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,6 +66,18 @@ export function SplitsModule() {
   const [isQuickQrOpen, setIsQuickQrOpen] = useState(false);
   const [quickUpiId, setQuickUpiId] = useState(settings.upiId || '');
   const [quickAmount, setQuickAmount] = useState<number>(0);
+  
+  // Interactive Copy State
+  const [copiedUpi, setCopiedUpi] = useState(false);
+
+  const handleCopyLink = (upiUrl: string) => {
+    navigator.clipboard.writeText(upiUrl);
+    setCopiedUpi(true);
+    audio.success();
+    haptics.success();
+    toast.success('Payment link copied');
+    setTimeout(() => setCopiedUpi(false), 2000);
+  };
 
   const contacts = useMemo(() => contactService.getContacts(), [expenses]);
 
@@ -83,10 +97,11 @@ export function SplitsModule() {
       const canvas = document.getElementById('quick-upi-canvas') as HTMLCanvasElement;
       if (canvas) {
         QRCode.toCanvas(canvas, upiUrl, {
-          width: 144,
+          width: 128,
           margin: 1,
+          errorCorrectionLevel: 'H',
           color: {
-            dark: '#1e1b4b',
+            dark: settings.accentColor || '#6366f1',
             light: '#ffffff'
           }
         }, (err) => {
@@ -125,10 +140,11 @@ export function SplitsModule() {
       const canvas = document.getElementById('upi-qrcode-canvas') as HTMLCanvasElement;
       if (canvas) {
         QRCode.toCanvas(canvas, upiUrl, {
-          width: 144,
+          width: 128,
           margin: 1,
+          errorCorrectionLevel: 'H',
           color: {
-            dark: '#1e1b4b',
+            dark: settings.accentColor || '#6366f1',
             light: '#ffffff'
           }
         }, (err) => {
@@ -363,11 +379,37 @@ export function SplitsModule() {
     setIsSettling(false);
     setSettlePerson(null);
     setExpandedPersonId(null);
+    
+    // Play celebratory sounds and confetti
+    audio.shimmer();
+    confetti({
+      particleCount: 120,
+      spread: 80,
+      origin: { y: 0.6 },
+      colors: [settings.accentColor || '#6366f1', '#10b981', '#3b82f6', '#f59e0b']
+    });
     haptics.success();
   };
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-500">
+      <style>{`
+        @keyframes scan {
+          0% { top: 0%; opacity: 0.2; }
+          50% { opacity: 0.8; }
+          100% { top: 100%; opacity: 0.2; }
+        }
+        .scanner-line {
+          position: absolute;
+          left: 0;
+          width: 100%;
+          height: 3px;
+          background: linear-gradient(90deg, transparent, ${settings.accentColor || '#6366f1'}, transparent);
+          animation: scan 2.5s linear infinite;
+          box-shadow: 0 0 10px ${settings.accentColor || '#6366f1'};
+          pointer-events: none;
+        }
+      `}</style>
       {/* ── Title Header ───────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-1">
         <div>
@@ -787,32 +829,51 @@ export function SplitsModule() {
                       {isOwed ? "Ask them to scan this QR" : "Scan to pay or tap pay button"}
                     </p>
 
-                    <div className="relative p-2 bg-white rounded-2xl shadow-md border border-white/10 shrink-0">
-                      <canvas id="upi-qrcode-canvas" className="rounded-lg h-36 w-36" />
+                    <div className="relative p-[3px] bg-gradient-to-tr from-primary via-violet-500 to-cyan-400 rounded-[22px] shadow-glow-sm shrink-0">
+                      <div className="relative p-2 bg-white rounded-[19px] flex items-center justify-center overflow-hidden">
+                        <canvas id="upi-qrcode-canvas" className="rounded-lg h-32 w-32" />
+                        {/* Center Logo Overlay */}
+                        <div className="absolute inset-0 m-auto w-8 h-8 rounded-xl bg-gradient-brand flex items-center justify-center shadow-md border-2 border-white overflow-hidden z-10">
+                          <img src="/logo.png" alt="Logo" className="h-4.5 w-4.5 object-contain" />
+                        </div>
+                        {/* Animated Scanner Laser Line */}
+                        <div className="scanner-line" />
+                      </div>
                     </div>
 
-                    <div className="text-center">
+                    <div className="text-center w-full space-y-2">
                       <p className="text-xs font-mono font-bold select-all text-primary">{currentUpi}</p>
-                      <button 
-                        onClick={() => {
-                          if (isOwed) {
-                            const updated = { ...settings, upiId: '' };
-                            settingsService.save(updated);
-                            setSettings(updated);
-                          } else {
-                            if (contactObj) {
-                              contactService.updateContact({ ...contactObj, upiId: undefined });
-                              loadData();
+                      
+                      <div className="flex justify-center gap-4">
+                        <button 
+                          onClick={() => {
+                            if (isOwed) {
+                              const updated = { ...settings, upiId: '' };
+                              settingsService.save(updated);
+                              setSettings(updated);
+                            } else {
+                              if (contactObj) {
+                                contactService.updateContact({ ...contactObj, upiId: undefined });
+                                loadData();
+                              }
                             }
-                          }
-                          setTempUpiId('');
-                          toast.info('UPI ID cleared. You can enter a new one.');
-                          haptics.selection();
-                        }}
-                        className="text-[9px] text-muted-foreground hover:underline uppercase tracking-wider font-bold mt-1 block mx-auto"
-                      >
-                        Change UPI ID
-                      </button>
+                            setTempUpiId('');
+                            toast.info('UPI ID cleared. You can enter a new one.');
+                            haptics.selection();
+                          }}
+                          className="text-[9px] text-muted-foreground hover:underline uppercase tracking-wider font-bold"
+                        >
+                          Change UPI ID
+                        </button>
+                        
+                        <button 
+                          onClick={() => handleCopyLink(upiUrl)}
+                          className="text-[9px] text-muted-foreground hover:underline uppercase tracking-wider font-bold flex items-center gap-1"
+                        >
+                          {copiedUpi ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                          <span>{copiedUpi ? 'Copied' : 'Copy Link'}</span>
+                        </button>
+                      </div>
                     </div>
 
                     {!isOwed && (
@@ -893,13 +954,37 @@ export function SplitsModule() {
             {/* QR Code and Info */}
             {quickUpiId.trim() ? (
               <div className="p-4 rounded-2xl bg-muted/20 border border-border/20 flex flex-col items-center gap-3">
-                <div className="relative p-2 bg-white rounded-2xl shadow-md border border-white/10 shrink-0">
-                  <canvas id="quick-upi-canvas" className="rounded-lg h-36 w-36" />
+                <div className="relative p-[3px] bg-gradient-to-tr from-primary via-violet-500 to-cyan-400 rounded-[22px] shadow-glow-sm shrink-0">
+                  <div className="relative p-2 bg-white rounded-[19px] flex items-center justify-center overflow-hidden">
+                    <canvas id="quick-upi-canvas" className="rounded-lg h-32 w-32" />
+                    {/* Center Logo Overlay */}
+                    <div className="absolute inset-0 m-auto w-8 h-8 rounded-xl bg-gradient-brand flex items-center justify-center shadow-md border-2 border-white overflow-hidden z-10">
+                      <img src="/logo.png" alt="Logo" className="h-4.5 w-4.5 object-contain" />
+                    </div>
+                    {/* Animated Scanner Laser Line */}
+                    <div className="scanner-line" />
+                  </div>
                 </div>
                 
-                <p className="text-xs font-mono font-bold text-primary select-all">
-                  {quickUpiId}
-                </p>
+                <div className="text-center w-full space-y-1.5">
+                  <p className="text-xs font-mono font-bold text-primary select-all">
+                    {quickUpiId}
+                  </p>
+                  
+                  {(() => {
+                    const name = settings.billedFrom.name || 'User';
+                    const upiUrl = `upi://pay?pa=${quickUpiId.trim()}&pn=${encodeURIComponent(name)}&am=${quickAmount.toFixed(2)}&cu=INR`;
+                    return (
+                      <button 
+                        onClick={() => handleCopyLink(upiUrl)}
+                        className="text-[9px] text-muted-foreground hover:underline uppercase tracking-wider font-bold mx-auto flex items-center gap-1"
+                      >
+                        {copiedUpi ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                        <span>{copiedUpi ? 'Copied' : 'Copy Link'}</span>
+                      </button>
+                    );
+                  })()}
+                </div>
                 {quickAmount > 0 && (
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                     Requesting: {formatCurrency(quickAmount)}
