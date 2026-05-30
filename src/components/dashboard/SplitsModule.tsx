@@ -11,10 +11,13 @@ import { contactService } from '@/lib/contact-service';
 import { storageService } from '@/lib/storage';
 import { tripService } from '@/lib/trip-service';
 import { scheduleSplitReminders } from '@/lib/split-reminders';
+import { settingsService } from '@/lib/settings';
 import { cn, formatCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { haptics } from '@/lib/haptics';
 import { toast } from 'sonner';
+import QRCode from 'qrcode';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +56,53 @@ export function SplitsModule() {
   // Settle Up Dialog State
   const [settlePerson, setSettlePerson] = useState<PersonBalance | null>(null);
   const [isSettling, setIsSettling] = useState(false);
+  const [settings, setSettings] = useState(() => settingsService.get());
+  const [tempUpiId, setTempUpiId] = useState('');
+
+  const contacts = useMemo(() => contactService.getContacts(), [expenses]);
+
+  useEffect(() => {
+    if (!isSettling || !settlePerson) return;
+    
+    const isOwed = settlePerson.netBalance > 0;
+    let upi = '';
+    
+    if (isOwed) {
+      upi = settings.upiId || '';
+    } else {
+      const contactObj = contacts.find(c => c.id === settlePerson.contactId);
+      upi = contactObj?.upiId || '';
+    }
+    
+    setTempUpiId(upi);
+  }, [isSettling, settlePerson, settings, contacts]);
+
+  useEffect(() => {
+    if (!isSettling || !settlePerson || !tempUpiId) return;
+
+    const isOwed = settlePerson.netBalance > 0;
+    const name = isOwed ? (settings.billedFrom.name || 'User') : settlePerson.contactName;
+    const amount = Math.abs(settlePerson.netBalance);
+    const upiUrl = `upi://pay?pa=${tempUpiId.trim()}&pn=${encodeURIComponent(name)}&am=${amount.toFixed(2)}&cu=INR`;
+
+    const timer = setTimeout(() => {
+      const canvas = document.getElementById('upi-qrcode-canvas') as HTMLCanvasElement;
+      if (canvas) {
+        QRCode.toCanvas(canvas, upiUrl, {
+          width: 144,
+          margin: 1,
+          color: {
+            dark: '#1e1b4b',
+            light: '#ffffff'
+          }
+        }, (err) => {
+          if (err) console.error('QR code generation error:', err);
+        });
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [isSettling, settlePerson, tempUpiId, settings]);
 
   // Load initial data
   const loadData = () => {
@@ -71,8 +121,6 @@ export function SplitsModule() {
       window.removeEventListener('expenses-updated', handleExpensesUpdate);
     };
   }, []);
-
-  const contacts = useMemo(() => contactService.getContacts(), [expenses]);
 
   // Compute balances per contact
   const peopleBalances = useMemo(() => {
@@ -573,23 +621,155 @@ export function SplitsModule() {
       </div>
 
       {/* ── Settle Up Confirmation Dialog ─────────────────────────── */}
-      <AlertDialog open={isSettling} onOpenChange={setIsSettling}>
+      <AlertDialog open={isSettling} onOpenChange={(open) => {
+        setIsSettling(open);
+        if (!open) setSettlePerson(null);
+      }}>
         <AlertDialogContent className="rounded-3xl border-border/40 glass max-w-[90vw] sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-bold">
-              Clear all balances with {settlePerson?.contactName}?
+              Clear balances with {settlePerson?.contactName}?
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-muted-foreground">
+            <AlertDialogDescription className="text-muted-foreground text-xs leading-relaxed">
               This will mark all {settlePerson?.unpaidExpenses.length} unpaid bills with {settlePerson?.contactName} as paid.
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          {settlePerson && (
+            <div className="py-2 space-y-4">
+              {/* Debt summary card */}
+              <div className={cn(
+                "p-4 rounded-2xl border text-center space-y-1 bg-black/10",
+                settlePerson.netBalance > 0 ? "border-emerald-500/20" : "border-rose-500/20"
+              )}>
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  {settlePerson.netBalance > 0 ? "They owe you" : "You owe them"}
+                </p>
+                <h4 className={cn(
+                  "text-2xl font-display font-black",
+                  settlePerson.netBalance > 0 ? "text-emerald-400" : "text-rose-400"
+                )}>
+                  {formatCurrency(Math.abs(settlePerson.netBalance))}
+                </h4>
+              </div>
+
+              {/* UPI section */}
+              {(() => {
+                const isOwed = settlePerson.netBalance > 0;
+                const contactObj = contacts.find(c => c.id === settlePerson.contactId);
+                const currentUpi = isOwed ? settings.upiId : contactObj?.upiId;
+
+                if (!currentUpi) {
+                  return (
+                    <div className="space-y-3 p-4 rounded-2xl bg-muted/20 border border-border/20 text-left">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-bold">UPI Payments Offline</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {isOwed 
+                              ? "Set your UPI ID to show a settlement QR Code for them to scan." 
+                              : `Add ${settlePerson.contactName}'s UPI ID to generate a payment link & QR Code.`}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Input
+                          value={tempUpiId}
+                          onChange={e => setTempUpiId(e.target.value)}
+                          placeholder="e.g. name@upi"
+                          className="h-9 text-xs rounded-xl bg-background/50 border-border/40 font-mono"
+                        />
+                        <Button
+                          onClick={() => {
+                            if (!tempUpiId.trim()) return;
+                            if (isOwed) {
+                              const updated = { ...settings, upiId: tempUpiId.trim() };
+                              settingsService.save(updated);
+                              setSettings(updated);
+                              toast.success('Your UPI ID saved');
+                            } else {
+                              if (contactObj) {
+                                contactService.updateContact({
+                                  ...contactObj,
+                                  upiId: tempUpiId.trim()
+                                });
+                                toast.success(`${settlePerson.contactName}'s UPI ID saved`);
+                                loadData();
+                              }
+                            }
+                            haptics.success();
+                          }}
+                          className="h-9 px-3 rounded-xl bg-primary text-primary-foreground font-bold text-xs"
+                        >
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // If UPI ID exists, show QR code & Pay link
+                const upiUrl = `upi://pay?pa=${currentUpi}&pn=${encodeURIComponent(isOwed ? (settings.billedFrom.name || 'User') : settlePerson.contactName)}&am=${Math.abs(settlePerson.netBalance).toFixed(2)}&cu=INR`;
+
+                return (
+                  <div className="p-4 rounded-2xl bg-muted/20 border border-border/20 flex flex-col items-center gap-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                      {isOwed ? "Ask them to scan this QR" : "Scan to pay or tap pay button"}
+                    </p>
+
+                    <div className="relative p-2 bg-white rounded-2xl shadow-md border border-white/10 shrink-0">
+                      <canvas id="upi-qrcode-canvas" className="rounded-lg h-36 w-36" />
+                    </div>
+
+                    <div className="text-center">
+                      <p className="text-xs font-mono font-bold select-all text-primary">{currentUpi}</p>
+                      <button 
+                        onClick={() => {
+                          if (isOwed) {
+                            const updated = { ...settings, upiId: '' };
+                            settingsService.save(updated);
+                            setSettings(updated);
+                          } else {
+                            if (contactObj) {
+                              contactService.updateContact({ ...contactObj, upiId: undefined });
+                              loadData();
+                            }
+                          }
+                          setTempUpiId('');
+                          toast.info('UPI ID cleared. You can enter a new one.');
+                          haptics.selection();
+                        }}
+                        className="text-[9px] text-muted-foreground hover:underline uppercase tracking-wider font-bold mt-1 block mx-auto"
+                      >
+                        Change UPI ID
+                      </button>
+                    </div>
+
+                    {!isOwed && (
+                      <a
+                        href={upiUrl}
+                        onClick={() => haptics.medium()}
+                        className="flex items-center justify-center gap-2 w-full h-11 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-md mt-1"
+                      >
+                        <Wallet className="h-4 w-4" />
+                        <span>Pay via UPI App</span>
+                      </a>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
           <AlertDialogFooter className="gap-2">
             <AlertDialogCancel className="rounded-xl border-white/10 hover:bg-white/5">Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={confirmSettlePerson}
               className="rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white border-none"
             >
-              Clear Balances
+              Clear Balances (Mark Paid)
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

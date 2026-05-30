@@ -22,6 +22,7 @@ const defaultSettings: AppSettings = {
   budgets: [],
   hapticsEnabled: true,
   navOrder: ['dashboard', 'expenses', 'splits', 'food', 'reimbursements', 'trips', 'vehicle', 'analytics', 'settings'],
+  upiId: '',
 };
 
 export const settingsService = {

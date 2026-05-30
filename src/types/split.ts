@@ -6,6 +6,7 @@ export interface Contact {
   email?: string;
   phone?: string;
   avatar?: string;
+  upiId?: string;
   createdAt: string;
 }
 

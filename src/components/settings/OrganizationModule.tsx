@@ -63,6 +63,12 @@ export function OrganizationModule({ settings, updateSettings, onBack }: Organiz
               placeholder="+91 98765 43210"
             />
           </div>
+          <Field
+            id="bf-upi" label="Your UPI ID (For receiving splits)"
+            value={settings.upiId || ''}
+            onChange={v => updateSettings({ upiId: v })}
+            placeholder="username@okaxis"
+          />
         </div>
       </div>
     </div>

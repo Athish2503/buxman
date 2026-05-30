@@ -68,4 +68,5 @@ export interface AppSettings {
   biometricLock?: boolean;
   hapticsEnabled?: boolean;
   navOrder?: string[];
+  upiId?: string;
 }
