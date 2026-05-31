@@ -23,6 +23,10 @@ const defaultSettings: AppSettings = {
   hapticsEnabled: true,
   navOrder: ['dashboard', 'expenses', 'splits', 'food', 'reimbursements', 'trips', 'vehicle', 'analytics', 'settings'],
   upiId: '',
+  googleDriveClientId: '',
+  googleDriveBackupEnabled: false,
+  googleDriveLastBackup: '',
+  googleDriveLinkedEmail: '',
 };
 
 export const settingsService = {

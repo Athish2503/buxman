@@ -19,6 +19,8 @@ import { walletService } from "./lib/modules-storage";
 import { Onboarding } from "./components/onboarding";
 import { metaService } from "./lib/recurring";
 
+import { googleDriveService } from "./lib/google-drive";
+
 const queryClient = new QueryClient();
 
 const App = () => {
@@ -32,6 +34,9 @@ const App = () => {
   useEffect(() => {
     // Init storage in parallel with splash
     storageEngine.init().then(async () => {
+      // Intercept and handle Google Drive redirect token callback
+      googleDriveService.handleRedirectCallback();
+
       // Sync wallet reminders
       walletService.syncReminders();
 

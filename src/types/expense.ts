@@ -69,4 +69,8 @@ export interface AppSettings {
   hapticsEnabled?: boolean;
   navOrder?: string[];
   upiId?: string;
+  googleDriveClientId?: string;
+  googleDriveBackupEnabled?: boolean;
+  googleDriveLastBackup?: string;
+  googleDriveLinkedEmail?: string;
 }
