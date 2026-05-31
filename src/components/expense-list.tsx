@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
 import {
   Edit, Trash2, Eye, Filter, Download, Search,
@@ -82,6 +82,110 @@ export function ExpenseList({
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
 
+  // Slide-to-select variables
+  const isSlidingRef = useRef(false);
+  const slideActionRef = useRef<'select' | 'deselect' | null>(null);
+  const lastSlidIdRef = useRef<string | null>(null);
+
+  const handleMouseDown = (e: React.MouseEvent, id: string) => {
+    // Only start slide selection if selection is already active
+    if (selected.size === 0) return;
+    if (e.button !== 0) return; // Only left click
+
+    isSlidingRef.current = true;
+    const isSelected = selected.has(id);
+    slideActionRef.current = isSelected ? 'deselect' : 'select';
+    lastSlidIdRef.current = id;
+
+    toggleSelect(id);
+  };
+
+  const handleMouseEnter = (id: string) => {
+    if (!isSlidingRef.current || !slideActionRef.current) return;
+    if (lastSlidIdRef.current === id) return;
+
+    lastSlidIdRef.current = id;
+    haptics.selection();
+
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (slideActionRef.current === 'select') {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const handleTouchStart = (e: React.TouchEvent, id: string) => {
+    if (selected.size === 0) return;
+
+    isSlidingRef.current = true;
+    const isSelected = selected.has(id);
+    slideActionRef.current = isSelected ? 'deselect' : 'select';
+    lastSlidIdRef.current = id;
+
+    toggleSelect(id);
+  };
+
+  const handleTouchMove = (e: TouchEvent) => {
+    if (!isSlidingRef.current || !slideActionRef.current) return;
+
+    const touch = e.touches[0];
+    const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+    const itemEl = targetEl?.closest('[data-expense-id]');
+    const id = itemEl?.getAttribute('data-expense-id');
+
+    if (id && lastSlidIdRef.current !== id) {
+      lastSlidIdRef.current = id;
+      haptics.selection();
+
+      setSelected(prev => {
+        const next = new Set(prev);
+        if (slideActionRef.current === 'select') {
+          next.add(id);
+        } else {
+          next.delete(id);
+        }
+        return next;
+      });
+    }
+  };
+
+  const handleTouchEnd = () => {
+    isSlidingRef.current = false;
+    slideActionRef.current = null;
+    lastSlidIdRef.current = null;
+  };
+
+  const handleMouseUp = () => {
+    isSlidingRef.current = false;
+    slideActionRef.current = null;
+    lastSlidIdRef.current = null;
+  };
+
+  useEffect(() => {
+    const onMouseUp = () => handleMouseUp();
+    const onTouchMove = (e: TouchEvent) => {
+      if (isSlidingRef.current) {
+        if (e.cancelable) e.preventDefault();
+        handleTouchMove(e);
+      }
+    };
+    const onTouchEnd = () => handleTouchEnd();
+
+    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onTouchEnd);
+
+    return () => {
+      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+    };
+  }, []);
+
   useEffect(() => {
     setFilterType(initialFilterType);
   }, [initialFilterType]);
@@ -147,10 +251,25 @@ export function ExpenseList({
     });
   };
 
+  const reimbursableExpenses = filteredExpenses.filter(e => e.status !== 'reimbursed');
+  const isAllReimbursableSelected = reimbursableExpenses.length > 0 && reimbursableExpenses.every(e => selected.has(e.id));
+
   const toggleSelectAll = () => {
     haptics.selection();
-    if (selected.size === filteredExpenses.length) setSelected(new Set());
-    else setSelected(new Set(filteredExpenses.map(e => e.id)));
+    if (reimbursableExpenses.length === 0) return;
+    if (isAllReimbursableSelected) {
+      setSelected(prev => {
+        const next = new Set(prev);
+        reimbursableExpenses.forEach(e => next.delete(e.id));
+        return next;
+      });
+    } else {
+      setSelected(prev => {
+        const next = new Set(prev);
+        reimbursableExpenses.forEach(e => next.add(e.id));
+        return next;
+      });
+    }
   };
 
   const clearSelection = () => setSelected(new Set());
@@ -365,6 +484,22 @@ export function ExpenseList({
           <button onClick={() => { setViewMode('cards'); haptics.selection(); }} className={cn("h-8 w-8 flex items-center justify-center rounded-lg transition-all", viewMode === 'cards' ? "bg-card shadow-sm text-primary" : "text-muted-foreground")}><MoreVertical className="h-3.5 w-3.5 rotate-90" /></button>
           <button onClick={() => { setViewMode('table'); haptics.selection(); }} className={cn("h-8 w-8 flex items-center justify-center rounded-lg transition-all", viewMode === 'table' ? "bg-card shadow-sm text-primary" : "text-muted-foreground")}><ArrowUpDown className="h-3.5 w-3.5" /></button>
         </div>
+        <Button 
+          variant="outline" 
+          size="icon" 
+          onClick={toggleSelectAll} 
+          className={cn(
+            "h-10 w-10 shrink-0 rounded-xl bg-card/40 border-white/5 text-muted-foreground hover:text-foreground",
+            isAllReimbursableSelected && "text-primary border-primary/20 bg-primary/5"
+          )}
+          title={isAllReimbursableSelected ? "Deselect All" : "Select All"}
+        >
+          {isAllReimbursableSelected ? (
+            <CheckSquare className="h-4.5 w-4.5 text-primary" />
+          ) : (
+            <Square className="h-4.5 w-4.5" />
+          )}
+        </Button>
         <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
           <SheetTrigger asChild>
             <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 rounded-xl bg-card/40 border-white/5"><SlidersHorizontal className="h-4 w-4" /></Button>
@@ -395,20 +530,28 @@ export function ExpenseList({
                         Total: <span className="text-foreground">{formatCurrency(total)}</span>
                       </p>
                    </div>
-                   <div className="space-y-3">
-                    {groupExpenses.map(expense => (
-                      <ExpenseItem
-                        key={expense.id}
-                        expense={expense}
-                        isSelected={selected.has(expense.id)}
-                        onToggleSelect={toggleSelect}
-                        onView={setSelectedExpense}
-                        onEdit={setEditingExpense}
-                        onDelete={onDeleteExpense}
-                        onStatusChange={handleStatusChange}
-                      />
-                    ))}
-                   </div>
+                    <div className="space-y-3">
+                     {groupExpenses.map(expense => (
+                       <div
+                         key={expense.id}
+                         data-expense-id={expense.id}
+                         onMouseDown={(e) => handleMouseDown(e, expense.id)}
+                         onMouseEnter={() => handleMouseEnter(expense.id)}
+                         onTouchStart={(e) => handleTouchStart(e, expense.id)}
+                         className="select-none"
+                       >
+                         <ExpenseItem
+                           expense={expense}
+                           isSelected={selected.has(expense.id)}
+                           onToggleSelect={toggleSelect}
+                           onView={setSelectedExpense}
+                           onEdit={setEditingExpense}
+                           onDelete={onDeleteExpense}
+                           onStatusChange={handleStatusChange}
+                         />
+                       </div>
+                     ))}
+                    </div>
                 </div>
               ))}
             </div>
@@ -418,7 +561,7 @@ export function ExpenseList({
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-white/5 border-b border-white/5">
-                  <th className="p-4 w-10"><Checkbox checked={selected.size === filteredExpenses.length && filteredExpenses.length > 0} onCheckedChange={toggleSelectAll} /></th>
+                  <th className="p-4 w-10"><Checkbox checked={isAllReimbursableSelected} onCheckedChange={toggleSelectAll} /></th>
                   <th className="p-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Vendor</th>
                   <th className="p-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 text-right">Amount</th>
                   <th className="p-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Status</th>

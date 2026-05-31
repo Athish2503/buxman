@@ -2,8 +2,10 @@ import jsPDF from 'jspdf';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+import QRCode from 'qrcode';
 import { Expense, ExpenseSummary } from '@/types/expense';
 import { getCategoryConfig } from '@/lib/categories';
+import { settingsService } from '@/lib/settings';
 import { format } from 'date-fns';
 
 interface PartyInfo {
@@ -18,6 +20,7 @@ interface PDFOptions {
   billedFrom?: PartyInfo;
   shareMessage?: string;
   invoiceNo?: string;
+  upiId?: string;
 }
 
 // Refined professional palette — neutral with a single accent
@@ -111,6 +114,26 @@ export const generateExpensesPDF = async (
 
   const billedTo = options.billedTo || { name: 'Company Name', line2: 'Accounts Payable Dept.' };
   const billedFrom = options.billedFrom || { name: 'Employee Name', line2: 'Reimbursement Claim' };
+
+  // Resolve UPI ID and generate QR Code if available
+  const settings = settingsService.get();
+  const upiId = options.upiId || settings.upiId;
+  let qrCodeDataUrl = '';
+  let upiUrl = '';
+  if (upiId && upiId.trim()) {
+    const payeeName = billedFrom.name || 'Employee';
+    const amountStr = summary.total.toFixed(2);
+    upiUrl = `upi://pay?pa=${upiId.trim()}&pn=${encodeURIComponent(payeeName)}&am=${amountStr}&cu=INR&tn=${encodeURIComponent(invoiceNo)}`;
+    try {
+      qrCodeDataUrl = await QRCode.toDataURL(upiUrl, {
+        margin: 1,
+        width: 150,
+        errorCorrectionLevel: 'M',
+      });
+    } catch (err) {
+      console.error('Failed to generate UPI QR code:', err);
+    }
+  }
 
   // Palette - Executive Slate & Sky
   const P = {
@@ -308,27 +331,126 @@ export const generateExpensesPDF = async (
     y += rowH;
   });
 
-  // ===== GRAND TOTAL =====
-  y += 15;
-  const totalBoxW = 60;
-  const totalBoxX = W - M - totalBoxW;
-  
-  // Total Label
-  setText(pdf, P.muted);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(8);
-  pdf.text('TOTAL REIMBURSEMENT DUE', totalBoxX, y);
-  
-  y += 6;
-  renderText(pdf, formatINR(summary.total), W - M, y, 18, P.ink, 'bold', 'right');
+  // ===== GRAND TOTAL & UPI PAYMENT =====
+  const hasUpi = !!qrCodeDataUrl;
+  const bottomSectionHeight = hasUpi ? 50 : 35;
+  if (y + bottomSectionHeight > H - 20) {
+    pdf.addPage();
+    y = 20;
+  } else {
+    y += 15;
+  }
 
-  // Signature
-  y += 20;
-  setDraw(pdf, P.border);
-  pdf.line(W - M - 50, y, W - M, y);
-  setText(pdf, P.muted);
-  pdf.setFontSize(7);
-  pdf.text('AUTHORIZED SIGNATURE', W - M - 25, y + 4, { align: 'center' });
+  const sectionY = y;
+
+  if (hasUpi) {
+    // Render Left Column: Premium UPI payment card
+    const cardX = M;
+    const cardY = sectionY;
+    const cardW = 95;
+    const cardH = 38;
+
+    // Background Card Surface
+    setFill(pdf, P.surface);
+    pdf.roundedRect(cardX, cardY, cardW, cardH, 2, 2, 'F');
+    // Card Border
+    pdf.setLineWidth(0.2);
+    setDraw(pdf, P.border);
+    pdf.roundedRect(cardX, cardY, cardW, cardH, 2, 2, 'S');
+
+    // Draw the QR Code image on the left of the card
+    const qrSize = 32;
+    const qrX = cardX + 3;
+    const qrY = cardY + 3;
+    pdf.addImage(qrCodeDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+
+    // Draw details on the right of the card
+    const infoX = cardX + 38;
+    
+    // Title
+    setText(pdf, P.accent);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(9);
+    pdf.text('Scan or Tap to Pay', infoX, cardY + 8);
+
+    // Subtitle
+    setText(pdf, P.muted);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(6.5);
+    pdf.text('Detects UPI apps on tap', infoX, cardY + 12);
+
+    // Payee
+    setText(pdf, P.body);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.5);
+    const payeeName = billedFrom.name || 'Employee';
+    const truncatedPayee = payeeName.length > 25 ? payeeName.substring(0, 23) + '..' : payeeName;
+    pdf.text(`Payee: ${truncatedPayee}`, infoX, cardY + 18);
+
+    // UPI ID
+    setText(pdf, P.ink);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7.5);
+    const truncatedUpi = upiId.length > 22 ? upiId.substring(0, 20) + '..' : upiId;
+    pdf.text(`UPI: ${truncatedUpi}`, infoX, cardY + 23);
+
+    // Amount due
+    setText(pdf, P.ink);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10.5);
+    pdf.text(formatINR(summary.total), infoX, cardY + 31);
+
+
+
+    // Render Right Column: Totals & Signature
+    const totalBoxW = 60;
+    const totalBoxX = W - M - totalBoxW;
+
+    // Total Label
+    setText(pdf, P.muted);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    pdf.text('TOTAL REIMBURSEMENT DUE', totalBoxX, sectionY + 5);
+
+    // Total Amount
+    renderText(pdf, formatINR(summary.total), W - M, sectionY + 14, 18, P.ink, 'bold', 'right');
+
+    // Signature
+    setDraw(pdf, P.border);
+    pdf.setLineWidth(0.3);
+    pdf.line(W - M - 50, sectionY + 28, W - M, sectionY + 28);
+    
+    setText(pdf, P.muted);
+    pdf.setFontSize(7);
+    pdf.text('AUTHORIZED SIGNATURE', W - M - 25, sectionY + 32, { align: 'center' });
+
+    y = sectionY + cardH + 10;
+  } else {
+    // Original fallback layout
+    const totalBoxW = 60;
+    const totalBoxX = W - M - totalBoxW;
+
+    // Total Label
+    setText(pdf, P.muted);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    pdf.text('TOTAL REIMBURSEMENT DUE', totalBoxX, sectionY);
+
+    y = sectionY + 6;
+    renderText(pdf, formatINR(summary.total), W - M, y, 18, P.ink, 'bold', 'right');
+
+    // Signature
+    y += 20;
+    setDraw(pdf, P.border);
+    pdf.setLineWidth(0.3);
+    pdf.line(W - M - 50, y, W - M, y);
+    
+    setText(pdf, P.muted);
+    pdf.setFontSize(7);
+    pdf.text('AUTHORIZED SIGNATURE', W - M - 25, y + 4, { align: 'center' });
+
+    y = y + 10;
+  }
 
   // ===== PROOF OF EXPENSES =====
   const hasImages = expenses.filter(e => e.receiptImage);
