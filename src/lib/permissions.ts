@@ -9,6 +9,7 @@ export interface PermissionStatus {
   notifications: boolean;
   financialNotifications: boolean;
   overlay: boolean;
+  isMiui?: boolean;
   allGranted: boolean;
 }
 
@@ -24,6 +25,7 @@ export const permissions = {
         notifications: true, 
         financialNotifications: true,
         overlay: true,
+        isMiui: false,
         allGranted: true 
       };
     }
@@ -32,7 +34,7 @@ export const permissions = {
       const cameraStatus = await Camera.checkPermissions();
       const notificationStatus = await LocalNotifications.checkPermissions();
       
-      let financialStatus = { notifications: false, overlay: false };
+      let financialStatus: { notifications: boolean; overlay: boolean; isMiui?: boolean } = { notifications: false, overlay: false, isMiui: false };
       try {
         financialStatus = await FinancialNotification.checkFinancialPermissions();
       } catch (e) {
@@ -40,7 +42,8 @@ export const permissions = {
         if ((window as any).NativeBridge) {
           financialStatus = {
             notifications: (window as any).NativeBridge.checkNotificationPermission(),
-            overlay: (window as any).NativeBridge.checkOverlayPermission()
+            overlay: (window as any).NativeBridge.checkOverlayPermission(),
+            isMiui: false
           };
         }
       }
@@ -53,6 +56,7 @@ export const permissions = {
         notifications: notificationStatus.display === 'granted',
         financialNotifications: financialStatus.notifications,
         overlay: financialStatus.overlay,
+        isMiui: financialStatus.isMiui || false,
         allGranted: false
       };
 

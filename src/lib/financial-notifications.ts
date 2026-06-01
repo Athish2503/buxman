@@ -1,9 +1,10 @@
 import { registerPlugin } from '@capacitor/core';
 
 export interface FinancialNotificationPlugin {
-  checkFinancialPermissions(): Promise<{ notifications: boolean; overlay: boolean }>;
+  checkFinancialPermissions(): Promise<{ notifications: boolean; overlay: boolean; isMiui?: boolean }>;
   openNotificationSettings(): Promise<void>;
   openOverlaySettings(): Promise<void>;
+  openMiuiPermissionSettings(): Promise<{ success: boolean }>;
   updateCategories(options: { categories: string[] }): Promise<void>;
   flushPendingQueue(): Promise<void>;
   requestIgnoreBatteryOptimizations(): Promise<void>;

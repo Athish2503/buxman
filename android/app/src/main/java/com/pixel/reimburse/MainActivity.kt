@@ -232,6 +232,14 @@ class MainActivity : BridgeActivity() {
         super.onResume()
         bridge.webView.onResume()
         bridge.webView.resumeTimers()
+
+        // Auto-heal notification listener connection if enabled but not connected
+        val enabledListeners = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
+        val isServiceEnabled = enabledListeners != null && enabledListeners.contains(packageName)
+        if (isServiceEnabled && !com.pixel.reimburse.transactions.TransactionNotificationListener.isConnected) {
+            Log.d("MainActivity", "Notification listener enabled but not active. Rebinding on app resume...")
+            com.pixel.reimburse.transactions.TransactionNotificationListener.rebindService(this)
+        }
     }
 
     override fun onDestroy() {

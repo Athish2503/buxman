@@ -168,11 +168,52 @@ class FinancialNotificationPlugin : Plugin() {
         Log.d("FinancialNotification", "FinancialNotificationPlugin initialized successfully.")
     }
 
+    private fun isMiuiDevice(): Boolean {
+        return try {
+            val buildClass = Class.forName("miui.os.Build")
+            buildClass != null
+        } catch (e: Exception) {
+            val manufacturer = android.os.Build.MANUFACTURER.lowercase(java.util.Locale.US)
+            manufacturer.contains("xiaomi") || manufacturer.contains("redmi") || manufacturer.contains("poco")
+        }
+    }
+
+    private fun openMiuiPermissionEditor(context: Context): Boolean {
+        return try {
+            val intent = Intent("miui.intent.action.APP_PERM_EDITOR").apply {
+                setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
+                putExtra("extra_pkgname", context.packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            Log.e("FinancialNotification", "Failed to open MIUI App Perm Editor directly", e)
+            false
+        }
+    }
+
+    @PluginMethod
+    fun openMiuiPermissionSettings(call: PluginCall) {
+        val success = openMiuiPermissionEditor(context)
+        val result = JSObject().apply {
+            put("success", success)
+        }
+        call.resolve(result)
+    }
+
     @PluginMethod
     fun checkFinancialPermissions(call: PluginCall) {
+        val notificationsEnabled = isNotificationServiceEnabled()
+        if (notificationsEnabled && !com.pixel.reimburse.transactions.TransactionNotificationListener.isConnected) {
+            Log.d("FinancialNotification", "Notification listener enabled but not connected. Rebinding...")
+            com.pixel.reimburse.transactions.TransactionNotificationListener.rebindService(context)
+        }
+
         val result = JSObject().apply {
-            put("notifications", isNotificationServiceEnabled())
+            put("notifications", notificationsEnabled)
             put("overlay", Settings.canDrawOverlays(context))
+            put("isMiui", isMiuiDevice())
         }
         call.resolve(result)
     }

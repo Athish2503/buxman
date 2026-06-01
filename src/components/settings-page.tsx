@@ -10,9 +10,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-import { AppSettings, BudgetGoal, CategoryDefinition, ExpenseCategory } from '@/types/expense';
+import { AppSettings, BudgetGoal, ExpenseCategory } from '@/types/expense';
 import { settingsService } from '@/lib/settings';
-import { categoryService, iconMap } from '@/lib/category-service';
+import { CategoryDefinition, categoryService, iconMap } from '@/lib/category-service';
 import { storageEngine } from '@/lib/storage-engine';
 import { cn } from '@/lib/utils';
 
@@ -49,7 +49,8 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
   const [permissionsStatus, setPermissionsStatus] = useState({
     sms: false,
     notifications: false,
-    overlay: false
+    overlay: false,
+    isMiui: false
   });
   const [showConfirm, setShowConfirm] = useState<{
     title: string;
@@ -73,10 +74,14 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
     if (activeTab === 'smart') {
       const check = async () => {
         const { permissions } = await import('@/lib/permissions');
+        const status = await permissions.checkStatus();
         const sms = await permissions.checkSMSStatus();
-        const notifications = await permissions.checkNotificationStatus();
-        const overlay = await permissions.checkOverlayStatus();
-        setPermissionsStatus({ sms, notifications, overlay });
+        setPermissionsStatus({ 
+          sms, 
+          notifications: status.financialNotifications, 
+          overlay: status.overlay, 
+          isMiui: status.isMiui || false 
+        });
       };
       check();
       interval = setInterval(check, 2000);

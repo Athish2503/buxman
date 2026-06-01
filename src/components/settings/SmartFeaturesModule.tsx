@@ -13,6 +13,7 @@ interface SmartFeaturesModuleProps {
     sms: boolean;
     notifications: boolean;
     overlay: boolean;
+    isMiui?: boolean;
   };
   onBack: () => void;
 }
@@ -217,6 +218,33 @@ export function SmartFeaturesModule({ permissionsStatus, onBack }: SmartFeatures
           >
             {isOverlayActive ? 'Overlay Permission Granted' : 'Grant Overlay Permission'}
           </Button>
+
+          {permissionsStatus.isMiui && (
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-[11px] text-amber-200/90 space-y-2 mt-2">
+              <p className="font-bold flex items-center gap-1.5 text-amber-400">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                MIUI/Xiaomi Background Pop-up Settings
+              </p>
+              <p className="leading-relaxed">
+                Xiaomi devices require a specific system setting to display transaction overlays when the app is in the background. Please open the Permissions Editor and enable <strong>"Display pop-up windows while running in the background"</strong>.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full rounded-xl border-amber-500/30 hover:bg-amber-500/20 text-xs font-bold text-amber-300 bg-transparent h-9"
+                onClick={async () => {
+                  try {
+                    toast.info("Opening MIUI permissions editor...");
+                    await (await import('@/lib/financial-notifications')).default.openMiuiPermissionSettings();
+                  } catch (e) {
+                    toast.error("Failed to launch settings screen");
+                  }
+                }}
+              >
+                Configure MIUI Pop-up Settings
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* ════════════════════════════════════════════════════════════

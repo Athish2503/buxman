@@ -8,6 +8,43 @@ import android.util.Log
 class TransactionNotificationListener : NotificationListenerService() {
     companion object {
         private const val TAG = "TRANSACTION_DEBUG"
+        @Volatile
+        var isConnected = false
+            private set
+
+        fun rebindService(context: android.content.Context) {
+            val component = android.content.ComponentName(context, TransactionNotificationListener::class.java)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                try {
+                    Log.i(TAG, "Attempting requestRebind for TransactionNotificationListener")
+                    requestRebind(component)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed requestRebind, falling back to toggle", e)
+                    toggleService(context, component)
+                }
+            } else {
+                toggleService(context, component)
+            }
+        }
+
+        private fun toggleService(context: android.content.Context, component: android.content.ComponentName) {
+            try {
+                val pm = context.packageManager
+                pm.setComponentEnabledSetting(
+                    component,
+                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    android.content.pm.PackageManager.DONT_KILL_APP
+                )
+                pm.setComponentEnabledSetting(
+                    component,
+                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                    android.content.pm.PackageManager.DONT_KILL_APP
+                )
+                Log.i(TAG, "Toggled TransactionNotificationListener service state to force system rebind.")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed toggling listener service state", e)
+            }
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -96,11 +133,25 @@ class TransactionNotificationListener : NotificationListenerService() {
 
     override fun onListenerConnected() {
         super.onListenerConnected()
+        isConnected = true
         Log.i(TAG, "TransactionNotificationListener Successfully Bound & Active.")
     }
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
-        Log.w(TAG, "TransactionNotificationListener Disconnected.")
+        isConnected = false
+        Log.w(TAG, "TransactionNotificationListener Disconnected. Requesting rebind.")
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            try {
+                requestRebind(android.content.ComponentName(this, TransactionNotificationListener::class.java))
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed requesting rebind from onListenerDisconnected", e)
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        isConnected = false
     }
 }

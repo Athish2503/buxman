@@ -58,6 +58,25 @@ class OverlayActivity : AppCompatActivity() {
         setupAnimations()
     }
 
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        Log.d(TAG, "OverlayActivity onNewIntent called, refreshing UI components.")
+        
+        // Reset state flags
+        isSavingOrDismissing = false
+        binding.layoutSuccessAnimation.visibility = View.GONE
+        
+        val amount = intent.getDoubleExtra("amount", 0.0)
+        val merchant = intent.getStringExtra("merchant") ?: "Unknown Merchant"
+        val appName = intent.getStringExtra("appName") ?: "System"
+        val type = intent.getStringExtra("type") ?: "debit"
+        val account = intent.getStringExtra("account") ?: ""
+
+        setupUI(amount, merchant, appName, type, account)
+        setupAnimations()
+    }
+
     private fun setupUI(amount: Double, merchant: String, appName: String, type: String, account: String) {
         val isCredit = type == "credit"
         val accentColor = if (isCredit) 0xFF10B981.toInt() else 0xFFEF4444.toInt() // Emerald Green vs Rose Red
