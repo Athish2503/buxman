@@ -110,6 +110,17 @@ class OverlayActivity : AppCompatActivity() {
             updateSplitSummary(amount)
         }
 
+        binding.btnOverlaySaveUpi.setOnClickListener {
+            val enteredUpi = binding.etOverlayUpiId.text.toString().trim()
+            if (enteredUpi.isNotBlank()) {
+                saveUpiIdToStorage(enteredUpi)
+                binding.etOverlayUpiId.clearFocus()
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+                imm?.hideSoftInputFromWindow(binding.etOverlayUpiId.windowToken, 0)
+                updateSplitSummary(amount)
+            }
+        }
+
         val contacts = loadContactsFromStorage()
         if (contacts.isEmpty()) {
             binding.tvSplitSummary.text = "No contacts found. Please add contacts in the main app."
@@ -380,10 +391,79 @@ class OverlayActivity : AppCompatActivity() {
         return list
     }
 
+    private fun loadUpiIdFromStorage(): String? {
+        try {
+            val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+            val settingsKey = "reimburse_settings_v2"
+            val jsonStr = prefs.getString(settingsKey, null)
+            if (jsonStr != null) {
+                val obj = org.json.JSONObject(jsonStr)
+                val upiId = obj.optString("upiId", "")
+                if (upiId.isNotBlank()) return upiId
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load upiId from CapacitorStorage", e)
+        }
+        return null
+    }
+
+    private fun loadUserNameFromStorage(): String {
+        try {
+            val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+            val settingsKey = "reimburse_settings_v2"
+            val jsonStr = prefs.getString(settingsKey, null)
+            if (jsonStr != null) {
+                val obj = org.json.JSONObject(jsonStr)
+                val billedFrom = obj.optJSONObject("billedFrom")
+                if (billedFrom != null) {
+                    val name = billedFrom.optString("name")
+                    if (!name.isNullOrBlank()) return name
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load userName from CapacitorStorage", e)
+        }
+        return "User"
+    }
+
+    private fun loadSettingsFromStorage(): org.json.JSONObject? {
+        try {
+            val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+            val settingsKey = "reimburse_settings_v2"
+            val jsonStr = prefs.getString(settingsKey, null)
+            if (jsonStr != null) {
+                return org.json.JSONObject(jsonStr)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load settings from CapacitorStorage", e)
+        }
+        return null
+    }
+
+    private fun saveUpiIdToStorage(upiId: String) {
+        try {
+            val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+            val settingsKey = "reimburse_settings_v2"
+            val jsonStr = prefs.getString(settingsKey, null)
+            val settingsObj = if (jsonStr != null) {
+                org.json.JSONObject(jsonStr)
+            } else {
+                org.json.JSONObject()
+            }
+            settingsObj.put("upiId", upiId)
+            prefs.edit().putString(settingsKey, settingsObj.toString()).commit()
+            Log.d(TAG, "UPI ID saved natively: $upiId")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save UPI ID natively", e)
+        }
+    }
+
     private fun updateSplitSummary(totalAmount: Double) {
         val selectedChips = getSelectedContacts()
         if (selectedChips.isEmpty()) {
             binding.tvSplitSummary.text = "Select contacts to see split details"
+            binding.layoutOverlayUpiSetup.visibility = View.GONE
+            binding.layoutOverlayQrContainer.visibility = View.GONE
             return
         }
 
@@ -391,6 +471,32 @@ class OverlayActivity : AppCompatActivity() {
         val splitAmount = totalAmount / totalPeople
         val formattedSplit = "₹%,.2f".format(splitAmount)
         binding.tvSplitSummary.text = "Split equally: $totalPeople people. Your share: $formattedSplit. Others owe: $formattedSplit each."
+
+        val upiId = loadUpiIdFromStorage()
+        if (upiId.isNullOrBlank()) {
+            binding.layoutOverlayUpiSetup.visibility = View.VISIBLE
+            binding.layoutOverlayQrContainer.visibility = View.GONE
+        } else {
+            binding.layoutOverlayUpiSetup.visibility = View.GONE
+            binding.layoutOverlayQrContainer.visibility = View.VISIBLE
+
+            val name = loadUserNameFromStorage()
+            val upiUrl = "upi://pay?pa=${upiId.trim()}&pn=${java.net.URLEncoder.encode(name, "UTF-8")}&am=${"%.2f".format(splitAmount)}&cu=INR"
+
+            val settings = loadSettingsFromStorage()
+            val accentColorHex = settings?.optString("accentColor", "#7C3AED") ?: "#7C3AED"
+            val darkColor = try {
+                android.graphics.Color.parseColor(accentColorHex)
+            } catch (e: Exception) {
+                0xFF7C3AED.toInt()
+            }
+
+            val qrBitmap = QRCodeGenerator.generate(upiUrl, 400, darkColor, android.graphics.Color.WHITE)
+            if (qrBitmap != null) {
+                binding.ivOverlayQr.setImageBitmap(qrBitmap)
+                binding.tvOverlayQrDetails.text = "Scan to pay ₹${"%.2f".format(splitAmount)} to $upiId"
+            }
+        }
     }
 
     private fun getSelectedContacts(): List<Pair<String, String>> {

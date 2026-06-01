@@ -237,6 +237,84 @@
                     android:textColor="#94A3B8"
                     android:textSize="12sp"
                     android:layout_marginStart="2dp" />
+
+                <!-- UPI Input field (if not set or edit) -->
+                <LinearLayout
+                    android:id="@+id/layout_overlay_upi_setup"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center_vertical"
+                    android:visibility="gone">
+
+                    <EditText
+                        android:id="@+id/et_overlay_upi_id"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_overlay_input"
+                        android:hint="Enter your UPI ID (e.g. name@okaxis)"
+                        android:padding="10dp"
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#44FFFFFF"
+                        android:textSize="12sp"
+                        android:inputType="textEmailAddress" />
+
+                    <Button
+                        android:id="@+id/btn_overlay_save_upi"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Save"
+                        android:textSize="11sp"
+                        android:layout_marginStart="8dp"
+                        android:backgroundTint="#7C3AED"
+                        app:cornerRadius="8dp" />
+                </LinearLayout>
+
+                <!-- QR Code Display Layout -->
+                <LinearLayout
+                    android:id="@+id/layout_overlay_qr_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:layout_marginTop="16dp"
+                    android:background="#1AFFFFFF"
+                    android:padding="16dp"
+                    android:visibility="gone">
+
+                    <!-- Scan header title -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="SCAN TO PAY BACK"
+                        android:fontFamily="sans-serif-black"
+                        android:letterSpacing="0.2"
+                        android:textColor="#7C3AED"
+                        android:textSize="10sp"
+                        android:layout_marginBottom="8dp" />
+
+                    <!-- QR code image view -->
+                    <ImageView
+                        android:id="@+id/iv_overlay_qr"
+                        android:layout_width="160dp"
+                        android:layout_height="160dp"
+                        android:layout_gravity="center"
+                        android:background="#FFFFFF"
+                        android:padding="8dp" />
+
+                    <!-- UPI details -->
+                    <TextView
+                        android:id="@+id/tv_overlay_qr_details"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:fontFamily="sans-serif-bold"
+                        android:text="₹0.00 to user@upi"
+                        android:textColor="#E2E8F0"
+                        android:textSize="11sp" />
+                </LinearLayout>
             </LinearLayout>
 
             <!-- Actions buttons layout -->

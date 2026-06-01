@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Receipt, Check, X, Sparkles, Building2, MoreHorizontal, AlertCircle } from 'lucide-react';
+import { Receipt, Check, X, Sparkles, Building2, MoreHorizontal, AlertCircle, QrCode } from 'lucide-react';
 import { useTransactionStore } from '@/lib/useTransactionStore';
 import { categoryService, iconMap } from '@/lib/category-service';
 import { Expense } from '@/types/expense';
@@ -9,6 +9,9 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { SplitBillSection } from '@/components/split';
 import { ExpenseSplit } from '@/types/split';
+import { settingsService } from '@/lib/settings';
+import QRCode from 'qrcode';
+import { toast } from 'sonner';
 
 interface PendingTransactionsModalProps {
   onAddExpense: (expense: Expense) => void;
@@ -28,6 +31,15 @@ export function PendingTransactionsModal({ onAddExpense }: PendingTransactionsMo
   const [isSuccessAnimating, setIsSuccessAnimating] = useState(false);
   const [split, setSplit] = useState<ExpenseSplit | undefined>(undefined);
   const [paidBy, setPaidBy] = useState<string | undefined>(undefined);
+  const [settings, setSettings] = useState(() => settingsService.get());
+  const [tempUpiId, setTempUpiId] = useState(settings.upiId || '');
+
+  // Track if UPI ID is updated in settings
+  useEffect(() => {
+    setTempUpiId(settings.upiId || '');
+  }, [settings.upiId]);
+
+  const isCredit = pendingTx ? pendingTx.type === 'credit' : false;
 
   // Synchronize internal form state when active pending transaction switches
   useEffect(() => {
@@ -39,7 +51,40 @@ export function PendingTransactionsModal({ onAddExpense }: PendingTransactionsMo
     }
   }, [pendingTx]);
 
+  // Generate UPI QR Code URL
+  useEffect(() => {
+    if (!pendingTx || !settings.upiId || !split || !split.members || split.members.length === 0) return;
+
+    const splitAmount = (parseFloat(amount) || pendingTx.amount) / (split.members.length + 1);
+    const name = settings.billedFrom.name || 'User';
+    const upiUrl = `upi://pay?pa=${settings.upiId.trim()}&pn=${encodeURIComponent(name)}&am=${splitAmount.toFixed(2)}&cu=INR`;
+
+    QRCode.toDataURL(upiUrl, {
+      width: 256,
+      margin: 1.5,
+      color: {
+        dark: settings.accentColor || '#7c3aed',
+        light: '#ffffff'
+      }
+    })
+    .then((url) => {
+      const img = document.getElementById('split-upi-qr-image') as HTMLImageElement;
+      if (img) img.src = url;
+    })
+    .catch((err) => {
+      console.error('Failed to generate split UPI QR Code:', err);
+    });
+  }, [amount, split, settings.upiId, pendingTx]);
+
   if (!pendingTx) return null;
+
+  const handleSaveUpiId = () => {
+    if (!tempUpiId.trim()) return;
+    const updated = { ...settings, upiId: tempUpiId.trim() };
+    settingsService.save(updated);
+    setSettings(updated);
+    toast.success('Your UPI ID has been configured!');
+  };
 
   const categories = categoryService.getVisible();
 
@@ -239,6 +284,78 @@ export function PendingTransactionsModal({ onAddExpense }: PendingTransactionsMo
                 initialPaidBy={paidBy}
               />
             </div>
+
+            {/* UPI Split QR Code Generator Section */}
+            {split && split.members && split.members.length > 0 && !isCredit && (
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                <style>{`
+                  @keyframes scan {
+                    0% { top: 0%; opacity: 0.2; }
+                    50% { opacity: 0.8; }
+                    100% { top: 100%; opacity: 0.2; }
+                  }
+                  .scanner-line {
+                    position: absolute;
+                    left: 0;
+                    width: 100%;
+                    height: 3px;
+                    background: linear-gradient(90deg, transparent, ${settings.accentColor || '#6366f1'}, transparent);
+                    animation: scan 2.5s linear infinite;
+                    box-shadow: 0 0 10px ${settings.accentColor || '#6366f1'};
+                    pointer-events: none;
+                  }
+                `}</style>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <QrCode className="h-4 w-4 text-primary animate-pulse" />
+                    <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Quick Split UPI QR</span>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-emerald-400">
+                    ₹{((parseFloat(amount) || pendingTx.amount) / (split.members.length + 1)).toFixed(2)} each
+                  </span>
+                </div>
+
+                {settings.upiId ? (
+                  <div className="flex flex-col items-center justify-center p-4 bg-zinc-950/60 rounded-xl border border-white/5 relative overflow-hidden group">
+                    {/* Scanner line animation */}
+                    <div className="scanner-line" />
+                    
+                    <img 
+                      id="split-upi-qr-image"
+                      alt="UPI Split QR Code"
+                      className="w-40 h-40 object-contain p-2 bg-white rounded-lg shadow-lg z-10"
+                    />
+
+                    <div className="mt-3 text-center space-y-1 z-10">
+                      <p className="text-[10px] text-muted-foreground">Scan with any UPI app to pay</p>
+                      <p className="text-xs font-mono font-extrabold text-foreground">{settings.upiId}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
+                    <p className="text-xs text-amber-300 font-medium">
+                      Setup your UPI ID to generate dynamic payment QR codes for your friends.
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="e.g. yourname@upi"
+                        className="flex-1 bg-background/50 border border-border/40 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white outline-none focus:border-primary/50"
+                        value={tempUpiId}
+                        onChange={(e) => setTempUpiId(e.target.value)}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleSaveUpiId}
+                        className="h-8 text-xs font-bold"
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Raw SMS Payload */}
             <div className="p-3.5 bg-black/40 border border-white/5 rounded-2xl flex gap-2.5 items-start">
