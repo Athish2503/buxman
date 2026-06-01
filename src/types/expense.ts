@@ -18,6 +18,7 @@ export interface Expense {
   paidBy?: string; // Contact ID, or undefined/null for current user
   split?: import('./split').ExpenseSplit;
   tripId?: string;
+  type?: 'debit' | 'credit';
   createdAt: string;
   updatedAt: string;
 }

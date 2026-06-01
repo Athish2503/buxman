@@ -178,7 +178,12 @@ export function ExpenseItem({
               </div>
             </div>
             <div className="text-right shrink-0 flex flex-col items-end">
-              <p className="font-black text-[16px] font-mono tracking-tighter text-foreground">{formatCurrency(expense.amount)}</p>
+              <p className={cn(
+                "font-black text-[16px] font-mono tracking-tighter",
+                expense.type === 'credit' ? "text-emerald-400" : "text-foreground"
+              )}>
+                {expense.type === 'credit' ? '+' : ''}{formatCurrency(expense.amount)}
+              </p>
               {expense.isReimbursement && (
                 <div className={cn(
                   "mt-1.5 px-2 py-0.5 rounded-full inline-flex items-center gap-1 border border-white/5 shadow-inner",

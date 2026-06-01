@@ -79,6 +79,7 @@ export const useTransactionListener = () => {
               description: data.notes || (pendingTx ? pendingTx.rawText : 'Captured via Smart Overlay'),
               status: 'approved',
               isReimbursement: !!data.isReimbursement,
+              type: data.type || 'debit',
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             } as any);

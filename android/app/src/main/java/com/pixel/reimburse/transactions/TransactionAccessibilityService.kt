@@ -9,7 +9,7 @@ class TransactionAccessibilityService : AccessibilityService() {
     companion object {
         private const val TAG = "TRANSACTION_DEBUG"
         private val targetPackages = listOf("google.android.apps.nbu.paisa", "phonepe", "paytm", "pop.upi")
-        private val scanKeywords = listOf("paid", "debited", "sent", "transaction successful", "₹")
+        private val scanKeywords = listOf("paid", "debited", "sent", "received", "credited", "transaction successful", "₹")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {

@@ -18,10 +18,10 @@ object TransactionDetector {
 
         val parsedInfo = TransactionParser.parseTransaction(text, packageName, title, source)
         
-        // Reject credits and unknown types early if the user only wants deducted/debit messages
-        if (parsedInfo.type != "debit") {
-            Log.d(TAG, "[$source] REJECTED: Not a debit/deducted transaction (Type: ${parsedInfo.type})")
-            FinancialNotificationPlugin.logRejection(context, text, source, "Not a debit/deducted transaction", parsedInfo.matchedKeywords)
+        // Reject unknown types early if they are neither debit nor credit transactions
+        if (parsedInfo.type != "debit" && parsedInfo.type != "credit") {
+            Log.d(TAG, "[$source] REJECTED: Not a debit or credit transaction (Type: ${parsedInfo.type})")
+            FinancialNotificationPlugin.logRejection(context, text, source, "Not a debit or credit transaction", parsedInfo.matchedKeywords)
             return
         }
 

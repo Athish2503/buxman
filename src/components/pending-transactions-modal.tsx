@@ -62,9 +62,10 @@ export function PendingTransactionsModal({ onAddExpense }: PendingTransactionsMo
         isReimbursement: false,
         paidBy: paidBy,
         split: split,
+        type: pendingTx.type || 'debit',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      };
+      } as any;
 
       onAddExpense(newExpense);
       updateTransaction(pendingTx.id, { status: 'completed', category, notes });
@@ -92,20 +93,33 @@ export function PendingTransactionsModal({ onAddExpense }: PendingTransactionsMo
           className="relative w-full max-w-[420px] rounded-[2.5rem] border border-white/10 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] bg-zinc-950/80 backdrop-blur-3xl"
         >
           {/* Top Neon Gradient Glow Strip */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-purple-500 to-rose-400 opacity-80 z-10" />
+          <div className={cn(
+            "absolute top-0 left-0 right-0 h-1 opacity-80 z-10",
+            isCredit 
+              ? "bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600"
+              : "bg-gradient-to-r from-primary via-purple-500 to-rose-400"
+          )} />
 
           <div className="max-h-[85vh] overflow-y-auto p-6 space-y-6 no-scrollbar">
             {/* Header Area */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-primary/10 text-primary border border-primary/20 shadow-glow">
+                <div className={cn(
+                  "flex items-center justify-center w-11 h-11 rounded-2xl border shadow-glow",
+                  isCredit 
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                    : "bg-primary/10 text-primary border-primary/20"
+                )}>
                   <Sparkles className="w-5 h-5 animate-spin-slow" />
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-                    <h3 className="text-[10px] font-black tracking-[0.25em] text-primary uppercase">
-                      Detected Deduction
+                    <span className={cn("h-1.5 w-1.5 rounded-full animate-pulse", isCredit ? "bg-emerald-400" : "bg-primary")} />
+                    <h3 className={cn(
+                      "text-[10px] font-black tracking-[0.25em] uppercase",
+                      isCredit ? "text-emerald-400" : "text-primary"
+                    )}>
+                      {isCredit ? 'Detected Credit' : 'Detected Deduction'}
                     </h3>
                   </div>
                   <p className="text-xs font-semibold text-muted-foreground mt-0.5">
@@ -125,16 +139,16 @@ export function PendingTransactionsModal({ onAddExpense }: PendingTransactionsMo
             {/* Configurable Amount UI Display (Neo-banking interface) */}
             <div className="relative py-6 px-4 bg-gradient-to-b from-white/5 to-white/[0.01] border border-white/5 rounded-3xl flex flex-col items-center justify-center shadow-inner group">
               <span className="text-[9px] font-black text-muted-foreground/60 uppercase tracking-[0.2em] mb-1">
-                Amount Deducted
+                {isCredit ? 'Amount Credited' : 'Amount Deducted'}
               </span>
               <div className="flex items-center justify-center w-full gap-1">
-                <span className="text-4xl font-black text-primary select-none opacity-80">₹</span>
+                <span className={cn("text-4xl font-black select-none opacity-80", isCredit ? "text-emerald-400" : "text-primary")}>₹</span>
                 <input
                   type="number"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   className="text-4xl sm:text-5xl font-black text-white bg-transparent border-none outline-none focus:ring-0 focus:outline-none w-[180px] text-center p-0 tracking-tight"
-                  style={{ caretColor: 'var(--primary)' }}
+                  style={{ caretColor: isCredit ? '#10b981' : 'var(--primary)' }}
                 />
               </div>
             </div>
@@ -247,7 +261,12 @@ export function PendingTransactionsModal({ onAddExpense }: PendingTransactionsMo
                 Ignore
               </Button>
               <Button
-                className="flex-1 h-13 text-xs font-black uppercase tracking-widest bg-gradient-primary text-white border-none shadow-glow active:scale-95 transition-all"
+                className={cn(
+                  "flex-1 h-13 text-xs font-black uppercase tracking-widest text-white border-none shadow-glow active:scale-95 transition-all",
+                  isCredit 
+                    ? "bg-gradient-to-r from-emerald-500 to-teal-500 shadow-emerald-500/20"
+                    : "bg-gradient-primary"
+                )}
                 onClick={handleSave}
               >
                 <Check className="w-4 h-4 mr-1.5" />
