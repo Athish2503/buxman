@@ -402,6 +402,7 @@ const Index = () => {
             onOpenChange={(open) => {
               setAutoOpenExpenseForm(open);
             }}
+            trigger={null}
           />
         </div>
       </PermissionGuard>

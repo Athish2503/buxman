@@ -89,10 +89,24 @@ class OverlayActivity : AppCompatActivity() {
         val displayAccount = if (account.isBlank()) "Account ending ****" else account
 
         // Value Hierarchy
-        val displayAmount = if (isQuickAdd) "0.00" else "₹${"%.2f".format(amount)}"
-        binding.tvOverlayAmount.text = if (isQuickAdd) "₹0.00" else "₹${"%.2f".format(amount)}"
-        binding.tvOverlayAmount.setTextColor(if (isQuickAdd) 0xFF8B5CF6.toInt() else accentColor)
-        binding.tvOverlayMerchant.text = if (isQuickAdd) "Quick Add • Widget" else "$displayMerchant • $displayAccount"
+        if (isQuickAdd) {
+            // Quick-add mode: hide static amount/merchant, show editable fields
+            binding.tvOverlayAmount.visibility = android.view.View.GONE
+            binding.tvOverlayMerchant.visibility = android.view.View.GONE
+            binding.etQuickAmount.visibility = android.view.View.VISIBLE
+            binding.tvAmountPrefix.visibility = android.view.View.VISIBLE
+            binding.etQuickVendor.visibility = android.view.View.VISIBLE
+            binding.etQuickAmount.requestFocus()
+        } else {
+            binding.tvOverlayAmount.text = "₹${"%.2f".format(amount)}"
+            binding.tvOverlayAmount.setTextColor(accentColor)
+            binding.tvOverlayMerchant.text = "$displayMerchant • $displayAccount"
+            binding.tvOverlayAmount.visibility = android.view.View.VISIBLE
+            binding.tvOverlayMerchant.visibility = android.view.View.VISIBLE
+            binding.etQuickAmount.visibility = android.view.View.GONE
+            binding.tvAmountPrefix.visibility = android.view.View.GONE
+            binding.etQuickVendor.visibility = android.view.View.GONE
+        }
 
         // Dot Pulsar & Badge Name
         binding.tvSourceApp.text = when {
@@ -209,16 +223,31 @@ class OverlayActivity : AppCompatActivity() {
             val isReimbursement = if (isCredit) false else binding.switchReimbursable.isChecked
             val splitContacts = if (binding.switchSplit.isChecked) getSelectedContacts() else emptyList()
 
-            Log.d(TAG, "Saving transaction details natively: $merchant | $amount | Category: $category | Split with ${splitContacts.size} contacts")
-            val success = persistTransactionNatively(amount, merchant, category, notes, type, isReimbursement, splitContacts)
+            // In quick-add mode, read amount and merchant from editable fields
+            val finalAmount = if (isQuickAdd) {
+                binding.etQuickAmount.text.toString().toDoubleOrNull() ?: 0.0
+            } else amount
+            val finalMerchant = if (isQuickAdd) {
+                binding.etQuickVendor.text.toString().trim().ifBlank { "Quick Add" }
+            } else merchant
+
+            if (isQuickAdd && finalAmount <= 0.0) {
+                binding.etQuickAmount.error = "Enter an amount"
+                binding.etQuickAmount.requestFocus()
+                binding.btnOverlaySave.isEnabled = true
+                return@setOnClickListener
+            }
+
+            Log.d(TAG, "Saving: $finalMerchant | $finalAmount | Category: $category")
+            val success = persistTransactionNatively(finalAmount, finalMerchant, category, notes, type, isReimbursement, splitContacts)
 
             if (success) {
-                FinancialNotificationPlugin.onOverlayAction(this, "save", amount, merchant, category, notes, true, isReimbursement)
+                FinancialNotificationPlugin.onOverlayAction(this, "save", finalAmount, finalMerchant, category, notes, true, isReimbursement)
                 playSuccessAnimationAndDismiss()
             } else {
                 binding.btnOverlaySave.isEnabled = true
                 binding.btnOverlaySave.text = "Retry Save"
-                binding.btnOverlaySave.backgroundTintList = ColorStateList.valueOf(0xFFF59E0B.toInt()) // Amber yellow fallback tint
+                binding.btnOverlaySave.backgroundTintList = ColorStateList.valueOf(0xFFF59E0B.toInt())
             }
         }
 

@@ -774,18 +774,20 @@ export function ExpenseForm({
   return (
     <>
       {/* Trigger */}
-      <div onClick={() => setOpen(true)} className="contents">
-        {trigger ?? (
-          <Button
-            id="btn-add-expense"
-            className="bg-gradient-primary hover:opacity-90 transition-all text-white shadow-glow font-semibold gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">New Expense</span>
-            <span className="sm:hidden">Add</span>
-          </Button>
-        )}
-      </div>
+      {trigger !== null && (
+        <div onClick={() => setOpen(true)} className="contents">
+          {trigger ?? (
+            <Button
+              id="btn-add-expense"
+              className="bg-gradient-primary hover:opacity-90 transition-all text-white shadow-glow font-semibold gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">New Expense</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          )}
+        </div>
+      )}
 
       {createPortal(overlay, document.body)}
     </>

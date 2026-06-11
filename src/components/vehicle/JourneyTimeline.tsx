@@ -5,7 +5,7 @@ import { HeroSection } from './HeroSection';
 import { RoadSpine } from './RoadSpine';
 import { CheckpointNode } from './CheckpointNode';
 import { MilestoneNode } from './MilestoneNode';
-import { FuelActionButton } from './FuelActionButton';
+
 
 interface JourneyTimelineProps {
   vehicle: VehicleRate;
@@ -91,7 +91,6 @@ export const JourneyTimeline: React.FC<JourneyTimelineProps> = ({ vehicle, logs,
         </div>
       </div>
 
-      <FuelActionButton onAdd={onAddLog} />
     </div>
   );
 };

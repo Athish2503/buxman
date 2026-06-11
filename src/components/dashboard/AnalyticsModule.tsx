@@ -14,6 +14,7 @@ import {
   SpendingTrendChart,
   CategoryMonthMatrix,
   WeeklyHeatmap,
+  MonthlyCalendarHeatmap,
 } from '@/components/analytics-charts';
 import { localIntelligence } from '@/lib/intelligence';
 import { cn } from '@/lib/utils';
@@ -233,6 +234,15 @@ export function AnalyticsModule({ expenses, onNavigate }: AnalyticsModuleProps) 
         </div>
       </div>
 
+       {/* ── Section 2b: Monthly Calendar Heatmap ── */}
+      <ChartCard
+        title="Calendar View"
+        subtitle="Daily spend by month — tap any day to see expenses"
+        icon={Calendar}
+      >
+        <MonthlyCalendarHeatmap expenses={expenses} />
+      </ChartCard>
+
       {/* ── Section 1: Spending Trend ── */}
       <ChartCard
         title="Spending Trend"
@@ -251,6 +261,8 @@ export function AnalyticsModule({ expenses, onNavigate }: AnalyticsModuleProps) 
         <MonthlyBarChart expenses={expenses} />
       </ChartCard>
 
+     
+
       {/* ── Section 3 + 4: Category Breakdown & Matrix ── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <ChartCard title="By Category" subtitle="Top 7 categories" icon={LayoutGrid} className="lg:col-span-2">
@@ -264,7 +276,7 @@ export function AnalyticsModule({ expenses, onNavigate }: AnalyticsModuleProps) 
       {/* ── Section 5: Weekly Heatmap ── */}
       <ChartCard
         title="Weekly Heatmap"
-        subtitle="12-week spending intensity — hover any cell for details"
+        subtitle="12-week intensity — tap a cell to view that day's spending trend"
         icon={Flame}
       >
         <WeeklyHeatmap expenses={expenses} />

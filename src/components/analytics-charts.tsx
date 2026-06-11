@@ -1,4 +1,5 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -7,7 +8,7 @@ import {
 import {
   format, startOfMonth, eachMonthOfInterval, subMonths, isSameMonth,
   eachDayOfInterval, startOfWeek, endOfWeek, getDay, getDate,
-  subDays, startOfWeek as startWeek, isSameDay, parseISO
+  subDays, isSameDay, parseISO
 } from 'date-fns';
 import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, Table2 } from 'lucide-react';
 
@@ -476,100 +477,326 @@ export function CategoryMonthMatrix({ expenses }: ChartsProps) {
 }
 
 /* ────────────────────────────────────────────────────────────────
-   5. Weekly Spending Heatmap — last 12 weeks
+   5. Weekly Spending Heatmap — 12 weeks, tap cell for day detail
    ──────────────────────────────────────────────────────────────── */
 export function WeeklyHeatmap({ expenses }: ChartsProps) {
+  const [selectedDay, setSelectedDay] = useState<{ date: Date; amount: number; dateStr: string } | null>(null);
+
   const { weeks, maxAmount } = useMemo(() => {
     const today = new Date();
-    const start = subDays(today, 83); // ~12 weeks back
-
-    // Build a map of date → total spend
+    const start = subDays(today, 83);
     const dayMap: Record<string, number> = {};
     expenses.forEach(e => {
       const d = e.date.substring(0, 10);
       dayMap[d] = (dayMap[d] || 0) + calculateUserShare(e);
     });
-
-    // Build 12 weeks × 7 days grid
     const weeks: { date: Date; amount: number; dateStr: string }[][] = [];
     let currentWeek: { date: Date; amount: number; dateStr: string }[] = [];
-
     const allDays = eachDayOfInterval({ start, end: today });
     allDays.forEach(day => {
       const dateStr = format(day, 'yyyy-MM-dd');
       const amount = dayMap[dateStr] || 0;
-      const dow = getDay(day); // 0=Sun
-
-      if (dow === 0 && currentWeek.length > 0) {
-        weeks.push(currentWeek);
-        currentWeek = [];
-      }
+      const dow = getDay(day);
+      if (dow === 0 && currentWeek.length > 0) { weeks.push(currentWeek); currentWeek = []; }
       currentWeek.push({ date: day, amount, dateStr });
     });
     if (currentWeek.length > 0) weeks.push(currentWeek);
-
     const maxAmount = Math.max(...Object.values(dayMap), 1);
     return { weeks, maxAmount };
   }, [expenses]);
 
-  const DOW_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const dayExpenses = useMemo(() => {
+    if (!selectedDay) return [];
+    return expenses.filter(e => e.date.substring(0, 10) === selectedDay.dateStr);
+  }, [expenses, selectedDay]);
 
+  const trendData = useMemo(() => {
+    if (!selectedDay) return [];
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = subDays(selectedDay.date, 6 - i);
+      const dateStr = format(d, 'yyyy-MM-dd');
+      const amt = expenses.filter(e => e.date.substring(0, 10) === dateStr).reduce((s, e) => s + calculateUserShare(e), 0);
+      return { day: format(d, 'EEE'), amount: amt, isSelected: i === 6 };
+    });
+  }, [expenses, selectedDay]);
+
+  const DOW_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   const getColor = (amount: number) => {
     if (amount === 0) return 'hsl(var(--muted) / 0.3)';
     const intensity = Math.min(amount / maxAmount, 1);
     if (intensity < 0.25) return 'hsl(262 85% 65% / 0.25)';
-    if (intensity < 0.5) return 'hsl(262 85% 65% / 0.5)';
+    if (intensity < 0.5)  return 'hsl(262 85% 65% / 0.5)';
     if (intensity < 0.75) return 'hsl(262 85% 65% / 0.75)';
     return 'hsl(262 85% 65%)';
   };
 
   return (
     <div>
+      <p className="text-[10px] text-muted-foreground/50 mb-3">Tap any cell to see spending trend & details</p>
       <div className="flex gap-1 overflow-x-auto pb-1" role="grid" aria-label="Weekly spending heatmap">
-        {/* Day-of-week labels */}
         <div className="flex flex-col gap-1 mr-1 shrink-0">
           <div className="h-3" />
           {DOW_LABELS.map((d, i) => (
             <div key={i} className="h-[14px] flex items-center text-[8px] text-muted-foreground/50 w-3">{d}</div>
           ))}
         </div>
-
         {weeks.map((week, wi) => (
           <div key={wi} className="flex flex-col gap-1 shrink-0" role="row">
-            {/* Month label for first day */}
             <div className="h-3 text-[8px] text-muted-foreground/50 text-center">
               {week[0] && getDate(week[0].date) <= 7 ? format(week[0].date, 'MMM') : ''}
             </div>
             {week.map((day, di) => (
-              <div
+              <button
                 key={di}
                 role="gridcell"
-                className="h-[14px] w-[14px] rounded-[3px] transition-all duration-150 hover:scale-110 hover:ring-1 hover:ring-primary/50 cursor-default"
+                className={cn(
+                  "h-[14px] w-[14px] rounded-[3px] transition-all duration-150 hover:scale-125 active:scale-110",
+                  selectedDay?.dateStr === day.dateStr
+                    ? "ring-2 ring-primary ring-offset-1 ring-offset-background scale-125"
+                    : "hover:ring-1 hover:ring-primary/50"
+                )}
                 style={{ backgroundColor: getColor(day.amount) }}
-                title={day.amount > 0 ? `${format(day.date, 'dd MMM')}: ${formatCurrency(day.amount)}` : format(day.date, 'dd MMM')}
+                onClick={() => setSelectedDay(selectedDay?.dateStr === day.dateStr ? null : day)}
                 aria-label={day.amount > 0 ? `${format(day.date, 'dd MMM')}: ${formatCurrency(day.amount)}` : `${format(day.date, 'dd MMM')}: no spending`}
               />
             ))}
           </div>
         ))}
       </div>
-
-      {/* Legend */}
       <div className="flex items-center gap-2 mt-3">
         <span className="text-[9px] text-muted-foreground/50">Less</span>
         {[0, 0.25, 0.5, 0.75, 1].map((intensity, i) => (
-          <div
-            key={i}
-            className="h-3 w-3 rounded-sm"
-            style={{
-              backgroundColor: intensity === 0
-                ? 'hsl(var(--muted) / 0.3)'
-                : `hsl(262 85% 65% / ${intensity})`
-            }}
-          />
+          <div key={i} className="h-3 w-3 rounded-sm" style={{ backgroundColor: intensity === 0 ? 'hsl(var(--muted) / 0.3)' : `hsl(262 85% 65% / ${intensity})` }} />
         ))}
         <span className="text-[9px] text-muted-foreground/50">More</span>
       </div>
+
+      {/* Day Detail Panel */}
+      <AnimatePresence>
+        {selectedDay && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            transition={{ type: 'spring', damping: 24, stiffness: 320 }}
+            className="mt-4 rounded-2xl border border-border/50 bg-muted/20 overflow-hidden"
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
+              <div>
+                <p className="text-xs font-black">{format(selectedDay.date, 'EEEE, dd MMMM yyyy')}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {selectedDay.amount > 0 ? `${dayExpenses.length} expense${dayExpenses.length !== 1 ? 's' : ''}` : 'No spending'}
+                </p>
+              </div>
+              <p className="text-lg font-black text-primary">{formatCurrency(selectedDay.amount)}</p>
+            </div>
+            {selectedDay.amount > 0 ? (
+              <>
+                {/* 7-day trend mini chart */}
+                <div className="px-4 pt-3 pb-1">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 mb-2">7-Day Trend</p>
+                  <div className="flex items-end gap-1 h-14">
+                    {trendData.map((d, i) => {
+                      const maxTrend = Math.max(...trendData.map(t => t.amount), 1);
+                      const pct = d.amount > 0 ? Math.max((d.amount / maxTrend) * 100, 8) : 4;
+                      return (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                          <div className="w-full flex items-end" style={{ height: '44px' }}>
+                            <div
+                              className={cn("w-full rounded-t-sm transition-all duration-300", d.isSelected ? "bg-primary" : "bg-primary/30")}
+                              style={{ height: `${pct}%` }}
+                            />
+                          </div>
+                          <span className={cn("text-[8px] font-bold", d.isSelected ? "text-primary" : "text-muted-foreground/50")}>{d.day}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                {/* Expense list */}
+                <div className="px-4 pb-3 pt-2 space-y-1.5 max-h-40 overflow-y-auto">
+                  {dayExpenses.map((e, i) => (
+                    <div key={i} className="flex items-center justify-between py-1.5 border-b border-border/20 last:border-0">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold truncate">{e.vendor || 'Expense'}</p>
+                        <p className="text-[10px] text-muted-foreground capitalize">{e.category}</p>
+                      </div>
+                      <p className="text-xs font-black tabular-nums shrink-0 ml-2">{formatCurrency(calculateUserShare(e))}</p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="py-6 text-center">
+                <p className="text-xs text-muted-foreground/50">No expenses recorded on this day</p>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────
+   6. Monthly Calendar Heatmap — month view with daily spend amounts
+   ──────────────────────────────────────────────────────────────── */
+export function MonthlyCalendarHeatmap({ expenses }: ChartsProps) {
+  const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  const { calendarDays, dayMap, maxAmount } = useMemo(() => {
+    const dayMap: Record<string, number> = {};
+    expenses.forEach(e => {
+      const d = e.date.substring(0, 10);
+      dayMap[d] = (dayMap[d] || 0) + calculateUserShare(e);
+    });
+    const firstDay = currentMonth;
+    const startGrid = startOfWeek(firstDay, { weekStartsOn: 0 });
+    const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+    const endGrid = endOfWeek(lastDay, { weekStartsOn: 0 });
+    const allDays = eachDayOfInterval({ start: startGrid, end: endGrid });
+    const monthStr = format(currentMonth, 'yyyy-MM');
+    const monthAmounts = Object.entries(dayMap).filter(([k]) => k.startsWith(monthStr)).map(([, v]) => v);
+    const maxAmount = Math.max(...monthAmounts, 1);
+    return { calendarDays: allDays, dayMap, maxAmount };
+  }, [expenses, currentMonth]);
+
+  const monthStr = format(currentMonth, 'yyyy-MM');
+  const monthTotal = useMemo(() =>
+    Object.entries(dayMap).filter(([k]) => k.startsWith(monthStr)).reduce((s, [, v]) => s + v, 0),
+    [dayMap, monthStr]
+  );
+
+  const dayExpenses = useMemo(() =>
+    selectedDay ? expenses.filter(e => e.date.substring(0, 10) === selectedDay) : [],
+    [expenses, selectedDay]
+  );
+
+  const getCellBg = (dateStr: string) => {
+    const amt = dayMap[dateStr] || 0;
+    if (!dateStr.startsWith(monthStr)) return 'transparent';
+    if (amt === 0) return 'hsl(var(--muted) / 0.15)';
+    const intensity = Math.min(amt / maxAmount, 1);
+    if (intensity < 0.2)  return 'hsl(262 85% 65% / 0.15)';
+    if (intensity < 0.4)  return 'hsl(262 85% 65% / 0.30)';
+    if (intensity < 0.6)  return 'hsl(262 85% 65% / 0.50)';
+    if (intensity < 0.8)  return 'hsl(262 85% 65% / 0.70)';
+    return 'hsl(262 85% 65%)';
+  };
+
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const futureMonth = format(subMonths(currentMonth, -1), 'yyyy-MM') > format(new Date(), 'yyyy-MM');
+
+  return (
+    <div className="space-y-4">
+      {/* Month navigation */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => { setCurrentMonth(m => subMonths(m, 1)); setSelectedDay(null); }}
+          className="w-9 h-9 rounded-xl hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground flex items-center justify-center font-bold text-lg"
+          aria-label="Previous month"
+        >
+          ‹
+        </button>
+        <div className="text-center">
+          <p className="font-black text-base">{format(currentMonth, 'MMMM yyyy')}</p>
+          <p className="text-[10px] text-muted-foreground">
+            Monthly total: <span className="font-bold text-primary">{formatCurrency(monthTotal)}</span>
+          </p>
+        </div>
+        <button
+          onClick={() => { if (!futureMonth) { setCurrentMonth(m => subMonths(m, -1)); setSelectedDay(null); } }}
+          disabled={futureMonth}
+          className="w-9 h-9 rounded-xl hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground flex items-center justify-center font-bold text-lg disabled:opacity-30 disabled:cursor-not-allowed"
+          aria-label="Next month"
+        >
+          ›
+        </button>
+      </div>
+
+      {/* Day-of-week headers */}
+      <div className="grid grid-cols-7 gap-1">
+        {DOW.map(d => (
+          <div key={d} className="text-center text-[9px] font-black text-muted-foreground/40 uppercase tracking-wider py-1">{d.slice(0,2)}</div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 gap-1">
+        {calendarDays.map(day => {
+          const dateStr = format(day, 'yyyy-MM-dd');
+          const isCurrentMonth = dateStr.startsWith(monthStr);
+          const amount = dayMap[dateStr] || 0;
+          const isToday = dateStr === today;
+          const isSelected = selectedDay === dateStr;
+          const intensity = isCurrentMonth ? Math.min(amount / maxAmount, 1) : 0;
+
+          return (
+            <button
+              key={dateStr}
+              onClick={() => isCurrentMonth && setSelectedDay(isSelected ? null : dateStr)}
+              disabled={!isCurrentMonth}
+              className={cn(
+                "relative flex flex-col items-center justify-start p-1 rounded-xl transition-all duration-150 min-h-[52px]",
+                isCurrentMonth ? "cursor-pointer" : "opacity-20 cursor-default pointer-events-none",
+                isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background scale-105" : isCurrentMonth && amount > 0 ? "hover:scale-105 active:scale-95" : ""
+              )}
+              style={{ backgroundColor: getCellBg(dateStr) }}
+              aria-label={`${dateStr}: ${amount > 0 ? formatCurrency(amount) : 'no spending'}`}
+            >
+              <span className={cn(
+                "text-[11px] font-black leading-none",
+                isToday ? "text-primary" : isCurrentMonth ? (intensity > 0.6 ? "text-white" : "text-foreground") : "text-muted-foreground/30"
+              )}>
+                {getDate(day)}
+              </span>
+              {isToday && <div className="absolute bottom-1.5 h-1 w-1 rounded-full bg-primary" />}
+              {isCurrentMonth && amount > 0 && (
+                <span className={cn(
+                  "text-[8px] font-black leading-none mt-1 tabular-nums",
+                  intensity > 0.6 ? "text-white/90" : "text-primary"
+                )}>
+                  {formatCompactCurrency(amount)}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Selected day panel */}
+      <AnimatePresence>
+        {selectedDay && dayExpenses.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            transition={{ type: 'spring', damping: 24, stiffness: 320 }}
+            className="rounded-2xl border border-border/50 bg-muted/20 overflow-hidden"
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
+              <div>
+                <p className="text-xs font-black">{format(new Date(selectedDay + 'T12:00:00'), 'EEEE, MMMM d')}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{dayExpenses.length} expense{dayExpenses.length !== 1 ? 's' : ''}</p>
+              </div>
+              <p className="text-base font-black text-primary">{formatCurrency(dayMap[selectedDay] || 0)}</p>
+            </div>
+            <div className="divide-y divide-border/20 max-h-48 overflow-y-auto">
+              {dayExpenses.map((e, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold truncate">{e.vendor || 'Expense'}</p>
+                    <p className="text-[10px] text-muted-foreground capitalize">{e.category}</p>
+                  </div>
+                  <p className="text-xs font-black tabular-nums shrink-0 ml-2">{formatCurrency(calculateUserShare(e))}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

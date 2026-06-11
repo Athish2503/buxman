@@ -90,6 +90,7 @@
                     android:letterSpacing="0.15"
                     android:layout_marginBottom="4dp"/>
 
+                <!-- Static amount (shown for auto-detected transactions) -->
                 <TextView
                     android:id="@+id/tv_overlay_amount"
                     android:layout_width="wrap_content"
@@ -100,6 +101,37 @@
                     android:textSize="38sp"
                     android:lineSpacingMultiplier="0.9" />
 
+                <!-- Editable amount field (shown only in Quick-Add / Widget mode) -->
+                <EditText
+                    android:id="@+id/et_quick_amount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone"
+                    android:fontFamily="sans-serif-black"
+                    android:hint="0.00"
+                    android:textColorHint="#44FFFFFF"
+                    android:textColor="#FFFFFF"
+                    android:textSize="38sp"
+                    android:inputType="numberDecimal"
+                    android:background="@android:color/transparent"
+                    android:gravity="center"
+                    android:minWidth="100dp"
+                    android:textAlignment="center"
+                    android:lineSpacingMultiplier="0.9" />
+
+                <!-- Prefix label for editable amount -->
+                <TextView
+                    android:id="@+id/tv_amount_prefix"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone"
+                    android:fontFamily="sans-serif-black"
+                    android:text="₹  TAP TO ENTER AMOUNT"
+                    android:textColor="#44FFFFFF"
+                    android:textSize="12sp"
+                    android:gravity="center" />
+
+                <!-- Merchant static text -->
                 <TextView
                     android:id="@+id/tv_overlay_merchant"
                     android:layout_width="wrap_content"
@@ -109,6 +141,23 @@
                     android:text="MERCHANT"
                     android:textColor="#E2E8F0"
                     android:textSize="15sp"
+                    android:gravity="center" />
+
+                <!-- Editable vendor field (shown only in Quick-Add / Widget mode) -->
+                <EditText
+                    android:id="@+id/et_quick_vendor"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_overlay_input"
+                    android:fontFamily="sans-serif-medium"
+                    android:hint="Merchant / Vendor name"
+                    android:padding="12dp"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#44FFFFFF"
+                    android:textSize="14sp"
+                    android:inputType="textCapWords"
                     android:gravity="center" />
             </LinearLayout>
 

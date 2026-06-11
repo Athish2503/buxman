@@ -214,7 +214,7 @@ export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange }: F
         open={showExpenseForm}
         onOpenChange={setShowExpenseForm}
         onSubmit={onAddExpense}
-        trigger={<div className="hidden" />}
+        trigger={null}
       />
       <VehicleLogForm
         open={showFuelForm}
