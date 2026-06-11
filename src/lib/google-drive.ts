@@ -1,4 +1,5 @@
 import { toast } from 'sonner';
+import { Capacitor } from '@capacitor/core';
 import { settingsService } from './settings';
 import { dataMigrationService } from './data-migration';
 
@@ -26,8 +27,12 @@ class GoogleDriveService {
       return;
     }
 
-    // Clean up redirect URI to match exactly Google console settings
-    const redirectUri = window.location.origin + '/';
+    // On Android Capacitor, window.location.origin returns 'capacitor://localhost'
+    // which is NOT a valid OAuth redirect URI. We normalize it to 'http://localhost/'
+    // which must be registered in Google Cloud Console as an Authorized Redirect URI.
+    // On desktop/web, we use the real origin (e.g. http://localhost:5173/).
+    const isNative = Capacitor.isNativePlatform();
+    const redirectUri = isNative ? 'http://localhost/' : (window.location.origin + '/');
     const responseType = 'token';
     const scope = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email';
     const state = Math.random().toString(36).substring(2);

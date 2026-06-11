@@ -63,6 +63,7 @@ const Index = () => {
   const [vehicles, setVehicles]     = useState(() => mileageService.getVehicles());
   const [isFabOpen, setIsFabOpen]   = useState(false);
   const [activeTab, setActiveTab]   = useState<Tab>('dashboard');
+  const [autoOpenExpenseForm, setAutoOpenExpenseForm] = useState(false);
   const { theme, toggle: toggleTheme } = useTheme();
   const [navOrder, setNavOrder] = useState<Tab[]>(() => {
     const settings = settingsService.get();
@@ -80,11 +81,23 @@ const Index = () => {
     const handleExpensesUpdate = () => {
       setExpenses(storageService.getExpenses());
     };
+
+    // Auto-open expense form when launched via widget/deep-link
+    const handleDeepLink = (e: Event) => {
+      const url = (e as CustomEvent).detail?.url || '';
+      if (url.includes('add-expense')) {
+        setAutoOpenExpenseForm(true);
+        haptics.medium();
+      }
+    };
+
     window.addEventListener('settings-updated', handleSettingsUpdate);
     window.addEventListener('expenses-updated', handleExpensesUpdate);
+    window.addEventListener('app-deep-link', handleDeepLink);
     return () => {
       window.removeEventListener('settings-updated', handleSettingsUpdate);
       window.removeEventListener('expenses-updated', handleExpensesUpdate);
+      window.removeEventListener('app-deep-link', handleDeepLink);
     };
   }, []);
 
@@ -381,6 +394,15 @@ const Index = () => {
 
           {/* Real-time Native Engine Pending Capture Modal */}
           <PendingTransactionsModal onAddExpense={handleAddExpense} />
+
+          {/* Widget / Deep-Link: Auto-open Expense Form */}
+          <ExpenseForm
+            onSubmit={handleAddExpense}
+            open={autoOpenExpenseForm}
+            onOpenChange={(open) => {
+              setAutoOpenExpenseForm(open);
+            }}
+          />
         </div>
       </PermissionGuard>
     </BiometricLock>

@@ -130,6 +130,19 @@
                 android:resource="@xml/widget_quick_actions_info" />
         </receiver>
 
+        <!-- AppWidget: One-Tap Add Expense Widget -->
+        <receiver
+            android:name=".widgets.QuickAddExpenseWidgetProvider"
+            android:label="Buxman — Add Expense"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_one_tap_add_info" />
+        </receiver>
+
         <!-- Quick Settings Tile Service -->
         <service
             android:name=".services.QuickAddTileService"

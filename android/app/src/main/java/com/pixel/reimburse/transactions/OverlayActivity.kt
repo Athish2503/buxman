@@ -79,23 +79,39 @@ class OverlayActivity : AppCompatActivity() {
 
     private fun setupUI(amount: Double, merchant: String, appName: String, type: String, account: String) {
         val isCredit = type == "credit"
+        val isQuickAdd = appName == "Widget" && merchant.isBlank() && amount == 0.0
         val accentColor = if (isCredit) 0xFF10B981.toInt() else 0xFFEF4444.toInt() // Emerald Green vs Rose Red
-        val displayMerchant = if (merchant.isBlank() || merchant == "UNKNOWN MERCHANT") "Unknown Merchant" else merchant
+        val displayMerchant = when {
+            isQuickAdd -> "Enter merchant name below"
+            merchant.isBlank() || merchant == "UNKNOWN MERCHANT" -> "Unknown Merchant"
+            else -> merchant
+        }
         val displayAccount = if (account.isBlank()) "Account ending ****" else account
 
         // Value Hierarchy
-        binding.tvOverlayAmount.text = "₹${"%,.2f".format(amount)}"
-        binding.tvOverlayAmount.setTextColor(accentColor)
-        binding.tvOverlayMerchant.text = "$displayMerchant • $displayAccount"
+        val displayAmount = if (isQuickAdd) "0.00" else "₹${"%.2f".format(amount)}"
+        binding.tvOverlayAmount.text = if (isQuickAdd) "₹0.00" else "₹${"%.2f".format(amount)}"
+        binding.tvOverlayAmount.setTextColor(if (isQuickAdd) 0xFF8B5CF6.toInt() else accentColor)
+        binding.tvOverlayMerchant.text = if (isQuickAdd) "Quick Add • Widget" else "$displayMerchant • $displayAccount"
 
         // Dot Pulsar & Badge Name
-        binding.tvSourceApp.text = if (isCredit) "CREDIT DETECTED" else "DEBIT DETECTED"
-        binding.tvSourceApp.setTextColor(accentColor)
-        binding.ivHeaderDot.setColorFilter(accentColor)
+        binding.tvSourceApp.text = when {
+            isQuickAdd -> "QUICK ADD"
+            isCredit -> "CREDIT DETECTED"
+            else -> "DEBIT DETECTED"
+        }
+        binding.tvSourceApp.setTextColor(if (isQuickAdd) 0xFF8B5CF6.toInt() else accentColor)
+        binding.ivHeaderDot.setColorFilter(if (isQuickAdd) 0xFF8B5CF6.toInt() else accentColor)
 
         // Adjust Action buttons & text tint
-        binding.btnOverlaySave.backgroundTintList = ColorStateList.valueOf(accentColor)
-        binding.btnOverlaySave.text = if (isCredit) "Record Income" else "Record Expense"
+        binding.btnOverlaySave.backgroundTintList = android.content.res.ColorStateList.valueOf(
+            if (isQuickAdd) 0xFF8B5CF6.toInt() else accentColor
+        )
+        binding.btnOverlaySave.text = when {
+            isQuickAdd -> "Save Expense"
+            isCredit -> "Record Income"
+            else -> "Record Expense"
+        }
 
         // Hide reimbursable switch for credit alerts
         binding.switchReimbursable.visibility = if (isCredit) View.GONE else View.VISIBLE
