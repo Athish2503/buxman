@@ -35,17 +35,20 @@ export function SwipeToAdd({
   const pct = useTransform(x, [0, dragWidth], [0, 1]);
   
   // Dynamic styling
-  const currentHue = useTransform(pct, [0, 1], [262, 186]);
+  const h = useTransform(pct, [0, 1], [217.2, 142.1]);
+  const s = useTransform(pct, [0, 1], [91.2, 70.6]);
+  const l = useTransform(pct, [0, 1], [59.8, 45.3]);
+  const thumbBg = useTransform([h, s, l], ([hVal, sVal, lVal]) => `linear-gradient(135deg, hsl(${hVal} ${sVal}% ${lVal}%), hsl(${Number(hVal) + 10} ${sVal}% ${Number(lVal) - 5}%))`);
+
   const bgColor = useTransform(pct, [0, 1], [
-    'rgba(0, 0, 0, 0.4)',
-    'rgba(139, 92, 246, 0.1)'
+    'rgba(0, 0, 0, 0.1)',
+    'rgba(59, 130, 246, 0.05)'
   ]);
 
   const labelOpacity = useTransform(pct, [0, 0.3], [1, 0]);
-  const labelBlur = useTransform(pct, [0, 0.3], [0, 4]);
-  const thumbBg = useTransform(currentHue, h => `linear-gradient(135deg, hsl(${h} 85% 65%), hsl(${h + 40} 85% 55%))`);
+  const labelBlur = useTransform(pct, [0, 0.3], [0, 1]);
   const arrowRotate = useTransform(pct, [0, 1], [0, 360]);
-  const arrowScale = useTransform(pct, [0, 0.8, 1], [1, 0.8, 1.2]);
+  const arrowScale = useTransform(pct, [0, 0.8, 1], [1, 0.8, 1.1]);
 
   const isTriggered = useRef(false);
 
@@ -100,15 +103,15 @@ export function SwipeToAdd({
     <div
       ref={trackRef}
       className={cn(
-        "relative h-[68px] rounded-[2rem] overflow-hidden select-none border-2 transition-all duration-700",
-        success ? "border-emerald-500/50 shadow-[0_0_30px_rgba(16,185,129,0.2)]" : "border-white/5 bg-black/40 shadow-inner"
+        "relative h-[68px] rounded-2xl overflow-hidden select-none border-2 transition-all duration-700",
+        success ? "border-emerald-500/30 shadow-sm" : "border-border/30 bg-muted/40 shadow-inner"
       )}
     >
-      <motion.div className="absolute inset-0" style={{ backgroundColor: success ? 'rgba(16, 185, 129, 0.1)' : bgColor }} />
+      <motion.div className="absolute inset-0" style={{ backgroundColor: success ? 'rgba(16, 185, 129, 0.05)' : bgColor }} />
 
       {/* Progress Glow */}
       <motion.div 
-        className="absolute left-0 top-0 bottom-0 blur-2xl opacity-20 pointer-events-none"
+        className="absolute left-0 top-0 bottom-0 opacity-5 pointer-events-none"
         style={{ width: x, background: thumbBg }}
       />
 
@@ -120,7 +123,7 @@ export function SwipeToAdd({
               key="success"
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              className="flex items-center gap-3 text-emerald-400 font-black text-xs uppercase tracking-[0.2em]"
+              className="flex items-center gap-3 text-emerald-500 dark:text-emerald-400 font-bold text-xs uppercase tracking-[0.2em]"
             >
               <Check className="h-5 w-5" strokeWidth={4} />
               <span>Logged Successfully</span>
@@ -131,7 +134,7 @@ export function SwipeToAdd({
               className="flex items-center gap-3"
             >
               <div className="h-5 w-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-primary/60">Processing...</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-primary/60">Processing...</span>
             </motion.div>
           ) : (
             <motion.div 
@@ -139,8 +142,8 @@ export function SwipeToAdd({
               style={{ opacity: labelOpacity, filter: `blur(${labelBlur}px)` }}
               className="flex items-center gap-3"
             >
-              <Zap className="h-3 w-3 text-white/20 animate-pulse" />
-              <span className="text-[11px] font-black uppercase tracking-[0.3em] text-white/20 shimmer-text italic">
+              <Zap className="h-3 w-3 text-foreground/20 animate-pulse" />
+              <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-foreground/30 shimmer-text italic">
                 {label}
               </span>
             </motion.div>
@@ -159,15 +162,15 @@ export function SwipeToAdd({
           onDragStart={() => haptics.light()}
           onDragEnd={handleDragEnd}
           className={cn(
-            "absolute left-[6px] top-[6px] h-[52px] w-[52px] rounded-[1.4rem] flex items-center justify-center",
-            "cursor-grab active:cursor-grabbing z-10 shadow-2xl transition-shadow",
-            "bg-white/10 backdrop-blur-xl border border-white/20"
+            "absolute left-[6px] top-[6px] h-[52px] w-[52px] rounded-xl flex items-center justify-center",
+            "cursor-grab active:cursor-grabbing z-10 shadow-md transition-shadow",
+            "border border-transparent"
           )}
           whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98, boxShadow: "0 0 20px rgba(255,255,255,0.2)" }}
+          whileTap={{ scale: 0.98 }}
         >
           <motion.div 
-            className="absolute inset-0 rounded-[1.4rem] opacity-90"
+            className="absolute inset-0 rounded-xl opacity-90"
             style={{ background: thumbBg }}
           />
           

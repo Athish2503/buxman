@@ -18,9 +18,9 @@ export const FuelActionButton: React.FC<FuelActionButtonProps> = ({ onAdd, onSca
   };
 
   const actions = [
-    { icon: Pencil, label: 'Manual Log', color: 'bg-primary', onClick: onAdd },
-    { icon: Camera, label: 'Scan Receipt', color: 'bg-neon-purple', onClick: onScan || onAdd },
-    { icon: MapPin, label: 'Nearby Pump', color: 'bg-neon-amber', onClick: () => {} },
+    { icon: Pencil, label: 'Manual Log', color: 'bg-primary text-primary-foreground border-primary/10', onClick: onAdd },
+    { icon: Camera, label: 'Scan Receipt', color: 'bg-secondary text-secondary-foreground border-border', onClick: onScan || onAdd },
+    { icon: MapPin, label: 'Nearby Pump', color: 'bg-muted text-muted-foreground border-border', onClick: () => {} },
   ];
 
   return (
@@ -46,7 +46,7 @@ export const FuelActionButton: React.FC<FuelActionButtonProps> = ({ onAdd, onSca
                   {action.label}
                 </span>
                 <div className={cn(
-                  "h-12 w-12 rounded-2xl flex items-center justify-center text-white shadow-xl border border-white/20",
+                  "h-12 w-12 rounded-2xl flex items-center justify-center shadow-xl border border-border",
                   action.color
                 )}>
                   <action.icon className="h-5 w-5" />
@@ -61,8 +61,8 @@ export const FuelActionButton: React.FC<FuelActionButtonProps> = ({ onAdd, onSca
         whileTap={{ scale: 0.9 }}
         onClick={toggle}
         className={cn(
-          "relative h-16 px-6 rounded-[2rem] flex items-center gap-3 text-white shadow-glow transition-all duration-500 overflow-hidden",
-          isOpen ? "bg-black border border-white/20" : "bg-gradient-primary"
+          "relative h-16 px-6 rounded-[2rem] flex items-center gap-3 shadow-glow transition-all duration-500 overflow-hidden",
+          isOpen ? "bg-card border border-border text-foreground" : "bg-gradient-primary text-primary-foreground"
         )}
       >
         <div className="relative z-10 flex items-center gap-2">

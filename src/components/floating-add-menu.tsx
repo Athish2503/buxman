@@ -194,16 +194,16 @@ export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange }: F
           className="relative z-[110] w-[56px] h-[56px] rounded-full flex items-center justify-center shadow-glow"
           style={{
             background: isOpen
-              ? 'linear-gradient(135deg, hsl(0 72% 55%), hsl(15 90% 50%))'
-              : 'linear-gradient(135deg, hsl(258 88% 66%), hsl(280 85% 65%) 50%, hsl(258 88% 58%))',
-            border: '3px solid hsl(225 22% 5%)',
+              ? 'linear-gradient(135deg, hsl(var(--destructive)), hsl(var(--destructive) / 0.85))'
+              : 'var(--gradient-brand)',
+            border: '3px solid hsl(var(--background))',
             boxShadow: isOpen
-              ? '0 0 28px hsl(0 72% 55% / 0.5), 0 8px 24px hsl(0 0% 0% / 0.5)'
-              : '0 0 32px hsl(258 88% 66% / 0.55), 0 8px 24px hsl(0 0% 0% / 0.5), inset 0 1px 0 rgba(255,255,255,0.2)',
+              ? '0 0 28px hsl(var(--destructive) / 0.45), 0 8px 24px hsl(0 0% 0% / 0.5)'
+              : '0 0 32px hsl(var(--primary) / 0.5), 0 8px 24px hsl(0 0% 0% / 0.5), inset 0 1px 0 rgba(255,255,255,0.2)',
           }}
           aria-label={isOpen ? 'Close menu' : 'Add entry'}
         >
-          <Plus className="h-6 w-6 text-white drop-shadow" strokeWidth={2.8} />
+          <Plus className={cn("h-6 w-6 drop-shadow transition-colors duration-250", isOpen ? "text-destructive-foreground" : "text-primary-foreground")} strokeWidth={2.8} />
         </motion.button>
       </div>
 

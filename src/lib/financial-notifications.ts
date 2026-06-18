@@ -48,6 +48,7 @@ export interface FinancialNotificationPlugin {
     merchant: string;
     category?: string;
     notes?: string;
+    type?: string;
     persistedNatively?: boolean;
     isReimbursement?: boolean;
   }) => void): Promise<any>;

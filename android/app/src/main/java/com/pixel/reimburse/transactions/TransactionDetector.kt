@@ -65,6 +65,19 @@ object TransactionDetector {
         // Alert the Capacitor Bridge (for the app UI)
         FinancialNotificationPlugin.onTransactionCaptured(context, parsedInfo)
 
+        // Show standard notification alert
+        try {
+            com.pixel.reimburse.NotificationHelper.showTransactionNotification(
+                context = context,
+                rawText = parsedInfo.rawText,
+                amount = parsedInfo.amount,
+                merchant = parsedInfo.merchant,
+                type = parsedInfo.type
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to show transaction notification", e)
+        }
+
         // Show Overlay if accepted
         if (accepted) {
             triggerOverlay(context, parsedInfo)

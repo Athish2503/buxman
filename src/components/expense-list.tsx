@@ -397,7 +397,7 @@ export function ExpenseList({
   return (
     <div className="space-y-4">
       {selected.size > 0 && (
-        <div className="glass border border-primary/30 rounded-2xl p-3 flex flex-col gap-3 animate-slide-right shadow-2xl">
+        <div className="bg-card border border-primary/30 rounded-xl p-3 flex flex-col gap-3 animate-slide-right shadow-md">
           <div className="flex items-center justify-between px-1">
             <span className="text-xs font-bold text-primary uppercase tracking-wider">{selected.size} Selected</span>
             <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={clearSelection}>
@@ -436,7 +436,7 @@ export function ExpenseList({
       )}
 
       {showTypeTabs && (
-        <div className="flex bg-muted/40 p-1 rounded-2xl w-full border border-white/5">
+        <div className="flex bg-surface-2 p-1 rounded-xl w-full border border-border/50">
         {(['all', 'personal', 'reimbursable'] as const).map(t => {
           const active = filterType === t;
           const count = expenses.filter(e => {
@@ -455,8 +455,8 @@ export function ExpenseList({
               className={cn(
                 "flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-xl transition-all duration-300",
                 active 
-                  ? "bg-card text-primary shadow-xl scale-[1.02] border border-white/5" 
-                  : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                  ? "bg-card text-primary shadow-sm border border-border" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-surface-3"
               )}
             >
               <div className="flex items-center gap-1.5">
@@ -478,9 +478,9 @@ export function ExpenseList({
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-          <Input placeholder="Search vendors, notes..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-card/40 border-white/5 h-10 rounded-xl focus:ring-primary/20" />
+          <Input placeholder="Search vendors, notes..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-card border-border h-10 rounded-lg focus:ring-primary/20" />
         </div>
-        <div className="flex bg-muted/40 p-1 rounded-xl border border-white/5 shadow-inner">
+        <div className="flex bg-surface-2 p-1 rounded-lg border border-border/50">
           <button onClick={() => { setViewMode('cards'); haptics.selection(); }} className={cn("h-8 w-8 flex items-center justify-center rounded-lg transition-all", viewMode === 'cards' ? "bg-card shadow-sm text-primary" : "text-muted-foreground")}><MoreVertical className="h-3.5 w-3.5 rotate-90" /></button>
           <button onClick={() => { setViewMode('table'); haptics.selection(); }} className={cn("h-8 w-8 flex items-center justify-center rounded-lg transition-all", viewMode === 'table' ? "bg-card shadow-sm text-primary" : "text-muted-foreground")}><ArrowUpDown className="h-3.5 w-3.5" /></button>
         </div>
@@ -489,7 +489,7 @@ export function ExpenseList({
           size="icon" 
           onClick={toggleSelectAll} 
           className={cn(
-            "h-10 w-10 shrink-0 rounded-xl bg-card/40 border-white/5 text-muted-foreground hover:text-foreground",
+            "h-10 w-10 shrink-0 rounded-lg bg-card border-border text-muted-foreground hover:text-foreground",
             isAllReimbursableSelected && "text-primary border-primary/20 bg-primary/5"
           )}
           title={isAllReimbursableSelected ? "Deselect All" : "Select All"}
@@ -502,9 +502,9 @@ export function ExpenseList({
         </Button>
         <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
           <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 rounded-xl bg-card/40 border-white/5"><SlidersHorizontal className="h-4 w-4" /></Button>
+            <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 rounded-lg bg-card border-border"><SlidersHorizontal className="h-4 w-4" /></Button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="glass rounded-t-[2.5rem] border-t-white/10 pb-12"><FilterPanel /></SheetContent>
+          <SheetContent side="bottom" className="bg-card rounded-t-2xl border-t border-border pb-12"><FilterPanel /></SheetContent>
         </Sheet>
       </div>
 
@@ -557,10 +557,10 @@ export function ExpenseList({
             </div>
           </PullToRefresh>
         ) : (
-          <div className="rounded-2xl border border-white/5 bg-card/40 overflow-hidden overflow-x-auto shadow-xl">
+          <div className="rounded-xl border border-border bg-card overflow-hidden overflow-x-auto shadow-sm">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-white/5 border-b border-white/5">
+                <tr className="bg-muted/50 border-b border-border">
                   <th className="p-4 w-10"><Checkbox checked={isAllReimbursableSelected} onCheckedChange={toggleSelectAll} /></th>
                   <th className="p-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Vendor</th>
                   <th className="p-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 text-right">Amount</th>
@@ -568,9 +568,9 @@ export function ExpenseList({
                   <th className="p-4 w-10"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-border">
                 {filteredExpenses.map(expense => (
-                  <tr key={expense.id} className={cn("hover:bg-white/5 transition-colors", selected.has(expense.id) ? "bg-primary/5" : "")} onClick={() => toggleSelect(expense.id)}>
+                  <tr key={expense.id} className={cn("hover:bg-surface-2/50 transition-colors", selected.has(expense.id) ? "bg-primary/5" : "")} onClick={() => toggleSelect(expense.id)}>
                     <td className="p-4" onClick={e => e.stopPropagation()}><Checkbox checked={selected.has(expense.id)} onCheckedChange={() => toggleSelect(expense.id)} /></td>
                     <td className="p-4">
                       <div className="flex items-center gap-1.5">
@@ -588,10 +588,10 @@ export function ExpenseList({
                     <td className="p-4" onClick={e => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="glass border-white/10 rounded-xl min-w-[120px]">
+                        <DropdownMenuContent align="end" className="bg-card border-border rounded-lg min-w-[120px] shadow-lg">
                           <DropdownMenuItem onClick={() => setSelectedExpense(expense)} className="gap-2 text-xs font-medium"><Eye className="h-3.5 w-3.5" /> View</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setEditingExpense(expense)} className="gap-2 text-xs font-medium"><Edit className="h-3.5 w-3.5" /> Edit</DropdownMenuItem>
-                          <DropdownMenuSeparator className="bg-white/5" />
+                          <DropdownMenuSeparator className="bg-border/50" />
                           <DropdownMenuItem className="text-destructive gap-2 text-xs font-medium" onClick={() => onDeleteExpense(expense.id)}><Trash2 className="h-3.5 w-3.5" /> Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -625,7 +625,7 @@ export function ExpenseList({
 
       <ImageViewer src={viewingReceipt || ''} isOpen={!!viewingReceipt} onClose={() => setViewingReceipt(null)} title="Receipt" />
       <Dialog open={!!editingExpense} onOpenChange={open => !open && setEditingExpense(null)}>
-        <DialogContent className="glass w-[95vw] sm:max-w-xl max-h-[92vh] overflow-y-auto overflow-x-hidden p-0 sm:p-6 rounded-[2.5rem] sm:rounded-3xl border-white/10 shadow-2xl">
+        <DialogContent className="bg-card w-[95vw] sm:max-w-xl max-h-[92vh] overflow-y-auto overflow-x-hidden p-0 sm:p-6 rounded-2xl border-border shadow-xl">
           <DialogHeader className="sr-only">
             <DialogTitle>Edit Expense</DialogTitle>
           </DialogHeader>

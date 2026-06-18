@@ -27,12 +27,12 @@ object NotificationHelper {
         }
     }
 
-    fun showTransactionNotification(context: Context, body: String) {
+    fun showTransactionNotification(context: Context, rawText: String, amount: Double, merchant: String, type: String) {
         createNotificationChannel(context)
 
         val intent = Intent(context, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            putExtra("body", body)
+            putExtra("body", rawText)
         }
 
         val pendingIntent = PendingIntent.getActivity(
@@ -42,17 +42,27 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val isCredit = type == "credit"
+        val title = if (isCredit) "Income Detected" else "Expense Detected"
+        val displayMerchant = if (merchant.isBlank() || merchant == "UNKNOWN MERCHANT") "Unknown Merchant" else merchant
+        val bodyText = if (isCredit) {
+            "Received ₹${"%.2f".format(amount)} from $displayMerchant"
+        } else {
+            "Spent ₹${"%.2f".format(amount)} at $displayMerchant"
+        }
+
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Transaction Detected")
-            .setContentText("Tap to add this expense: $body")
+            .setContentTitle(title)
+            .setContentText("$bodyText. Tap to review.")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
 
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager?
-        manager?.notify(1001, notification)
+        val notificationId = rawText.hashCode()
+        manager?.notify(notificationId, notification)
     }
 
     fun showSplitReminderNotification(context: Context, title: String, body: String) {

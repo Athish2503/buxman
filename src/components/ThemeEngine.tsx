@@ -13,17 +13,17 @@ export function ThemeEngine() {
         const { h, s, l } = hexToHsl(settings.accentColor);
         root.style.setProperty('--primary', `${h} ${s}% ${l}%`);
         root.style.setProperty('--ring', `${h} ${s}% ${l}%`);
-        
-        // Dark/Light specific adjustments could go here if needed
-        // For now, we just override the HSL values
+        root.style.setProperty('--primary-hover', `${h} ${s}% ${Math.max(0, l - 8)}%`);
+        root.style.setProperty('--primary-light', `${h} ${s}% ${Math.min(100, l + 35)}%`);
+      } else {
+        root.style.removeProperty('--primary');
+        root.style.removeProperty('--ring');
+        root.style.removeProperty('--primary-hover');
+        root.style.removeProperty('--primary-light');
       }
       
-      // Apply Glass Intensity
-      if (settings.glassIntensity !== undefined) {
-        const isDark = root.classList.contains('dark');
-        const color = isDark ? '222 20% 13%' : '0 0% 100%';
-        root.style.setProperty('--glass-bg', `hsl(${color} / ${settings.glassIntensity})`);
-      }
+      // Clean up dynamic glass values
+      root.style.removeProperty('--glass-bg');
     };
 
     applyTheme();

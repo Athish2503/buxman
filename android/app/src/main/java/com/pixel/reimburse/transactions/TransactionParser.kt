@@ -65,21 +65,42 @@ object TransactionParser {
         var type = "unknown"
 
         // Positive Scoring
+        var hasDebit = false
         for (kw in DEBIT_KEYWORDS) {
             if (lowerText.contains(kw)) {
                 scoreBreakdown["DEBIT_KW"] = SCORE_DEBITED
                 matchedKeywords.add(kw)
-                type = "debit"
+                hasDebit = true
                 break
             }
         }
+        var hasCredit = false
         for (kw in CREDIT_KEYWORDS) {
             if (lowerText.contains(kw)) {
                 scoreBreakdown["CREDIT_KW"] = SCORE_CREDITED
                 matchedKeywords.add(kw)
-                type = "credit"
+                hasCredit = true
                 break
             }
+        }
+
+        if (hasDebit && hasCredit) {
+            // Conflict resolution: Prioritize debit if strong action verbs are present
+            if (lowerText.contains("debited") || 
+                lowerText.contains("deducted") || 
+                lowerText.contains("deduction") || 
+                lowerText.contains("spent") || 
+                lowerText.contains("paid") || 
+                lowerText.contains("withdrawn") || 
+                lowerText.contains("charged")) {
+                type = "debit"
+            } else {
+                type = "credit"
+            }
+        } else if (hasDebit) {
+            type = "debit"
+        } else if (hasCredit) {
+            type = "credit"
         }
         
         if (UPI_KEYWORDS.any { lowerText.contains(it) }) {
@@ -209,9 +230,9 @@ object TransactionParser {
     private fun extractMerchant(text: String, type: String): String {
         val lowerText = text.lowercase()
         val markers = if (type == "debit") {
-            listOf("trf to", "sent to", "paid to", "at ", "to ")
+            listOf("trf to", "transfer to", "sent to", "paid to", "towards ", "at ", "to ", "for ")
         } else {
-            listOf("received from", "credited by", "from ")
+            listOf("received from", "credited by", "refunded by", "cashback from", "from ")
         }
 
         for (marker in markers) {
@@ -220,14 +241,18 @@ object TransactionParser {
                 val start = idx + marker.length
                 var end = text.length
                 
-                val endMarkers = listOf(" ref", " txn", " on ", " via", " using", " upi:", " a/c")
+                val endMarkers = listOf(" ref", " txn", " on ", " via", " using", " upi:", " a/c", " from", " to", " for")
                 for (endM in endMarkers) {
                     val endIdx = lowerText.indexOf(endM, start)
                     if (endIdx != -1 && endIdx < end) end = endIdx
                 }
                 
                 val result = text.substring(start, end).trim()
-                if (result.length in 3..40 && !result.lowercase().contains("account")) {
+                val lowerResult = result.lowercase()
+                if (result.length in 3..40 && 
+                    !lowerResult.contains("account") && 
+                    !lowerResult.contains("a/c") && 
+                    !lowerResult.contains("acct")) {
                     return result.uppercase()
                 }
             }

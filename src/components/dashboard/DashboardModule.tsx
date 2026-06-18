@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp, IndianRupee, Fuel, Car, Bike, ArrowRight, ChevronRight,
   Wallet, Receipt, PiggyBank, Zap, GaugeCircle, BarChart3, CheckCircle2,
-  Clock, AlertCircle, Sparkles, Briefcase, PieChart
+  Clock, AlertCircle, Sparkles, Briefcase, PieChart,
+  AlertTriangle, Lightbulb, ChevronLeft
 } from 'lucide-react';
 import { Expense, BudgetGoal } from '@/types/expense';
 import { formatCompactCurrency, cn, calculateUserShare } from '@/lib/utils';
@@ -94,124 +95,117 @@ function BalanceHeroCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-      className="relative rounded-[2rem] overflow-hidden mb-5 border border-white/10 shadow-2xl"
+      className="relative rounded-xl overflow-hidden border border-border bg-gradient-to-br from-primary/10 via-card to-card shadow-sm flex flex-col justify-between"
     >
-      {/* Background Layering */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[hsl(255_40%_15%)] via-[hsl(255_35%_11%)] to-[hsl(225_30%_7%)]" />
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-80 h-80 bg-violet-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute inset-0 bg-noise opacity-30 mix-blend-overlay pointer-events-none" />
-
-      {/* Subtle top ambient glow line */}
-      <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
-
-      <div className="relative p-5 sm:p-6 pb-5">
-        {/* Top Header Row */}
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2.5">
-            <div className="h-10 w-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow shadow-primary/30">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
-            <div 
-              className="select-none active:scale-95 transition-transform" 
-              onClick={() => {
-                const now = Date.now();
-                const last = (window as any)._lastTap || 0;
-                const count = (window as any)._tapCount || 0;
-                if (now - last < 500) {
-                  (window as any)._tapCount = count + 1;
-                } else {
-                  (window as any)._tapCount = 1;
-                }
-                (window as any)._lastTap = now;
-                if ((window as any)._tapCount >= 3) {
-                  (window as any)._tapCount = 0;
-                  window.location.href = '/diagnostics';
-                }
-              }}
-            >
-              <p className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-tight">{greeting}</p>
-              <h2 className="text-sm font-display font-bold text-white tracking-tight flex items-center gap-1.5 mt-0.5">
-                Financial Hub
-              </h2>
-            </div>
-          </div>
-
-          {/* Timeframe Scope Switcher */}
-          <div className="flex items-center bg-black/40 backdrop-blur-md p-1 rounded-xl border border-white/5">
-            {(['month', 'all'] as const).map(t => (
-              <button
-                key={t}
-                onClick={() => { haptics.selection(); setTimeframe(t); }}
-                className={cn(
-                  "px-3 py-1 rounded-lg text-[10px] font-bold tracking-wider uppercase transition-all duration-200",
-                  timeframe === t 
-                    ? "bg-white/15 text-white shadow-sm border border-white/10" 
-                    : "text-white/40 hover:text-white/70"
-                )}
+      <div className="p-5 flex flex-col justify-between h-full">
+        <div>
+          {/* Top Header Row */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shadow-sm">
+                <Sparkles className="h-4.5 w-4.5" />
+              </div>
+              <div 
+                className="select-none active:scale-95 transition-transform" 
+                onClick={() => {
+                  const now = Date.now();
+                  const last = (window as any)._lastTap || 0;
+                  const count = (window as any)._tapCount || 0;
+                  if (now - last < 500) {
+                    (window as any)._tapCount = count + 1;
+                  } else {
+                    (window as any)._tapCount = 1;
+                  }
+                  (window as any)._lastTap = now;
+                  if ((window as any)._tapCount >= 3) {
+                    (window as any)._tapCount = 0;
+                    window.location.href = '/diagnostics';
+                  }
+                }}
               >
-                {t === 'month' ? 'Month' : 'Total'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Main Balance Display */}
-        <div className="mb-4">
-          <div className="flex items-baseline justify-between mb-1.5">
-            <p className="text-[11px] font-bold text-white/50 uppercase tracking-widest">
-              {timeframe === 'month' ? 'Current Month Spend' : 'Cumulative Spend'}
-            </p>
-            <span className="text-[10px] font-mono text-white/40">
-              {filteredExpenses.length} {filteredExpenses.length === 1 ? 'item' : 'items'}
-            </span>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <div className="text-4xl sm:text-5xl font-display font-black text-white tracking-tight drop-shadow-md">
-              ₹<AnimatedNumber value={total} />
-            </div>
-          </div>
-
-          {/* Distribution Continuous Bar */}
-          {total > 0 && (
-            <div className="mt-3.5 space-y-1.5">
-              <div className="h-2 w-full bg-black/40 rounded-full overflow-hidden flex p-0.5 gap-0.5 border border-white/5 backdrop-blur-sm">
-                {personalPct > 0 && (
-                  <motion.div 
-                    initial={{ width: 0 }} 
-                    animate={{ width: `${personalPct}%` }} 
-                    transition={{ duration: 0.8, ease: "easeOut" }}
-                    className="h-full bg-violet-400 rounded-full" 
-                  />
-                )}
-                {pendingPct > 0 && (
-                  <motion.div 
-                    initial={{ width: 0 }} 
-                    animate={{ width: `${pendingPct}%` }} 
-                    transition={{ duration: 0.8, ease: "easeOut" }}
-                    className="h-full bg-amber-400 rounded-full" 
-                  />
-                )}
-                {recoveredPct > 0 && (
-                  <motion.div 
-                    initial={{ width: 0 }} 
-                    animate={{ width: `${recoveredPct}%` }} 
-                    transition={{ duration: 0.8, ease: "easeOut" }}
-                    className="h-full bg-emerald-400 rounded-full" 
-                  />
-                )}
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none">{greeting}</p>
+                <h2 className="text-xs font-bold text-foreground tracking-tight mt-0.5">
+                  Financial Hub
+                </h2>
               </div>
             </div>
-          )}
+
+            {/* Timeframe Scope Switcher */}
+            <div className="flex items-center bg-secondary p-0.5 rounded-lg border border-border">
+              {(['month', 'all'] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => { haptics.selection(); setTimeframe(t); }}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-[9px] font-bold tracking-wider uppercase transition-all duration-200",
+                    timeframe === t 
+                      ? "bg-card text-foreground shadow-sm border border-border" 
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {t === 'month' ? 'Month' : 'Total'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Main Balance Display */}
+          <div className="mb-4">
+            <div className="flex items-baseline justify-between mb-1">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                {timeframe === 'month' ? 'Spend Current Month' : 'Total Cumulative Spend'}
+              </p>
+              <span className="text-[9px] font-mono text-muted-foreground">
+                {filteredExpenses.length} {filteredExpenses.length === 1 ? 'item' : 'items'}
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <div className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
+                ₹<AnimatedNumber value={total} />
+              </div>
+            </div>
+
+            {/* Distribution Continuous Bar */}
+            {total > 0 && (
+              <div className="mt-3.5 space-y-1.5">
+                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden flex gap-0.5">
+                  {personalPct > 0 && (
+                    <motion.div 
+                      initial={{ width: 0 }} 
+                      animate={{ width: `${personalPct}%` }} 
+                      transition={{ duration: 0.8, ease: "easeOut" }}
+                      className="h-full bg-primary rounded-full" 
+                    />
+                  )}
+                  {pendingPct > 0 && (
+                    <motion.div 
+                      initial={{ width: 0 }} 
+                      animate={{ width: `${pendingPct}%` }} 
+                      transition={{ duration: 0.8, ease: "easeOut" }}
+                      className="h-full bg-warning rounded-full" 
+                    />
+                  )}
+                  {recoveredPct > 0 && (
+                    <motion.div 
+                      initial={{ width: 0 }} 
+                      animate={{ width: `${recoveredPct}%` }} 
+                      transition={{ duration: 0.8, ease: "easeOut" }}
+                      className="h-full bg-success rounded-full" 
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Sub Bento Grid Items */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-1">
+        <div className="grid grid-cols-3 gap-2 pt-1">
           {[
-            { label: 'Personal', value: personal, icon: Wallet, color: 'text-violet-300', dot: 'bg-violet-400', bg: 'bg-gradient-to-b from-white/[0.07] to-white/[0.02]' },
-            { label: 'Pending', value: pending, icon: Clock, color: 'text-amber-300', dot: 'bg-amber-400', bg: 'bg-gradient-to-b from-white/[0.07] to-white/[0.02]' },
-            { label: 'Settled', value: recovered, icon: CheckCircle2, color: 'text-emerald-300', dot: 'bg-emerald-400', bg: 'bg-gradient-to-b from-white/[0.07] to-white/[0.02]' },
+            { label: 'Personal', value: personal, icon: Wallet, color: 'text-primary', dot: 'bg-primary', bg: 'bg-card' },
+            { label: 'Pending', value: pending, icon: Clock, color: 'text-warning', dot: 'bg-warning', bg: 'bg-card' },
+            { label: 'Settled', value: recovered, icon: CheckCircle2, color: 'text-success', dot: 'bg-success', bg: 'bg-card' },
           ].map((stat, i) => (
             <motion.div
               key={stat.label}
@@ -228,26 +222,100 @@ function BalanceHeroCard({
                 }
               }}
               className={cn(
-                "rounded-2xl p-3 sm:p-3.5 border border-white/8 backdrop-blur-md relative overflow-hidden group cursor-pointer hover:border-white/20 transition-all",
+                "rounded-lg p-2.5 border border-border relative overflow-hidden group cursor-pointer hover:bg-secondary/40 transition-all",
                 stat.bg
               )}
             >
               {/* Inner ambient light indicator */}
-              <div className="absolute top-0 right-0 p-2 opacity-30 group-hover:opacity-100 transition-opacity">
-                <div className={cn("w-1.5 h-1.5 rounded-full", stat.dot)} />
+              <div className="absolute top-0 right-0 p-1.5 opacity-60">
+                <div className={cn("w-1 h-1 rounded-full", stat.dot)} />
               </div>
 
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <stat.icon className={cn("h-3.5 w-3.5", stat.color)} />
-                <span className="text-[9px] font-black uppercase tracking-wider text-white/50">{stat.label}</span>
+              <div className="flex items-center gap-1.5 mb-1">
+                <stat.icon className={cn("h-3 w-3", stat.color)} />
+                <span className="text-[8px] font-bold uppercase tracking-wider text-muted-foreground">{stat.label}</span>
               </div>
               
-              <p className={cn("text-sm sm:text-base font-display font-bold leading-none tracking-tight", stat.color)}>
+              <p className={cn("text-xs font-bold leading-none tracking-tight", stat.color)}>
                 ₹<AnimatedNumber value={stat.value} />
               </p>
             </motion.div>
           ))}
         </div>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ── Smart Insights Card ── */
+function SmartInsightsCard({ insights }: { insights: Array<{ id: string; title: string; description: string; type: 'info' | 'warning' | 'success'; actionLabel?: string; onClick?: () => void }> }) {
+  const [index, setIndex] = useState(0);
+  const current = insights[index] || insights[0];
+
+  const handleNext = () => {
+    setIndex((prev) => (prev + 1) % insights.length);
+    haptics.selection();
+  };
+
+  const handlePrev = () => {
+    setIndex((prev) => (prev - 1 + insights.length) % insights.length);
+    haptics.selection();
+  };
+
+  if (!current) return null;
+
+  const typeConfig = {
+    info: { icon: Lightbulb, border: 'border-primary/20', bg: 'bg-primary/10', text: 'text-primary' },
+    warning: { icon: AlertTriangle, border: 'border-warning/20', bg: 'bg-warning/10', text: 'text-warning' },
+    success: { icon: Sparkles, border: 'border-success/20', bg: 'bg-success/10', text: 'text-success' },
+  }[current.type];
+
+  const Icon = typeConfig.icon;
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+      className={cn("rounded-xl border p-5 bg-card shadow-sm flex flex-col justify-between min-h-[220px] transition-all", typeConfig.border)}
+    >
+      <div className="flex flex-col gap-2">
+        <div className="flex items-start gap-3">
+          <div className={cn("p-2 rounded-lg flex items-center justify-center shrink-0 mt-0.5", typeConfig.bg)}>
+            <Icon className={cn("h-4.5 w-4.5", typeConfig.text)} />
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{current.title}</h4>
+            <p className="text-xs text-foreground leading-relaxed font-semibold">{current.description}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/40">
+        <div className="flex items-center gap-1.5">
+          {insights.length > 1 && (
+            <>
+              <button onClick={handlePrev} className="p-1 rounded-md hover:bg-secondary text-muted-foreground transition-colors">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="text-[9px] font-mono font-bold text-muted-foreground px-1 select-none">
+                {index + 1} / {insights.length}
+              </span>
+              <button onClick={handleNext} className="p-1 rounded-md hover:bg-secondary text-muted-foreground transition-colors">
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </>
+          )}
+        </div>
+        {current.actionLabel && current.onClick && (
+          <button
+            onClick={current.onClick}
+            className="text-[9px] font-bold uppercase tracking-widest text-primary hover:text-primary-hover px-3 py-1.5 rounded-lg bg-primary/10 transition-colors"
+          >
+            {current.actionLabel}
+          </button>
+        )}
       </div>
     </motion.div>
   );
@@ -289,6 +357,16 @@ function QuickActions({ onNavigate }: { onNavigate: (t: any) => void }) {
   );
 }
 
+/* ── KPI Widget Color Map ── */
+const COLOR_MAP: Record<string, { bg: string; text: string }> = {
+  violet:  { bg: 'bg-primary/10', text: 'text-primary' },
+  amber:   { bg: 'bg-amber-500/10', text: 'text-amber-600 dark:text-amber-500' },
+  orange:  { bg: 'bg-orange-500/10', text: 'text-orange-600 dark:text-orange-500' },
+  emerald: { bg: 'bg-emerald-500/10', text: 'text-emerald-600 dark:text-emerald-500' },
+  blue:    { bg: 'bg-blue-500/10', text: 'text-blue-600 dark:text-blue-400' },
+  cyan:    { bg: 'bg-cyan-500/10', text: 'text-cyan-600 dark:text-cyan-400' },
+};
+
 /* ── KPI Widget ── */
 function KpiWidget({ label, value, icon: Icon, color, delay = 0, prefix = '₹', suffix = '', decimals = 0 }: {
   label: string; value: number; icon: any; color: string; delay?: number; prefix?: string; suffix?: string; decimals?: number;
@@ -302,11 +380,11 @@ function KpiWidget({ label, value, icon: Icon, color, delay = 0, prefix = '₹',
     >
       <div className="flex items-center justify-between">
         <p className="label-caps text-muted-foreground">{label}</p>
-        <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center', `bg-${color}-500/12`)}>
-          <Icon className={cn('h-3.5 w-3.5', `text-${color}-400`)} />
+        <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center', COLOR_MAP[color]?.bg || 'bg-muted')}>
+          <Icon className={cn('h-3.5 w-3.5', COLOR_MAP[color]?.text || 'text-muted-foreground')} />
         </div>
       </div>
-      <div className="text-xl font-display font-black tracking-tight">
+      <div className="text-xl font-bold tracking-tight">
         {prefix}<AnimatedNumber value={value} decimals={decimals} />
         {suffix && <span className="text-xs font-medium text-muted-foreground ml-1">{suffix}</span>}
       </div>
@@ -384,16 +462,132 @@ export function DashboardModule({
     return { totalDist, totalCost, overallEco, costPerKm: totalDist > 0 ? totalCost / totalDist : 0 };
   }, [vehicleSummaries]);
 
+  // ── Smart Insights Engine ──
+  const smartInsights = useMemo(() => {
+    const insights: Array<{
+      id: string;
+      title: string;
+      description: string;
+      type: 'info' | 'warning' | 'success';
+      actionLabel?: string;
+      onClick?: () => void;
+    }> = [];
+
+    // 1. Claims Nudge
+    if (pendingAmount > 2000) {
+      insights.push({
+        id: 'pending-claims',
+        title: 'Pending Claims Nudge',
+        description: `You have ₹${pendingAmount.toLocaleString('en-IN')} in unclaimed reimbursable expenses ready for review.`,
+        type: 'warning',
+        actionLabel: 'View Claims',
+        onClick: () => onNavigate('reimbursements')
+      });
+    }
+
+    // 2. Budget Alert
+    const budgets = settings.budgets || [];
+    if (budgets.length > 0) {
+      const spentByCategory: Record<string, number> = {};
+      filteredExpenses.forEach(e => {
+        const cat = e.category || 'Other';
+        spentByCategory[cat] = (spentByCategory[cat] || 0) + calculateUserShare(e);
+      });
+
+      budgets.forEach((b: any) => {
+        const spent = spentByCategory[b.category] || 0;
+        const limit = b.limit || 1;
+        const pct = (spent / limit) * 100;
+        if (pct >= 85) {
+          insights.push({
+            id: `budget-${b.category}`,
+            title: 'Budget Alert',
+            description: `Your spend in "${b.category}" has reached ${Math.round(pct)}% of its ₹${limit.toLocaleString('en-IN')} monthly limit.`,
+            type: 'warning',
+            actionLabel: 'Manage',
+            onClick: () => onNavigate('settings')
+          });
+        }
+      });
+    }
+
+    // 3. Highest Spending Category
+    if (filteredExpenses.length > 0) {
+      const spentByCategory: Record<string, number> = {};
+      filteredExpenses.forEach(e => {
+        const cat = e.category || 'Other';
+        spentByCategory[cat] = (spentByCategory[cat] || 0) + calculateUserShare(e);
+      });
+
+      let topCat = '';
+      let topAmount = 0;
+      Object.entries(spentByCategory).forEach(([cat, amt]) => {
+        if (amt > topAmount) {
+          topAmount = amt;
+          topCat = cat;
+        }
+      });
+
+      if (topCat && topAmount > 1000) {
+        insights.push({
+          id: 'top-spending',
+          title: 'Top Category Spend',
+          description: `Your highest spend is in "${topCat}", totaling ₹${topAmount.toLocaleString('en-IN')} this period.`,
+          type: 'info',
+          actionLabel: 'Details',
+          onClick: () => onNavigate('expenses')
+        });
+      }
+    }
+
+    // 4. Vehicle Service Nudge
+    const vehicles = mileageService.getVehicles();
+    const logs = fuelService.getLogs();
+    vehicles.forEach(v => {
+      if (v.serviceInterval && v.lastServiceOdo) {
+        const vLogs = logs.filter(l => l.vehicleId === v.id);
+        const latestOdo = vLogs.length > 0 ? vLogs[0].odometer : 0;
+        const kms = latestOdo - v.lastServiceOdo;
+        if (kms >= v.serviceInterval * 0.9) {
+          insights.push({
+            id: `vehicle-service-${v.id}`,
+            title: 'Vehicle Service Alert',
+            description: `${v.name} is approaching its scheduled service interval (${kms.toLocaleString()} km logged).`,
+            type: 'warning',
+            actionLabel: 'Garage',
+            onClick: () => onNavigate('vehicle')
+          });
+        }
+      }
+    });
+
+    if (insights.length === 0) {
+      insights.push({
+        id: 'no-alerts',
+        title: 'All Systems Normal',
+        description: 'Your budgets are healthy and all claims are currently up to date.',
+        type: 'success'
+      });
+    }
+
+    return insights;
+  }, [filteredExpenses, pendingAmount, settings.budgets, onNavigate]);
+
+  const [analyticsMode, setAnalyticsMode] = useState<'trends' | 'categories' | 'budgets'>('trends');
+
   return (
     <div className="space-y-4 stagger">
 
-      {/* Balance Hero */}
-      <BalanceHeroCard 
-        filteredExpenses={filteredExpenses} 
-        timeframe={timeframe} 
-        setTimeframe={setTimeframe} 
-        onNavigate={onNavigate} 
-      />
+      {/* Bento Layout Top Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <BalanceHeroCard 
+          filteredExpenses={filteredExpenses} 
+          timeframe={timeframe} 
+          setTimeframe={setTimeframe} 
+          onNavigate={onNavigate} 
+        />
+        <SmartInsightsCard insights={smartInsights} />
+      </div>
 
       {/* Quick Actions */}
       <QuickActions onNavigate={onNavigate} />
@@ -438,25 +632,69 @@ export function DashboardModule({
               <KpiWidget label="Settled"   value={reimbursedAmount} icon={CheckCircle2} color="emerald" delay={0.15} />
             </div>
 
-            {/* Category Analysis */}
-            <div className="card-premium p-4">
-              <p className="label-caps text-muted-foreground mb-3">Spending by Category</p>
-              <CategoryRings expenses={filteredExpenses} />
-            </div>
-
-            {/* Spending Trend */}
-            <div className="card-premium p-4">
-              <SectionHeader title="Spending Chart" />
-              <SpendingTrendChart expenses={filteredExpenses} />
-            </div>
-
-            {/* Budget Goals */}
-            {(settings.budgets || []).length > 0 && (
-              <div className="card-premium p-4">
-                <SectionHeader title="Budget Goals" action="Manage" onAction={() => onNavigate('settings')} />
-                <BudgetTracker expenses={expenses} budgets={settings.budgets || []} onManage={() => onNavigate('settings')} />
+            {/* Tabbed Analytics Hub */}
+            <div className="card-premium p-4 space-y-4">
+              <div className="flex items-center justify-between border-b border-border/40 pb-2.5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Insights & Analysis</h3>
+                <div className="flex bg-secondary p-0.5 rounded-lg border border-border">
+                  {(['trends', 'categories', 'budgets'] as const).map((mode) => {
+                    if (mode === 'budgets' && (settings.budgets || []).length === 0) return null;
+                    return (
+                      <button
+                        key={mode}
+                        onClick={() => { haptics.selection(); setAnalyticsMode(mode); }}
+                        className={cn(
+                          "px-2.5 py-1 rounded-md text-[9px] font-bold tracking-wider uppercase transition-all duration-200",
+                          analyticsMode === mode
+                            ? "bg-card text-foreground shadow-sm border border-border"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {mode === 'trends' ? 'Trend' : mode === 'categories' ? 'Category' : 'Budgets'}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            )}
+
+              <div className="min-h-[220px] flex flex-col justify-center">
+                <AnimatePresence mode="wait">
+                  {analyticsMode === 'trends' && (
+                    <motion.div
+                      key="trends"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <SpendingTrendChart expenses={filteredExpenses} />
+                    </motion.div>
+                  )}
+                  {analyticsMode === 'categories' && (
+                    <motion.div
+                      key="categories"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <CategoryRings expenses={filteredExpenses} />
+                    </motion.div>
+                  )}
+                  {analyticsMode === 'budgets' && (
+                    <motion.div
+                      key="budgets"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <BudgetTracker expenses={expenses} budgets={settings.budgets || []} onManage={() => onNavigate('settings')} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
 
             {/* Recent Expenses */}
             {expenses.length > 0 && (

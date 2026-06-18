@@ -130,10 +130,10 @@ export function ExpenseItem({
         }}
         style={{ x }}
         className={cn(
-          "relative z-10 flex items-center gap-4 p-4 pl-12 transition-all duration-300 cursor-pointer active:scale-[0.99]",
+          "relative z-10 flex items-center gap-4 p-4 pl-12 transition-all duration-300 cursor-pointer active:scale-[0.99] border rounded-2xl",
           isSelected
-            ? "bg-primary/10 border-primary/40 shadow-glow shadow-primary/5"
-            : "glass-card border-white/5 hover:border-white/10"
+            ? "bg-primary/5 border-primary/30"
+            : "bg-card border-border hover:bg-surface-2/50"
         )}
       >
         {/* Selection tap area (left) */}
@@ -146,51 +146,57 @@ export function ExpenseItem({
           }}
         >
           <div className={cn(
-            "h-5 w-5 rounded-md border-2 flex items-center justify-center transition-all duration-300",
+            "h-5 w-5 rounded border-2 flex items-center justify-center transition-all duration-300",
             isSelected 
-              ? "border-primary bg-primary shadow-glow shadow-primary/20" 
-              : "border-white/10 bg-white/5"
+              ? "border-primary bg-primary" 
+              : "border-border bg-muted/40"
           )}>
-            {isSelected && <Check className="h-3.5 w-3.5 text-white" strokeWidth={4} />}
+            {isSelected && <Check className="h-3.5 w-3.5 text-primary-foreground" strokeWidth={4} />}
           </div>
         </div>
-
+ 
         {/* Category icon */}
         <div className={cn(
-          "h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg relative",
+          "h-12 w-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm relative",
           cfg.bgColor
         )}>
           <Icon className={cn("h-6 w-6", cfg.color)} />
-          <div className="absolute inset-0 rounded-2xl bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="absolute inset-0 rounded-xl bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
-
+ 
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="font-black text-[15px] tracking-tight truncate text-foreground/90 group-hover:text-foreground transition-colors">
+              <h3 className="font-bold text-[15px] tracking-tight truncate text-foreground/90 group-hover:text-foreground transition-colors">
                 {expense.vendor}
               </h3>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60">{cfg.label}</span>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">{cfg.label}</span>
                 <span className="h-1 w-1 rounded-full bg-muted-foreground/20" />
                 <span className="text-[10px] font-bold text-muted-foreground/40">{format(new Date(expense.date), 'dd MMM')}</span>
               </div>
             </div>
             <div className="text-right shrink-0 flex flex-col items-end">
               <p className={cn(
-                "font-black text-[16px] font-mono tracking-tighter",
-                expense.type === 'credit' ? "text-emerald-400" : "text-foreground"
+                "font-bold text-[16px] font-mono tracking-tighter",
+                expense.type === 'credit' ? "text-emerald-500" : "text-foreground"
               )}>
                 {expense.type === 'credit' ? '+' : ''}{formatCurrency(expense.amount)}
               </p>
               {expense.isReimbursement && (
                 <div className={cn(
-                  "mt-1.5 px-2 py-0.5 rounded-full inline-flex items-center gap-1 border border-white/5 shadow-inner",
-                  STATUS_COLORS[expense.status].replace('status-', 'bg-').replace('rejected', 'destructive/10 text-destructive border-destructive/20').replace('approved', 'success/10 text-success border-success/20').replace('pending', 'warning/10 text-warning border-warning/20').replace('reimbursed', 'primary/10 text-primary border-primary/20')
+                  "mt-1.5 px-2.5 py-0.5 inline-flex items-center gap-1",
+                  STATUS_COLORS[expense.status]
                 )}>
-                   <div className={cn("h-1 w-1 rounded-full", STATUS_COLORS[expense.status].includes('rejected') ? 'bg-destructive' : STATUS_COLORS[expense.status].includes('approved') ? 'bg-success' : STATUS_COLORS[expense.status].includes('pending') ? 'bg-warning' : 'bg-primary')} />
-                   <span className="text-[8px] font-black uppercase tracking-widest">{expense.status}</span>
+                   <div className={cn(
+                     "h-1.5 w-1.5 rounded-full shrink-0",
+                     expense.status === 'rejected' && 'bg-destructive',
+                     expense.status === 'approved' && 'bg-success',
+                     expense.status === 'pending' && 'bg-warning',
+                     expense.status === 'reimbursed' && 'bg-primary'
+                   )} />
+                   <span className="text-[8px] font-bold uppercase tracking-widest leading-none">{expense.status}</span>
                 </div>
               )}
             </div>
