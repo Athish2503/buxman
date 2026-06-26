@@ -48,8 +48,12 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
   const fleetStats = useMemo(() => {
     const totalSpent = logs.reduce((s, l) => s + l.totalCost, 0);
     const totalDist = logs.reduce((s, l) => s + (l.distanceSinceLast || 0), 0);
-    const totalLiters = logs.reduce((s, l) => s + l.liters, 0);
-    const avgEconomy = totalLiters > 0 ? totalDist / totalLiters : 0;
+    
+    // Only count clean intervals for avgEconomy
+    const cleanLogs = logs.filter(l => l.distanceSinceLast !== undefined && !l.missedPreviousRefill);
+    const totalCleanDist = cleanLogs.reduce((s, l) => s + (l.distanceSinceLast || 0), 0);
+    const totalCleanLiters = cleanLogs.reduce((s, l) => s + l.liters, 0);
+    const avgEconomy = totalCleanLiters > 0 ? totalCleanDist / totalCleanLiters : 0;
     
     return { totalSpent, totalDist, avgEconomy, vehicleCount: vehicles.length };
   }, [logs, vehicles]);
@@ -72,7 +76,12 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
     
     const totalSpent = activeLogs.reduce((s, l) => s + l.totalCost, 0);
     const totalDist = activeLogs.reduce((s, l) => s + (l.distanceSinceLast || 0), 0);
-    const costPerKm = totalDist > 0 ? totalSpent / totalDist : 0;
+    
+    // Calculate clean cost per km
+    const cleanLogs = activeLogs.filter(l => l.distanceSinceLast !== undefined && !l.missedPreviousRefill);
+    const cleanSpent = cleanLogs.reduce((s, l) => s + l.totalCost, 0);
+    const cleanDist = cleanLogs.reduce((s, l) => s + (l.distanceSinceLast || 0), 0);
+    const costPerKm = cleanDist > 0 ? cleanSpent / cleanDist : 0;
 
     const chartData = activeLogs
       .filter(l => l.economy)
@@ -716,6 +725,11 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
                                 {log.station}
                               </span>
                             )}
+                            {log.missedPreviousRefill && (
+                              <Badge variant="outline" className="h-4.5 px-1.5 text-[8px] border-warning/30 bg-warning/10 text-warning font-bold uppercase tracking-wider shrink-0">
+                                Missed Refill
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.1em] flex items-center gap-1.5">
                             <Calendar className="h-3 w-3 opacity-40" /> {format(new Date(log.date), 'dd MMM yyyy')} · {log.liters}L @ ₹{log.pricePerLiter}
@@ -748,13 +762,13 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
                             </div>
                           ) : (
                             <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 px-3 py-1.5 bg-white/5 rounded-xl border border-white/5">
-                              Initial Log
+                              {log.missedPreviousRefill ? "Missed Refill (Reset)" : "Initial Log"}
                             </span>
                           )}
 
                           {log.distanceSinceLast && (
                             <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest flex items-center gap-1.5">
-                              <MapPin className="h-3.5 w-3.5 opacity-30" /> {log.distanceSinceLast} km trip
+                              <MapPin className="h-3.5 w-3.5 opacity-30" /> {log.distanceSinceLast} km trip {log.missedPreviousRefill && <span className="text-[8px] text-warning/80 font-bold lowercase tracking-normal">(spans gap)</span>}
                             </span>
                           )}
                         </div>

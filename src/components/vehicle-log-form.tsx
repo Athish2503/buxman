@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
-import { X, Fuel, GaugeCircle, IndianRupee, CalendarDays, Car, Bike, Check } from 'lucide-react';
+import { X, Fuel, GaugeCircle, IndianRupee, CalendarDays, Car, Bike, Check, ShieldAlert } from 'lucide-react';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { SwipeToAdd } from '@/components/ui/swipe-to-add';
 import { Input } from '@/components/ui/input';
@@ -51,9 +51,49 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
   const [isFullTank, setIsFullTank] = useState(editLog?.isFullTank ?? true);
   const [station, setStation] = useState(editLog?.station || 'IndianOil');
   const [date, setDate] = useState(editLog?.date || format(new Date(), 'yyyy-MM-dd'));
+  const [missedPreviousRefill, setMissedPreviousRefill] = useState(editLog?.missedPreviousRefill ?? false);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  const [vehicleLogs, setVehicleLogs] = useState<FuelLog[]>([]);
+
+  useEffect(() => {
+    if (activeVehId && open) {
+      setVehicleLogs(fuelService.getLogs().filter(l => l.vehicleId === activeVehId));
+    }
+  }, [activeVehId, open]);
+
+  const previousLog = useMemo(() => {
+    if (!activeVehId) return null;
+    const sortedLogs = [...vehicleLogs].sort((a, b) => b.odometer - a.odometer);
+    if (editLog) {
+      return sortedLogs.find(l => l.odometer < editLog.odometer && l.id !== editLog.id) || null;
+    } else {
+      return sortedLogs[0] || null;
+    }
+  }, [vehicleLogs, activeVehId, editLog]);
+
+  const avgDistance = useMemo(() => {
+    const validDistances = vehicleLogs
+      .map(l => l.distanceSinceLast)
+      .filter((d): d is number => typeof d === 'number' && d > 0);
+    if (validDistances.length === 0) {
+      const vehicle = vehicles.find(v => v.id === activeVehId);
+      return vehicle?.icon === 'bike' ? 250 : 500;
+    }
+    return validDistances.reduce((a, b) => a + b, 0) / validDistances.length;
+  }, [vehicleLogs, activeVehId, vehicles]);
+
+  const gap = useMemo(() => {
+    const currentOdoNum = Number(odometer);
+    if (!previousLog || isNaN(currentOdoNum)) return 0;
+    return currentOdoNum - previousLog.odometer;
+  }, [previousLog, odometer]);
+
+  const isGapUnusuallyLarge = useMemo(() => {
+    return previousLog && gap > avgDistance * 1.7;
+  }, [previousLog, gap, avgDistance]);
 
   // Update state when editLog changes
   useEffect(() => {
@@ -66,6 +106,7 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
       setIsFullTank(editLog.isFullTank);
       setStation(editLog.station || 'IndianOil');
       setDate(editLog.date);
+      setMissedPreviousRefill(editLog.missedPreviousRefill ?? false);
     }
   }, [editLog]);
 
@@ -148,6 +189,7 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
       totalCost: Number(totalCost),
       isFullTank,
       station,
+      missedPreviousRefill,
       createdAt: editLog?.createdAt || new Date().toISOString()
     };
 
@@ -169,6 +211,7 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
         setOdometer('');
         setLiters('');
         setTotalCost('');
+        setMissedPreviousRefill(false);
       }
       onSuccess();
     }, 1200);
@@ -296,14 +339,47 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
         </div>
 
         {/* Odometer */}
-        <div>
-          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
-            <GaugeCircle className="h-3 w-3" /> Odometer Reading
-          </Label>
-          <Input 
-            type="number" value={odometer} onChange={e => setOdometer(e.target.value)} placeholder="Current KM"
-            className="h-12 bg-muted/30 border-border/40 text-lg font-mono focus:border-primary/50"
-          />
+        <div className="space-y-3">
+          <div>
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
+              <GaugeCircle className="h-3 w-3" /> Odometer Reading
+            </Label>
+            <Input 
+              type="number" value={odometer} onChange={e => setOdometer(e.target.value)} placeholder="Current KM"
+              className="h-12 bg-muted/30 border-border/40 text-lg font-mono focus:border-primary/50"
+            />
+          </div>
+
+          <AnimatePresence>
+            {isGapUnusuallyLarge && !missedPreviousRefill && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0, y: -10 }}
+                animate={{ opacity: 1, height: 'auto', y: 0 }}
+                exit={{ opacity: 0, height: 0, y: -10 }}
+                className="p-3.5 rounded-2xl bg-warning/10 border border-warning/30 text-warning space-y-2 overflow-hidden"
+              >
+                <div className="flex items-start gap-2">
+                  <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5 text-warning" />
+                  <div>
+                    <p className="text-xs font-bold">Unusually large distance (+{gap} km)</p>
+                    <p className="text-[10px] text-warning/80">
+                      That's much higher than your average (+{Math.round(avgDistance)} km) refill interval. Did you forget to log a refill in between?
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMissedPreviousRefill(true);
+                    haptics.selection();
+                  }}
+                  className="w-full py-1.5 rounded-lg bg-warning/20 hover:bg-warning/30 text-[10px] font-bold transition-all uppercase tracking-wider"
+                >
+                  Yes, I missed logging a refill
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -389,6 +465,40 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
               {isFullTank ? '✓ Full Tank' : 'Partial Tank'}
             </button>
           </div>
+        </div>
+
+        <div className={cn(
+          "flex items-center justify-between p-3.5 rounded-2xl border transition-all duration-300",
+          missedPreviousRefill 
+            ? "bg-warning/5 border-warning/30 text-warning" 
+            : "bg-muted/10 border-border/40 text-muted-foreground/80"
+        )}>
+          <div className="space-y-0.5 pr-2">
+            <Label className={cn(
+              "text-xs font-bold flex items-center gap-1.5",
+              missedPreviousRefill ? "text-warning" : "text-foreground"
+            )}>
+              Missed previous refill
+            </Label>
+            <p className="text-[10px] opacity-75">
+              Exclude this entry from fuel economy calculations to keep charts clean.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setMissedPreviousRefill(!missedPreviousRefill);
+              haptics.selection();
+            }}
+            className={cn(
+              "h-8 px-3 rounded-xl border text-[10px] font-black uppercase transition-all shrink-0 tracking-wider shadow-sm",
+              missedPreviousRefill 
+                ? "bg-warning/20 border-warning/30 text-warning" 
+                : "bg-muted/30 border-border/40 text-muted-foreground hover:border-border/80 hover:text-foreground"
+            )}
+          >
+            {missedPreviousRefill ? 'Yes, Missed' : 'No'}
+          </button>
         </div>
 
         <div className="pt-4 border-t border-border/30 mt-2">

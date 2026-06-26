@@ -22,6 +22,7 @@ export interface FuelLog {
   isFullTank: boolean;
   station?: string;
   notes?: string;
+  missedPreviousRefill?: boolean;
   
   // Computed (set during save or calculation)
   distanceSinceLast?: number;

@@ -30,3 +30,22 @@ export interface DiningExperience {
   _visitCount?: number; // Optional count for grouping UI
   createdAt: string;
 }
+
+export interface DiningRecommendation {
+  id: string;
+  restaurantName: string;
+  cuisine?: string;
+  priceRange?: PriceRange;
+  location?: {
+    address: string;
+    lat?: number;
+    lng?: number;
+    placeId?: string;
+  };
+  recommendedBy?: string; // Friend name, social media link, etc.
+  notes?: string; // Overall description/source notes
+  dishes: Dish[]; // Dishes to try
+  createdAt: string;
+  isVisited?: boolean;
+}
+

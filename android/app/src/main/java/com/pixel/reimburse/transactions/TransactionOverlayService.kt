@@ -46,24 +46,15 @@ class TransactionOverlayService : Service() {
         val type = intent?.getStringExtra("type") ?: "debit"
         val account = intent?.getStringExtra("account") ?: "Account ending ****"
 
-        Log.d(TAG, "[OverlayService] Redirecting to OverlayActivity: $merchant")
+        Log.d(TAG, "[OverlayService] Displaying floating overlay for: $merchant")
 
-        try {
-            val activityIntent = Intent(this, OverlayActivity::class.java).apply {
-                putExtra("amount", amount)
-                putExtra("merchant", merchant)
-                putExtra("appName", appName)
-                putExtra("rawText", rawText)
-                putExtra("type", type)
-                putExtra("account", account)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            }
-            startActivity(activityIntent)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed redirecting to OverlayActivity from service", e)
+        if (!Settings.canDrawOverlays(this)) {
+            Log.e(TAG, "Cannot show overlay: SYSTEM_ALERT_WINDOW permission missing.")
+            stopSelf()
+            return START_NOT_STICKY
         }
 
-        stopSelf()
+        showOverlay(amount, merchant, appName, rawText, type, account)
         return START_NOT_STICKY
     }
 
@@ -90,6 +81,7 @@ class TransactionOverlayService : Service() {
         val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             LayoutParams.TYPE_APPLICATION_OVERLAY
         } else {
+            @Suppress("DEPRECATION")
             LayoutParams.TYPE_PHONE
         }
 
@@ -146,6 +138,40 @@ class TransactionOverlayService : Service() {
             }?.start()
     }
 
+    private fun setupEditTextFocus(editText: EditText) {
+        editText.setOnTouchListener { v, event ->
+            if (event.action == MotionEvent.ACTION_UP) {
+                params?.let { p ->
+                    if ((p.flags and LayoutParams.FLAG_NOT_FOCUSABLE) != 0) {
+                        p.flags = p.flags and LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+                        try {
+                            windowManager.updateViewLayout(binding?.root, p)
+                            v.requestFocus()
+                            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                            imm.showSoftInput(v, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to update overlay focus", e)
+                        }
+                    }
+                }
+            }
+            false
+        }
+
+        editText.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                params?.let { p ->
+                    p.flags = p.flags or LayoutParams.FLAG_NOT_FOCUSABLE
+                    try {
+                        windowManager.updateViewLayout(binding?.root, p)
+                        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                        imm.hideSoftInputFromWindow(editText.windowToken, 0)
+                    } catch (e: Exception) {}
+                }
+            }
+        }
+    }
+
     private fun setupUI(amount: Double, merchant: String, appName: String, type: String, account: String) {
         val b = binding ?: return
         selectedCategory = null
@@ -175,9 +201,49 @@ class TransactionOverlayService : Service() {
         b.switchReimbursable.visibility = if (isCredit) View.GONE else View.VISIBLE
         b.switchReimbursable.isChecked = false
 
-        // Hide split switch and section in TransactionOverlayService since it delegates to OverlayActivity
-        b.switchSplit.visibility = View.GONE
+        // Splits and contact section
+        b.switchSplit.visibility = if (isCredit) View.GONE else View.VISIBLE
+        b.switchSplit.isChecked = false
         b.layoutSplitSection.visibility = View.GONE
+
+        b.switchSplit.setOnCheckedChangeListener { _, isChecked ->
+            b.layoutSplitSection.visibility = if (isChecked) View.VISIBLE else View.GONE
+            updateSplitSummary(amount)
+        }
+
+        b.btnOverlaySaveUpi.setOnClickListener {
+            val enteredUpi = b.etOverlayUpiId.text.toString().trim()
+            if (enteredUpi.isNotBlank()) {
+                saveUpiIdToStorage(enteredUpi)
+                b.etOverlayUpiId.clearFocus()
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+                imm?.hideSoftInputFromWindow(b.etOverlayUpiId.windowToken, 0)
+                updateSplitSummary(amount)
+            }
+        }
+
+        val contacts = loadContactsFromStorage()
+        if (contacts.isEmpty()) {
+            b.tvSplitSummary.text = "No contacts found. Please add contacts in the main app."
+        } else {
+            b.chipGroupSplitContacts.removeAllViews()
+            contacts.forEach { (contactId, name) ->
+                val themedCtx = ContextThemeWrapper(this, R.style.AppTheme)
+                val chip = Chip(themedCtx, null, com.google.android.material.R.attr.chipStyle)
+                chip.text = name
+                chip.isCheckable = true
+                chip.setTextColor(0xFFFFFFFF.toInt())
+                chip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(0x1AFFFFFF)
+                chip.chipStrokeColor = android.content.res.ColorStateList.valueOf(0x33FFFFFF)
+                chip.chipStrokeWidth = 1f
+                chip.tag = contactId
+
+                chip.setOnCheckedChangeListener { _, _ ->
+                    updateSplitSummary(amount)
+                }
+                b.chipGroupSplitContacts.addView(chip)
+            }
+        }
 
         // Dynamic category chips
         b.chipGroupOverlayCategories.removeAllViews()
@@ -218,9 +284,10 @@ class TransactionOverlayService : Service() {
             val notes = b.etOverlayNotes.text.toString()
             val category = selectedCategory ?: if (isCredit) "Income" else "Other"
             val isReimbursement = if (isCredit) false else b.switchReimbursable.isChecked
+            val splitContacts = if (b.switchSplit.isChecked) getSelectedContacts() else emptyList()
 
             Log.d(TAG, "Saving transaction: $merchant | $amount | Reimbursable: $isReimbursement")
-            val success = persistTransactionNatively(amount, merchant, category, notes, type, isReimbursement)
+            val success = persistTransactionNatively(amount, merchant, category, notes, type, isReimbursement, splitContacts)
             
             if (success) {
                 FinancialNotificationPlugin.onOverlayAction(this, "save", amount, merchant, category, notes, true, isReimbursement)
@@ -232,37 +299,8 @@ class TransactionOverlayService : Service() {
             }
         }
 
-        b.etOverlayNotes.setOnTouchListener { v, event ->
-            if (event.action == MotionEvent.ACTION_UP) {
-                params?.let { p ->
-                    if ((p.flags and LayoutParams.FLAG_NOT_FOCUSABLE) != 0) {
-                        p.flags = p.flags and LayoutParams.FLAG_NOT_FOCUSABLE.inv()
-                        try {
-                            windowManager.updateViewLayout(b.root, p)
-                            v.requestFocus()
-                            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-                            imm.showSoftInput(v, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed to update overlay focus", e)
-                        }
-                    }
-                }
-            }
-            false
-        }
-
-        b.etOverlayNotes.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) {
-                params?.let { p ->
-                    p.flags = p.flags or LayoutParams.FLAG_NOT_FOCUSABLE
-                    try {
-                        windowManager.updateViewLayout(b.root, p)
-                        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-                        imm.hideSoftInputFromWindow(b.etOverlayNotes.windowToken, 0)
-                    } catch (e: Exception) {}
-                }
-            }
-        }
+        setupEditTextFocus(b.etOverlayNotes)
+        setupEditTextFocus(b.etOverlayUpiId)
 
         setupDragBehavior()
     }
@@ -356,6 +394,154 @@ class TransactionOverlayService : Service() {
         return categories
     }
 
+    private fun loadContactsFromStorage(): List<Pair<String, String>> {
+        val list = mutableListOf<Pair<String, String>>()
+        try {
+            val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+            val contactsKey = "reimburse_contacts"
+            val jsonStr = prefs.getString(contactsKey, null)
+            if (jsonStr != null) {
+                val array = org.json.JSONArray(jsonStr)
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val id = obj.getString("id")
+                    val name = obj.getString("name")
+                    list.add(Pair(id, name))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load contacts from CapacitorStorage", e)
+        }
+        return list
+    }
+
+    private fun loadUpiIdFromStorage(): String? {
+        try {
+            val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+            val settingsKey = "reimburse_settings_v2"
+            val jsonStr = prefs.getString(settingsKey, null)
+            if (jsonStr != null) {
+                val obj = org.json.JSONObject(jsonStr)
+                val upiId = obj.optString("upiId", "")
+                if (upiId.isNotBlank()) return upiId
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load upiId from CapacitorStorage", e)
+        }
+        return null
+    }
+
+    private fun loadUserNameFromStorage(): String {
+        try {
+            val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+            val settingsKey = "reimburse_settings_v2"
+            val jsonStr = prefs.getString(settingsKey, null)
+            if (jsonStr != null) {
+                val obj = org.json.JSONObject(jsonStr)
+                val billedFrom = obj.optJSONObject("billedFrom")
+                if (billedFrom != null) {
+                    val name = billedFrom.optString("name")
+                    if (!name.isNullOrBlank()) return name
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load userName from CapacitorStorage", e)
+        }
+        return "User"
+    }
+
+    private fun loadSettingsFromStorage(): org.json.JSONObject? {
+        try {
+            val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+            val settingsKey = "reimburse_settings_v2"
+            val jsonStr = prefs.getString(settingsKey, null)
+            if (jsonStr != null) {
+                return org.json.JSONObject(jsonStr)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load settings from CapacitorStorage", e)
+        }
+        return null
+    }
+
+    private fun saveUpiIdToStorage(upiId: String) {
+        try {
+            val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+            val settingsKey = "reimburse_settings_v2"
+            val jsonStr = prefs.getString(settingsKey, null)
+            val settingsObj = if (jsonStr != null) {
+                org.json.JSONObject(jsonStr)
+            } else {
+                org.json.JSONObject()
+            }
+            settingsObj.put("upiId", upiId)
+            prefs.edit().putString(settingsKey, settingsObj.toString()).commit()
+            Log.d(TAG, "UPI ID saved natively: $upiId")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save UPI ID natively", e)
+        }
+    }
+
+    private fun updateSplitSummary(totalAmount: Double) {
+        val b = binding ?: return
+        val selectedChips = getSelectedContacts()
+        if (selectedChips.isEmpty()) {
+            b.tvSplitSummary.text = "Select contacts to see split details"
+            b.layoutOverlayUpiSetup.visibility = View.GONE
+            b.layoutOverlayQrContainer.visibility = View.GONE
+            return
+        }
+
+        val totalPeople = selectedChips.size + 1
+        val splitAmount = totalAmount / totalPeople
+        val formattedSplit = "₹%,.2f".format(splitAmount)
+        b.tvSplitSummary.text = "Split equally: $totalPeople people. Your share: $formattedSplit. Others owe: $formattedSplit each."
+
+        val upiId = loadUpiIdFromStorage()
+        if (upiId.isNullOrBlank()) {
+            b.layoutOverlayUpiSetup.visibility = View.VISIBLE
+            b.layoutOverlayQrContainer.visibility = View.GONE
+        } else {
+            b.layoutOverlayUpiSetup.visibility = View.GONE
+            b.layoutOverlayQrContainer.visibility = View.VISIBLE
+
+            val name = loadUserNameFromStorage()
+            val upiUrl = "upi://pay?pa=${upiId.trim()}&pn=${java.net.URLEncoder.encode(name, "UTF-8")}&am=${"%.2f".format(splitAmount)}&cu=INR"
+
+            val settings = loadSettingsFromStorage()
+            val accentColorHex = settings?.optString("accentColor", "#7C3AED") ?: "#7C3AED"
+            val darkColor = try {
+                android.graphics.Color.parseColor(accentColorHex)
+            } catch (e: Exception) {
+                0xFF7C3AED.toInt()
+            }
+
+            val qrBitmap = QRCodeGenerator.generate(upiUrl, 400, darkColor, android.graphics.Color.WHITE)
+            if (qrBitmap != null) {
+                b.ivOverlayQr.setImageBitmap(qrBitmap)
+                b.tvOverlayQrDetails.text = "Scan to pay ₹${"%.2f".format(splitAmount)} to $upiId"
+            }
+        }
+    }
+
+    private fun getSelectedContacts(): List<Pair<String, String>> {
+        val b = binding ?: return emptyList()
+        val list = mutableListOf<Pair<String, String>>()
+        try {
+            for (i in 0 until b.chipGroupSplitContacts.childCount) {
+                val chip = b.chipGroupSplitContacts.getChildAt(i) as? Chip
+                if (chip != null && chip.isChecked) {
+                    val contactId = chip.tag as? String ?: ""
+                    val name = chip.text.toString()
+                    list.add(Pair(contactId, name))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get selected contacts", e)
+        }
+        return list
+    }
+
     private fun persistTransactionNatively(
         amount: Double, 
         merchant: String, 
@@ -377,6 +563,28 @@ class TransactionOverlayService : Service() {
                 timeZone = java.util.TimeZone.getTimeZone("UTC")
             }.format(java.util.Date(now))
 
+            val splitObj = if (selectedContacts.isNotEmpty()) {
+                val totalPeople = selectedContacts.size + 1
+                val splitAmount = amount / totalPeople
+                
+                val membersArray = org.json.JSONArray()
+                for (contact in selectedContacts) {
+                    val memberObj = org.json.JSONObject().apply {
+                        put("contactId", contact.first)
+                        put("amount", splitAmount)
+                        put("paid", false)
+                    }
+                    membersArray.put(memberObj)
+                }
+                
+                org.json.JSONObject().apply {
+                    put("totalAmount", amount)
+                    put("splitType", "equal")
+                    put("userPaid", true)
+                    put("members", membersArray)
+                }
+            } else null
+
             val newExpense = org.json.JSONObject().apply {
                 put("id", "TXN_" + java.util.UUID.randomUUID().toString().substring(0, 8))
                 put("date", dateStr)
@@ -390,6 +598,9 @@ class TransactionOverlayService : Service() {
                 put("isReimbursement", isReimbursement)
                 put("createdAt", isoTimeStr)
                 put("updatedAt", isoTimeStr)
+                if (splitObj != null) {
+                    put("split", splitObj)
+                }
             }
 
             val updatedArray = org.json.JSONArray().apply {
@@ -407,6 +618,7 @@ class TransactionOverlayService : Service() {
     private fun playSuccessAnimationAndDismiss() {
         val b = binding ?: return
         b.etOverlayNotes.clearFocus()
+        b.etOverlayUpiId.clearFocus()
         b.layoutSuccessAnimation.visibility = View.VISIBLE
         b.layoutSuccessAnimation.alpha = 0f
         b.layoutSuccessAnimation.animate().alpha(1f).setDuration(200).start()

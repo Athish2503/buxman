@@ -25,7 +25,12 @@ export const JourneyTimeline: React.FC<JourneyTimelineProps> = ({ vehicle, logs,
     const avgEconomy = economyLogs.length ? economyLogs.reduce((s, l) => s + l.economy!, 0) / economyLogs.length : 0;
     const totalSpent = logs.reduce((s, l) => s + l.totalCost, 0);
     const totalDist = logs.reduce((s, l) => s + (l.distanceSinceLast || 0), 0);
-    const costPerKm = totalDist > 0 ? totalSpent / totalDist : 0;
+    
+    // Only count clean intervals for costPerKm calculation
+    const cleanLogs = logs.filter(l => l.distanceSinceLast !== undefined && !l.missedPreviousRefill);
+    const cleanSpent = cleanLogs.reduce((s, l) => s + l.totalCost, 0);
+    const cleanDist = cleanLogs.reduce((s, l) => s + (l.distanceSinceLast || 0), 0);
+    const costPerKm = cleanDist > 0 ? cleanSpent / cleanDist : 0;
 
     return { avgEconomy, totalSpent, totalDist, costPerKm };
   }, [logs]);

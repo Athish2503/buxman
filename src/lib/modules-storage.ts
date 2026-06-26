@@ -76,14 +76,19 @@ export const fuelService = {
         
         // Calculate economy: distance since last / liters added this time
         // This provides an "interval efficiency" estimate even for partial fills
-        if (log.liters > 0) {
+        if (log.liters > 0 && !log.missedPreviousRefill) {
           log.economy = log.distanceSinceLast / log.liters;
           
           // Calculate trend (comparison to previous log's economy)
           if (prev.economy) {
             const diff = log.economy - prev.economy;
             log.economyTrend = (diff / prev.economy) * 100;
+          } else {
+            log.economyTrend = undefined;
           }
+        } else {
+          log.economy = undefined;
+          log.economyTrend = undefined;
         }
       } else {
         log.distanceSinceLast = undefined;

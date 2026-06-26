@@ -4,6 +4,7 @@ import { Fuel, MapPin, Gauge, Clock, CloudRain, Sun, Moon, Wind, Info } from 'lu
 import { FuelLog } from '@/types/modules';
 import { format } from 'date-fns';
 import { cn, formatCurrency } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 interface CheckpointNodeProps {
   log: FuelLog;
@@ -45,6 +46,11 @@ export const CheckpointNode: React.FC<CheckpointNodeProps> = ({ log, index, onCl
             <span className="text-xs font-black uppercase tracking-widest opacity-60">
               {log.station || 'IndianOil'}
             </span>
+            {log.missedPreviousRefill && (
+              <Badge variant="outline" className="h-4.5 px-1.5 text-[8px] border-warning/30 bg-warning/5 text-warning font-bold uppercase tracking-wider">
+                Missed Refill
+              </Badge>
+            )}
           </div>
 
           {/* Main Info */}
@@ -65,12 +71,18 @@ export const CheckpointNode: React.FC<CheckpointNodeProps> = ({ log, index, onCl
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-primary/60 mb-0.5">Distance</p>
               <p className="text-sm font-bold">+{log.distanceSinceLast || 0} km</p>
+              {log.missedPreviousRefill && (
+                <span className="block text-[8px] text-warning/70 font-semibold mt-0.5">(spans gap)</span>
+              )}
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-success/60 mb-0.5">Efficiency</p>
               <p className="text-sm font-bold text-success text-glow-fuel">
                 {log.economy ? `${log.economy.toFixed(1)} km/l` : '--'}
               </p>
+              {log.missedPreviousRefill && (
+                <span className="block text-[8px] text-warning/75 font-semibold mt-0.5">(skipped)</span>
+              )}
             </div>
           </div>
 

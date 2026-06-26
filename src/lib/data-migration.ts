@@ -14,6 +14,7 @@ export interface FullExportData {
   fuel: any[];
   wallet: any[];
   dining: any[];
+  diningRecommendations?: any[];
   contacts: any[];
   trips: any[];
   reports?: any[];
@@ -49,6 +50,7 @@ export const dataMigrationService = {
       fuel: safeParse('reimburse_fuel_v1', []),
       wallet: safeParse('reimburse_wallet_v1', []),
       dining: safeParse('reimburse_food_v1', []),
+      diningRecommendations: safeParse('reimburse_food_recommendations_v1', []),
       contacts: safeParse('reimburse_contacts', []),
       trips: safeParse('reimburse_trips', []),
       reports: safeParse('reimburse_reports_v1', []),
@@ -260,6 +262,7 @@ export const dataMigrationService = {
       await syncKey('reimburse_fuel_v1', data.fuel);
       await syncKey('reimburse_wallet_v1', data.wallet);
       await syncKey('reimburse_food_v1', data.dining);
+      await syncKey('reimburse_food_recommendations_v1', data.diningRecommendations);
       await syncKey('reimburse_contacts', data.contacts);
       await syncKey('reimburse_trips', data.trips);
       await syncKey('reimburse_reports_v1', data.reports);

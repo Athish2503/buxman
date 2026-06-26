@@ -1,7 +1,8 @@
-import { DiningExperience, Dish } from '@/types/food';
+import { DiningExperience, Dish, DiningRecommendation } from '@/types/food';
 import { storageEngine } from '@/lib/storage-engine';
 
 const FOOD_STORAGE_KEY = 'reimburse_food_v1';
+const RECOMMENDATIONS_STORAGE_KEY = 'reimburse_food_recommendations_v1';
 
 export const foodService = {
   getExperiences(): DiningExperience[] {
@@ -84,5 +85,47 @@ export const foodService = {
       });
       
     return Array.from(dishes.values());
+  },
+
+  getRecommendations(): DiningRecommendation[] {
+    try {
+      const data = localStorage.getItem(RECOMMENDATIONS_STORAGE_KEY);
+      if (!data) return [];
+      const parsed = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.error('Error fetching dining recommendations:', error);
+      return [];
+    }
+  },
+
+  addRecommendation(recommendation: DiningRecommendation) {
+    const recommendations = this.getRecommendations();
+    const updated = [recommendation, ...recommendations];
+    storageEngine.set(RECOMMENDATIONS_STORAGE_KEY, JSON.stringify(updated));
+    window.dispatchEvent(new Event('dining-recommendations-updated'));
+    return updated;
+  },
+
+  updateRecommendation(updatedRec: DiningRecommendation) {
+    const recommendations = this.getRecommendations();
+    const updated = recommendations.map((rec) =>
+      rec.id === updatedRec.id ? updatedRec : rec
+    );
+    storageEngine.set(RECOMMENDATIONS_STORAGE_KEY, JSON.stringify(updated));
+    window.dispatchEvent(new Event('dining-recommendations-updated'));
+    return updated;
+  },
+
+  deleteRecommendation(id: string) {
+    const recommendations = this.getRecommendations();
+    const updated = recommendations.filter((rec) => rec.id !== id);
+    storageEngine.set(RECOMMENDATIONS_STORAGE_KEY, JSON.stringify(updated));
+    window.dispatchEvent(new Event('dining-recommendations-updated'));
+    return updated;
+  },
+
+  getRecommendationById(id: string): DiningRecommendation | undefined {
+    return this.getRecommendations().find((rec) => rec.id === id);
   }
 };
