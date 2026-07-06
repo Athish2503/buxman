@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { 
   ShieldAlert, Database, ChevronRight, Receipt, Fuel, Camera, Car,
   Cloud, CloudOff, Settings, Key, UploadCloud, DownloadCloud, LogOut,
-  X, RefreshCw
+  X, RefreshCw, Clapperboard, ExternalLink, Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -49,6 +49,25 @@ export function DataManagementModule({
   const [isSyncing, setIsSyncing] = useState(false);
   const [customClientId, setCustomClientId] = useState(settings.googleDriveClientId || '');
   const [showConfig, setShowConfig] = useState(false);
+  const [omdbKey, setOmdbKey] = useState(settings.omdbApiKey || '');
+  const [omdbSaved, setOmdbSaved] = useState(false);
+
+  const handleSaveOmdbKey = () => {
+    // Extract bare key if the user accidentally pasted a full OMDb URL
+    let cleanKey = omdbKey.trim();
+    if (cleanKey.startsWith('http')) {
+      try {
+        const extracted = new URL(cleanKey).searchParams.get('apikey');
+        if (extracted) cleanKey = extracted.trim();
+      } catch { /* not a URL, keep as-is */ }
+    }
+    const updated = { ...settingsService.get(), omdbApiKey: cleanKey };
+    settingsService.save(updated);
+    setOmdbKey(cleanKey); // update input to show the cleaned key
+    setSettings(updated);
+    setOmdbSaved(true);
+    setTimeout(() => setOmdbSaved(false), 2000);
+  };
 
   // Backups listing states
   const [showRestoreModal, setShowRestoreModal] = useState(false);
@@ -383,6 +402,60 @@ export function DataManagementModule({
               </div>
             )}
           </div>
+
+          {/* ── OMDb API Key ─────────────────────────────────────────────── */}
+          <div className="p-5 rounded-[2.5rem] bg-white dark:bg-card/30 border border-border/50 dark:border-border/40 space-y-4 relative overflow-hidden shadow-sm dark:shadow-none">
+            <div className="flex items-center gap-4">
+              <div className="h-11 w-11 rounded-2xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                <Clapperboard className="h-5 w-5 text-amber-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-sm font-bold">OMDb API Key</h4>
+                <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-0.5">Watchlist Title Search &amp; Poster Art</p>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Add your free OMDb API key to enable movie/series autocomplete search and poster fetching when adding to your Watchlist.
+              Get a free key (1000 req/day) at{' '}
+              <a
+                href="https://www.omdbapi.com/apikey.aspx"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-amber-400 hover:underline inline-flex items-center gap-0.5"
+              >
+                omdbapi.com <ExternalLink className="h-2.5 w-2.5" />
+              </a>
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                placeholder="Paste OMDb API key here..."
+                value={omdbKey}
+                onChange={e => setOmdbKey(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSaveOmdbKey()}
+                className="h-9 flex-1 bg-background/50 border border-border/40 text-xs rounded-xl px-3 outline-none focus:border-amber-400/50 font-mono text-foreground"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSaveOmdbKey}
+                className={cn(
+                  'h-9 rounded-xl font-bold px-4 text-xs shrink-0 transition-all',
+                  omdbSaved
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                    : 'border-amber-500/30 text-amber-400 hover:bg-amber-500/10'
+                )}
+              >
+                {omdbSaved ? <Check className="h-3.5 w-3.5" /> : 'Save'}
+              </Button>
+            </div>
+            {settings.omdbApiKey && (
+              <p className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                <Check className="h-3 w-3" /> API key configured — Watchlist search is active
+              </p>
+            )}
+          </div>
+
            <div className="p-6 rounded-[2.5rem] bg-white dark:bg-card/30 border border-border/50 dark:border-border/40 space-y-6 relative overflow-hidden shadow-sm dark:shadow-none">
              <div className="flex items-center gap-4">
                <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center shadow-inner">

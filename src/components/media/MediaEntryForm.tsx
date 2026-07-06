@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
-import { X, Plus, Film, Tv, Check, Star, User, Clapperboard } from 'lucide-react';
+import { X, Plus, Film, Tv, Check, Star, User, Clapperboard, Search, Loader2, Pin } from 'lucide-react';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { SwipeToAdd } from '@/components/ui/swipe-to-add';
 import { Input } from '@/components/ui/input';
@@ -10,11 +10,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { mediaService } from '@/lib/media-service';
 import { contactService } from '@/lib/contact-service';
-import { MediaRecommendation } from '@/types/media';
+import { MediaRecommendation, MediaPlatform } from '@/types/media';
 import { haptics } from '@/lib/haptics';
 import { audio } from '@/lib/audio';
 import { cn, rewardBurst } from '@/lib/utils';
 import { toast } from 'sonner';
+import { omdbService, MediaSearchSuggestion } from '@/lib/omdb-service';
+import { PLATFORM_LIST, PLATFORM_CONFIG } from './platformConfig';
 
 const PRESET_GENRES = [
   'Action', 'Comedy', 'Drama', 'Sci-Fi', 'Fantasy', 
@@ -36,23 +38,95 @@ function FormBody({
   isEdit = false,
   onDone,
 }: Omit<MediaEntryFormProps, 'open' | 'onOpenChange'> & { onDone?: () => void }) {
-  const [title, setTitle] = useState(initialData?.title || '');
-  const [type, setType] = useState<'movie' | 'series'>(initialData?.type || 'movie');
+  const [title, setTitle]         = useState(initialData?.title || '');
+  const [type, setType]           = useState<'movie' | 'series'>(initialData?.type || 'movie');
   const [selectedFriendId, setSelectedFriendId] = useState(initialData?.recommendedBy || '');
-  const [genres, setGenres] = useState<string[]>(initialData?.genres || []);
+  const [genres, setGenres]       = useState<string[]>(initialData?.genres || []);
   const [customGenre, setCustomGenre] = useState('');
-  const [status, setStatus] = useState<'to_watch' | 'watching' | 'watched'>(initialData?.status || 'to_watch');
-  const [rating, setRating] = useState<number>(initialData?.rating || 5);
-  const [notes, setNotes] = useState(initialData?.notes || '');
+  const [status, setStatus]       = useState<'to_watch' | 'watching' | 'watched'>(initialData?.status || 'to_watch');
+  const [rating, setRating]       = useState<number>(initialData?.rating || 5);
+  const [notes, setNotes]         = useState(initialData?.notes || '');
+  const [platform, setPlatform]   = useState<MediaPlatform | ''>(initialData?.platform || '');
+  const [posterUrl, setPosterUrl] = useState(initialData?.posterUrl || '');
+  const [releaseYear, setReleaseYear] = useState(initialData?.releaseYear || '');
+
+  // OMDb search
+  const [suggestions, setSuggestions]     = useState<MediaSearchSuggestion[]>([]);
+  const [isSearching, setIsSearching]     = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [omdbConfigured]                  = useState(() => omdbService.isConfigured());
+  const searchDebounce                    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const titleInputRef                     = useRef<HTMLInputElement>(null);
+  const suggestionsRef                    = useRef<HTMLDivElement>(null);
 
   // Friend input inline state
   const [isAddingFriend, setIsAddingFriend] = useState(false);
-  const [newFriendName, setNewFriendName] = useState('');
-  const [contacts, setContacts] = useState(() => contactService.getContacts());
+  const [newFriendName, setNewFriendName]   = useState('');
+  const [contacts, setContacts]             = useState(() => contactService.getContacts());
 
   const [isProcessing, setIsProcessing] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess]           = useState(false);
 
+  // ── OMDb debounced search ────────────────────────────────────────────
+  const triggerSearch = useCallback((query: string) => {
+    if (searchDebounce.current) clearTimeout(searchDebounce.current);
+    if (!omdbConfigured || !query.trim() || query.trim().length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    searchDebounce.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await omdbService.search(query, undefined);
+        setSuggestions(results);
+        setShowSuggestions(results.length > 0);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 480);
+  }, [omdbConfigured]);
+
+  const handleTitleChange = (val: string) => {
+    setTitle(val);
+    triggerSearch(val);
+  };
+
+  const handlePickSuggestion = async (s: MediaSearchSuggestion) => {
+    haptics.medium();
+    setTitle(s.title);
+    setType(s.type);
+    setPosterUrl(s.posterUrl || '');
+    setReleaseYear(s.year || '');
+    setShowSuggestions(false);
+
+    // Fetch full detail (genres)
+    if (s.genres.length === 0) {
+      const detail = await omdbService.getDetail(s.imdbId);
+      if (detail?.genres && detail.genres.length > 0) {
+        setGenres(detail.genres);
+        if (detail.posterUrl) setPosterUrl(detail.posterUrl);
+      }
+    } else {
+      setGenres(s.genres);
+    }
+  };
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node) &&
+        titleInputRef.current && !titleInputRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // ── Friends ──────────────────────────────────────────────────────────
   const handleAddFriend = () => {
     if (newFriendName.trim()) {
       const newContact = contactService.addContact({ name: newFriendName.trim() });
@@ -65,13 +139,10 @@ function FormBody({
     }
   };
 
+  // ── Genres ───────────────────────────────────────────────────────────
   const handleToggleGenre = (genre: string) => {
     haptics.light();
-    if (genres.includes(genre)) {
-      setGenres(prev => prev.filter(g => g !== genre));
-    } else {
-      setGenres(prev => [...prev, genre]);
-    }
+    setGenres(prev => prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre]);
   };
 
   const handleAddCustomGenre = () => {
@@ -83,15 +154,12 @@ function FormBody({
     }
   };
 
+  // ── Submit ───────────────────────────────────────────────────────────
   const handleFormSubmit = async () => {
     if (isProcessing) return;
-    if (!title.trim()) {
-      toast.error('Title is required');
-      return;
-    }
+    if (!title.trim()) { toast.error('Title is required'); return; }
 
     setIsProcessing(true);
-
     try {
       const payload: Omit<MediaRecommendation, 'id' | 'createdAt' | 'updatedAt'> = {
         title: title.trim(),
@@ -101,6 +169,9 @@ function FormBody({
         status,
         rating: status === 'watched' ? rating : undefined,
         notes: notes.trim() || undefined,
+        platform: platform || undefined,
+        posterUrl: posterUrl || undefined,
+        releaseYear: releaseYear || undefined,
       };
 
       setSuccess(true);
@@ -112,13 +183,9 @@ function FormBody({
 
       if (!isEdit) {
         rewardBurst();
-        // Reset states
-        setTitle('');
-        setType('movie');
-        setSelectedFriendId('');
-        setGenres([]);
-        setNotes('');
-        setStatus('to_watch');
+        setTitle(''); setType('movie'); setSelectedFriendId('');
+        setGenres([]); setNotes(''); setStatus('to_watch');
+        setPlatform(''); setPosterUrl(''); setReleaseYear('');
       }
 
       onSubmit(payload);
@@ -133,18 +200,120 @@ function FormBody({
 
   return (
     <div className="flex flex-col gap-5 py-1">
-      {/* Title */}
+
+      {/* ── Title with OMDb autocomplete ─────────────────────────────── */}
       <div className="space-y-1.5">
-        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Title</Label>
-        <Input
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          placeholder="e.g. Interstellar, Severance"
-          className="h-9 text-xs rounded-xl bg-background/50 border-border/40 font-bold text-foreground"
-        />
+        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+          Title
+          {omdbConfigured && (
+            <span className="text-[8px] font-bold text-amber-400 border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 rounded-full">
+              OMDb Search Active
+            </span>
+          )}
+        </Label>
+        <div className="relative">
+          <div className="relative">
+            {omdbConfigured && (
+              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            )}
+            {isSearching && (
+              <Loader2 className="absolute right-3 top-2.5 h-3.5 w-3.5 text-muted-foreground animate-spin pointer-events-none" />
+            )}
+            <Input
+              ref={titleInputRef}
+              value={title}
+              onChange={e => handleTitleChange(e.target.value)}
+              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+              placeholder={omdbConfigured ? 'Search movie or series title...' : 'e.g. Interstellar, Severance'}
+              className={cn(
+                'h-9 text-xs rounded-xl bg-background/50 border-border/40 font-bold text-foreground',
+                omdbConfigured && 'pl-9'
+              )}
+            />
+          </div>
+
+          {/* Suggestions dropdown */}
+          <AnimatePresence>
+            {showSuggestions && suggestions.length > 0 && (
+              <motion.div
+                ref={suggestionsRef}
+                initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-full left-0 right-0 mt-1.5 z-[9999] glass rounded-2xl border border-border/40 shadow-2xl overflow-hidden"
+                style={{ background: 'hsl(var(--background))', maxHeight: '260px', overflowY: 'auto' }}
+              >
+                {suggestions.map((s, i) => (
+                  <button
+                    key={s.imdbId}
+                    type="button"
+                    onClick={() => handlePickSuggestion(s)}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/30',
+                      i !== 0 && 'border-t border-border/10'
+                    )}
+                  >
+                    {/* Poster thumb */}
+                    <div className="h-10 w-7 rounded-md overflow-hidden bg-muted/30 shrink-0 flex items-center justify-center">
+                      {s.posterUrl ? (
+                        <img
+                          src={s.posterUrl}
+                          alt={s.title}
+                          referrerPolicy="no-referrer"
+                          className="h-full w-full object-cover"
+                          onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; (e.currentTarget.parentElement as HTMLElement).innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-muted-foreground/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>'; }}
+                        />
+                      ) : (
+                        <Film className="h-3.5 w-3.5 text-muted-foreground/50" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-foreground truncate">{s.title}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {s.year} · {s.type === 'movie' ? 'Movie' : 'Series'}
+                      </p>
+                    </div>
+                    <span className={cn(
+                      'text-[8px] font-black uppercase px-1.5 py-0.5 rounded border shrink-0',
+                      s.type === 'movie'
+                        ? 'bg-purple-500/10 border-purple-500/20 text-purple-400'
+                        : 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400'
+                    )}>
+                      {s.type === 'movie' ? <Film className="h-2 w-2 inline mr-0.5" /> : <Tv className="h-2 w-2 inline mr-0.5" />}
+                      {s.type}
+                    </span>
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Poster preview if auto-filled */}
+        {posterUrl && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="flex items-center gap-3 mt-2 p-2 rounded-xl bg-muted/20 border border-border/20"
+          >
+            <img src={posterUrl} alt="Poster" referrerPolicy="no-referrer" className="h-14 w-10 rounded-lg object-cover shadow-lg" />
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-amber-400">Poster fetched</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{title}{releaseYear ? ` (${releaseYear})` : ''}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setPosterUrl(''); setReleaseYear(''); }}
+              className="ml-auto h-6 w-6 rounded-full bg-muted/30 flex items-center justify-center text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </motion.div>
+        )}
       </div>
 
-      {/* Type Toggle */}
+      {/* ── Media Type Toggle ─────────────────────────────────────────── */}
       <div className="space-y-1.5">
         <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Media Type</Label>
         <div className="grid grid-cols-2 gap-2">
@@ -153,33 +322,68 @@ function FormBody({
             variant="outline"
             onClick={() => { haptics.light(); setType('movie'); }}
             className={cn(
-              "h-10 rounded-xl text-xs font-bold transition-all border border-transparent flex items-center justify-center gap-1.5",
-              type === 'movie' 
-                ? "bg-purple-500 hover:bg-purple-600 text-white font-black" 
-                : "bg-muted/40 hover:bg-muted/60 text-muted-foreground"
+              'h-10 rounded-xl text-xs font-bold transition-all border border-transparent flex items-center justify-center gap-1.5',
+              type === 'movie' ? 'bg-purple-500 hover:bg-purple-600 text-white font-black' : 'bg-muted/40 hover:bg-muted/60 text-muted-foreground'
             )}
           >
-            <Film className="h-4 w-4" />
-            Movie
+            <Film className="h-4 w-4" /> Movie
           </Button>
           <Button
             type="button"
             variant="outline"
             onClick={() => { haptics.light(); setType('series'); }}
             className={cn(
-              "h-10 rounded-xl text-xs font-bold transition-all border border-transparent flex items-center justify-center gap-1.5",
-              type === 'series' 
-                ? "bg-cyan-500 hover:bg-cyan-600 text-white font-black" 
-                : "bg-muted/40 hover:bg-muted/60 text-muted-foreground"
+              'h-10 rounded-xl text-xs font-bold transition-all border border-transparent flex items-center justify-center gap-1.5',
+              type === 'series' ? 'bg-cyan-500 hover:bg-cyan-600 text-white font-black' : 'bg-muted/40 hover:bg-muted/60 text-muted-foreground'
             )}
           >
-            <Tv className="h-4 w-4" />
-            Series
+            <Tv className="h-4 w-4" /> Series
           </Button>
         </div>
       </div>
 
-      {/* Recommended By Friend Selector */}
+      {/* ── Platform Selector ─────────────────────────────────────────── */}
+      <div className="space-y-1.5">
+        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">
+          Platform <span className="font-normal text-muted-foreground/60">(optional)</span>
+        </Label>
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1 pt-0.5 -mx-1 px-1">
+          {/* "None" chip */}
+          <button
+            type="button"
+            onClick={() => { haptics.light(); setPlatform(''); }}
+            className={cn(
+              'shrink-0 px-3 py-1.5 rounded-full border text-[10px] font-bold transition-all whitespace-nowrap',
+              platform === ''
+                ? 'bg-muted/50 border-border/60 text-foreground'
+                : 'bg-transparent border-border/20 text-muted-foreground hover:bg-muted/20'
+            )}
+          >
+            None
+          </button>
+          {PLATFORM_LIST.map(p => {
+            const isSelected = platform === p.key;
+            return (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => { haptics.light(); setPlatform(isSelected ? '' : p.key); }}
+                className={cn(
+                  'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-bold transition-all whitespace-nowrap',
+                  isSelected
+                    ? `${p.color} ${p.textColor} ${p.borderColor}`
+                    : 'bg-transparent border-border/20 text-muted-foreground hover:bg-muted/20'
+                )}
+              >
+                <span>{p.emoji}</span>
+                <span>{p.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Recommended By Friend Selector ────────────────────────────── */}
       <div className="space-y-1.5">
         <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">
           Recommended By Friend
@@ -210,26 +414,14 @@ function FormBody({
                     className="h-9 w-20 bg-transparent text-xs outline-none font-bold text-foreground"
                     autoFocus
                     onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddFriend();
-                      } else if (e.key === 'Escape') {
-                        setIsAddingFriend(false);
-                      }
+                      if (e.key === 'Enter') { e.preventDefault(); handleAddFriend(); }
+                      else if (e.key === 'Escape') setIsAddingFriend(false);
                     }}
                   />
-                  <button
-                    type="button"
-                    className="h-7 w-7 rounded-full bg-primary/20 text-primary flex items-center justify-center hover:bg-primary/30"
-                    onClick={handleAddFriend}
-                  >
+                  <button type="button" className="h-7 w-7 rounded-full bg-primary/20 text-primary flex items-center justify-center hover:bg-primary/30" onClick={handleAddFriend}>
                     <Check className="h-3.5 w-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted/50"
-                    onClick={() => setIsAddingFriend(false)}
-                  >
+                  <button type="button" className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted/50" onClick={() => setIsAddingFriend(false)}>
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </motion.div>
@@ -239,20 +431,17 @@ function FormBody({
             {/* Self / No one chip */}
             <button
               type="button"
-              onClick={() => {
-                haptics.light();
-                setSelectedFriendId('');
-              }}
+              onClick={() => { haptics.light(); setSelectedFriendId(''); }}
               className={cn(
-                "flex-shrink-0 relative flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full border transition-all duration-300 active:scale-95",
+                'flex-shrink-0 relative flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full border transition-all duration-300 active:scale-95',
                 selectedFriendId === ''
-                  ? "bg-primary/10 border-primary/40 text-primary"
-                  : "bg-muted/20 border-transparent text-muted-foreground hover:bg-muted/30"
+                  ? 'bg-primary/10 border-primary/40 text-primary'
+                  : 'bg-muted/20 border-transparent text-muted-foreground hover:bg-muted/30'
               )}
             >
               <div className={cn(
-                "h-6 w-6 rounded-full flex items-center justify-center overflow-hidden border transition-colors",
-                selectedFriendId === '' ? "border-primary/40 bg-primary/20 text-primary" : "border-background bg-muted/50 text-muted-foreground"
+                'h-6 w-6 rounded-full flex items-center justify-center overflow-hidden border transition-colors',
+                selectedFriendId === '' ? 'border-primary/40 bg-primary/20 text-primary' : 'border-background bg-muted/50 text-muted-foreground'
               )}>
                 <User className="h-3 w-3" />
               </div>
@@ -261,35 +450,24 @@ function FormBody({
 
             {contacts.length > 0 && <div className="w-[1px] h-6 bg-border/40 flex-shrink-0 mx-1" />}
 
-            {/* List of friends */}
+            {/* Friend chips */}
             {contacts.map(c => {
               const isSelected = selectedFriendId === c.id;
               return (
                 <button
                   key={c.id}
                   type="button"
-                  onClick={() => {
-                    haptics.light();
-                    setSelectedFriendId(isSelected ? '' : c.id);
-                  }}
+                  onClick={() => { haptics.light(); setSelectedFriendId(isSelected ? '' : c.id); }}
                   className={cn(
-                    "flex-shrink-0 relative flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full border transition-all duration-300 active:scale-95",
-                    isSelected
-                      ? "bg-primary/10 border-primary/40 text-primary"
-                      : "bg-muted/20 border-transparent text-muted-foreground hover:bg-muted/30"
+                    'flex-shrink-0 relative flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full border transition-all duration-300 active:scale-95',
+                    isSelected ? 'bg-primary/10 border-primary/40 text-primary' : 'bg-muted/20 border-transparent text-muted-foreground hover:bg-muted/30'
                   )}
                 >
-                  <div className={cn(
-                    "h-6 w-6 rounded-full flex items-center justify-center overflow-hidden border transition-colors",
-                    isSelected ? "border-primary/40" : "border-background"
-                  )}>
+                  <div className={cn('h-6 w-6 rounded-full flex items-center justify-center overflow-hidden border transition-colors', isSelected ? 'border-primary/40' : 'border-background')}>
                     {c.avatar ? (
                       <img src={c.avatar} alt={c.name} className="h-full w-full object-cover" />
                     ) : (
-                      <div className={cn(
-                        "h-full w-full flex items-center justify-center",
-                        isSelected ? "bg-primary/20 text-primary" : "bg-muted/50"
-                      )}>
+                      <div className={cn('h-full w-full flex items-center justify-center', isSelected ? 'bg-primary/20 text-primary' : 'bg-muted/50')}>
                         <User className="h-3 w-3" />
                       </div>
                     )}
@@ -302,7 +480,7 @@ function FormBody({
         </div>
       </div>
 
-      {/* Genres preset tags */}
+      {/* ── Genres ────────────────────────────────────────────────────── */}
       <div className="space-y-1.5">
         <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Genres</Label>
         <div className="flex flex-wrap gap-1">
@@ -314,52 +492,48 @@ function FormBody({
                 type="button"
                 onClick={() => handleToggleGenre(genre)}
                 className={cn(
-                  "px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all",
-                  isSelected
-                    ? "bg-primary text-white border-transparent"
-                    : "bg-muted/20 border-border/10 text-muted-foreground hover:bg-muted/40"
+                  'px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all',
+                  isSelected ? 'bg-primary text-white border-transparent' : 'bg-muted/20 border-border/10 text-muted-foreground hover:bg-muted/40'
                 )}
               >
                 {genre}
               </button>
             );
           })}
+          {/* Custom genres from auto-fill */}
+          {genres.filter(g => !PRESET_GENRES.includes(g)).map(genre => (
+            <button
+              key={genre}
+              type="button"
+              onClick={() => handleToggleGenre(genre)}
+              className="px-2.5 py-1 rounded-lg text-[10px] font-bold border bg-primary text-white border-transparent"
+            >
+              {genre}
+            </button>
+          ))}
         </div>
-
-        {/* Custom genre Tag input */}
         <div className="flex gap-2 mt-2">
           <Input
             value={customGenre}
             onChange={e => setCustomGenre(e.target.value)}
             placeholder="Add custom genre..."
             className="h-8 text-[11px] rounded-lg bg-background/50 border-border/40 flex-1"
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                handleAddCustomGenre();
-              }
-            }}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustomGenre(); } }}
           />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleAddCustomGenre}
-            className="h-8 rounded-lg text-xs font-bold border-border/40 px-3 shrink-0"
-          >
+          <Button type="button" variant="outline" size="sm" onClick={handleAddCustomGenre} className="h-8 rounded-lg text-xs font-bold border-border/40 px-3 shrink-0">
             Add
           </Button>
         </div>
       </div>
 
-      {/* Status Selector */}
+      {/* ── Status Selector ───────────────────────────────────────────── */}
       <div className="space-y-1.5">
         <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Status</Label>
         <div className="grid grid-cols-3 gap-2">
           {[
             { value: 'to_watch', label: 'To Watch', activeClass: 'bg-slate-500/20 border-slate-500/50 text-slate-300' },
             { value: 'watching', label: 'Watching', activeClass: 'bg-primary/20 border-primary/50 text-primary' },
-            { value: 'watched', label: 'Watched', activeClass: 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' },
+            { value: 'watched',  label: 'Watched',  activeClass: 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' },
           ].map(opt => {
             const isSelected = status === opt.value;
             return (
@@ -367,12 +541,10 @@ function FormBody({
                 key={opt.value}
                 type="button"
                 variant="outline"
-                onClick={() => { haptics.light(); setStatus(opt.value as any); }}
+                onClick={() => { haptics.light(); setStatus(opt.value as typeof status); }}
                 className={cn(
-                  "h-10 rounded-xl text-[11px] font-bold transition-all border flex items-center justify-center gap-1",
-                  isSelected 
-                    ? opt.activeClass + " font-black" 
-                    : "bg-muted/30 border-transparent text-muted-foreground hover:bg-muted/50"
+                  'h-10 rounded-xl text-[11px] font-bold transition-all border flex items-center justify-center gap-1',
+                  isSelected ? opt.activeClass + ' font-black' : 'bg-muted/30 border-transparent text-muted-foreground hover:bg-muted/50'
                 )}
               >
                 {opt.label}
@@ -382,7 +554,7 @@ function FormBody({
         </div>
       </div>
 
-      {/* Rating (only if Watched) */}
+      {/* ── Rating (only if Watched) ──────────────────────────────────── */}
       {status === 'watched' && (
         <div className="space-y-1.5 animate-in slide-in-from-top-1 duration-200">
           <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Rating</Label>
@@ -394,21 +566,14 @@ function FormBody({
                 onClick={() => { haptics.light(); setRating(stars); }}
                 className="p-1 hover:scale-110 transition-transform"
               >
-                <Star
-                  className={cn(
-                    "h-6 w-6 transition-colors",
-                    stars <= rating 
-                      ? "text-amber-400 fill-amber-400" 
-                      : "text-muted-foreground/30"
-                  )}
-                />
+                <Star className={cn('h-6 w-6 transition-colors', stars <= rating ? 'text-amber-400 fill-amber-400' : 'text-muted-foreground/30')} />
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Notes / Review */}
+      {/* ── Notes / Review ────────────────────────────────────────────── */}
       <div className="space-y-1.5">
         <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Notes / Review</Label>
         <Textarea
@@ -419,7 +584,7 @@ function FormBody({
         />
       </div>
 
-      {/* Swipe to save */}
+      {/* ── Swipe to Save ────────────────────────────────────────────── */}
       <div className="pt-2">
         <SwipeToAdd
           onConfirm={handleFormSubmit}
@@ -441,32 +606,24 @@ export function MediaEntryForm({
 }: MediaEntryFormProps) {
   const isMobile = useIsMobile();
 
-  // Lock body scroll while open
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
+    document.body.style.overflow = open ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [open]);
 
   const formContent = (
-    <FormBody 
-      onSubmit={onSubmit} 
-      initialData={initialData} 
+    <FormBody
+      onSubmit={onSubmit}
+      initialData={initialData}
       isEdit={isEdit}
       onDone={() => onOpenChange(false)}
     />
   );
 
-
-
   const overlay = (
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-          {/* Shared backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -476,28 +633,21 @@ export function MediaEntryForm({
           />
 
           {isMobile ? (
-            /* ── Mobile: bottom sheet ── */
             <motion.div
               drag="y"
               dragConstraints={{ top: 0, bottom: 0 }}
               dragElastic={{ top: 0, bottom: 0.8 }}
-              onDragEnd={(_, info) => {
-                if (info.offset.y > 100) {
-                  onOpenChange(false);
-                }
-              }}
-              initial={{ y: "100%" }}
+              onDragEnd={(_, info) => { if (info.offset.y > 100) onOpenChange(false); }}
+              initial={{ y: '100%' }}
               animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               className="relative w-full z-[9999] rounded-t-3xl border-t border-border/40 overflow-hidden pointer-events-auto"
               style={{ background: 'hsl(var(--background))', maxHeight: '92dvh', display: 'flex', flexDirection: 'column' }}
             >
-              {/* Drag handle */}
               <div className="flex justify-center pt-3 pb-1 shrink-0">
                 <div className="h-1 w-10 rounded-full bg-muted-foreground/30" />
               </div>
-              {/* Header */}
               <div className="relative flex items-center justify-center px-5 py-3 shrink-0">
                 <div className="flex items-center gap-2">
                   <div className="h-7 w-7 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
@@ -512,13 +662,11 @@ export function MediaEntryForm({
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              {/* Scrollable body */}
               <div className="overflow-y-auto flex-1 px-5 pb-10" style={{ overscrollBehavior: 'contain' }}>
                 {formContent}
               </div>
             </motion.div>
           ) : (
-            /* ── Desktop: centred modal ── */
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -526,7 +674,6 @@ export function MediaEntryForm({
               className="relative w-full max-w-xl z-[9999] rounded-2xl border border-border/50 shadow-2xl overflow-hidden pointer-events-auto"
               style={{ background: 'hsl(var(--background))', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
             >
-              {/* Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-border/30 shrink-0">
                 <div className="flex items-center gap-2.5">
                   <div className="h-8 w-8 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">

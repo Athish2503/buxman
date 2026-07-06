@@ -4,7 +4,7 @@ import {
   TrendingUp, IndianRupee, Fuel, Car, Bike, ArrowRight, ChevronRight,
   Wallet, Receipt, PiggyBank, Zap, GaugeCircle, BarChart3, CheckCircle2,
   Clock, AlertCircle, Sparkles, Briefcase, PieChart,
-  AlertTriangle, Lightbulb, ChevronLeft
+  AlertTriangle, Lightbulb, ChevronLeft, Clapperboard, Star, Film, Tv, Play
 } from 'lucide-react';
 import { Expense, BudgetGoal } from '@/types/expense';
 import { formatCompactCurrency, cn, calculateUserShare } from '@/lib/utils';
@@ -15,6 +15,7 @@ import { BudgetTracker } from '@/components/budget-tracker';
 import { ExpenseList } from '@/components/expense-list';
 import { settingsService } from '@/lib/settings';
 import { haptics } from '@/lib/haptics';
+import { mediaService } from '@/lib/media-service';
 
 interface DashboardModuleProps {
   expenses: Expense[];
@@ -413,7 +414,7 @@ function SectionHeader({ title, action, onAction }: { title: string; action?: st
 export function DashboardModule({
   expenses, onNavigate, onUpdateExpense, onDeleteExpense, onDeleteAll, onBatchDelete, onBatchStatus, settings
 }: DashboardModuleProps) {
-  const [tab, setTab] = useState<'overview' | 'vehicle'>('overview');
+  const [tab, setTab] = useState<'overview' | 'vehicle' | 'watchlist'>('overview');
   const [timeframe, setTimeframe] = useState<'month' | 'all'>('month');
 
   // Compute filtered expenses reliably based on selected timeframe
@@ -575,6 +576,39 @@ export function DashboardModule({
 
   const [analyticsMode, setAnalyticsMode] = useState<'trends' | 'categories' | 'budgets'>('trends');
 
+  // ── Watchlist Stats ──
+  const mediaStats = useMemo(() => {
+    const all = mediaService.getMedia();
+    const toWatch  = all.filter(m => m.status === 'to_watch');
+    const watching = all.filter(m => m.status === 'watching');
+    const watched  = all.filter(m => m.status === 'watched');
+    const rated    = all.filter(m => m.rating);
+    const avgRating = rated.length
+      ? rated.reduce((s, m) => s + (m.rating ?? 0), 0) / rated.length
+      : 0;
+    // Genre distribution
+    const genreCounts: Record<string, number> = {};
+    all.forEach(m => m.genres.forEach(g => { genreCounts[g] = (genreCounts[g] || 0) + 1; }));
+    const topGenres = Object.entries(genreCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6);
+    // Platform distribution
+    const platformCounts: Record<string, number> = {};
+    all.forEach(m => {
+      const p = m.platform || 'none';
+      platformCounts[p] = (platformCounts[p] || 0) + 1;
+    });
+    const topPlatforms = Object.entries(platformCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+    // Top rated
+    const topRated = [...watched]
+      .filter(m => m.rating)
+      .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
+      .slice(0, 3);
+    return { all, toWatch, watching, watched, rated, avgRating, topGenres, topPlatforms, topRated };
+  }, [tab]); // re-run when tab switches so data is fresh
+
   return (
     <div className="space-y-4 stagger">
 
@@ -594,7 +628,7 @@ export function DashboardModule({
 
       {/* Tab Switcher */}
       <div className="flex bg-surface-2 p-1 rounded-2xl gap-1">
-        {(['overview', 'vehicle'] as const).map(t => (
+        {(['overview', 'vehicle', 'watchlist'] as const).map(t => (
           <button
             key={t}
             onClick={() => { haptics.selection(); setTab(t); }}
@@ -605,9 +639,11 @@ export function DashboardModule({
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            {t === 'overview' 
-              ? <><PieChart className="w-3.5 h-3.5" /> Overview</> 
-              : <><Car className="w-3.5 h-3.5" /> Vehicle</>
+            {t === 'overview'
+              ? <><PieChart className="w-3.5 h-3.5" />Overview</>
+              : t === 'vehicle'
+              ? <><Car className="w-3.5 h-3.5" />Vehicle</>
+              : <><Clapperboard className="w-3.5 h-3.5" />Watchlist</>
             }
           </button>
         ))}
@@ -800,6 +836,199 @@ export function DashboardModule({
               className="w-full py-4 rounded-2xl bg-surface-2 border border-border/40 hover:bg-surface-3 transition-all flex items-center justify-center gap-2 group"
             >
               <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Go to Garage</span>
+              <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" />
+            </motion.button>
+          </motion.div>
+        )}
+        {/* ── Watchlist Tab ── */}
+        {tab === 'watchlist' && (
+          <motion.div
+            key="watchlist"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-4"
+          >
+            {/* KPI Grid */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <KpiWidget label="Total"     value={mediaStats.all.length}      icon={Clapperboard} color="violet"  prefix="" delay={0}    suffix="" />
+              <KpiWidget label="To Watch"  value={mediaStats.toWatch.length}  icon={Clock}        color="amber"   prefix="" delay={0.05} suffix="" />
+              <KpiWidget label="Watching"  value={mediaStats.watching.length} icon={Play}         color="blue"    prefix="" delay={0.10} suffix="" />
+              <KpiWidget label="Watched"   value={mediaStats.watched.length}  icon={CheckCircle2} color="emerald" prefix="" delay={0.15} suffix="" />
+            </div>
+
+            {/* Avg Rating + completion rate */}
+            {mediaStats.all.length > 0 && (
+              <div className="grid grid-cols-2 gap-2.5">
+                {/* Avg Rating */}
+                <div className="card-premium p-4 flex flex-col gap-2">
+                  <p className="label-caps text-muted-foreground">Avg Rating</p>
+                  <div className="flex items-center gap-1.5">
+                    <Star className="h-5 w-5 text-amber-400 fill-amber-400" />
+                    <span className="text-2xl font-bold tracking-tight">
+                      {mediaStats.avgRating > 0 ? mediaStats.avgRating.toFixed(1) : '—'}
+                    </span>
+                    <span className="text-xs text-muted-foreground">/5</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">{mediaStats.rated.length} rated</p>
+                </div>
+                {/* Completion Rate */}
+                <div className="card-premium p-4 flex flex-col gap-2">
+                  <p className="label-caps text-muted-foreground">Completion</p>
+                  <div className="text-2xl font-bold tracking-tight">
+                    {mediaStats.all.length > 0
+                      ? Math.round((mediaStats.watched.length / mediaStats.all.length) * 100)
+                      : 0}%
+                  </div>
+                  <div className="h-1.5 w-full bg-surface-3 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${mediaStats.all.length > 0 ? (mediaStats.watched.length / mediaStats.all.length) * 100 : 0}%` }}
+                      transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Genre Distribution */}
+            {mediaStats.topGenres.length > 0 && (
+              <div className="card-premium p-4 space-y-3">
+                <SectionHeader title="Top Genres" />
+                <div className="space-y-2.5">
+                  {mediaStats.topGenres.map(([genre, count], i) => (
+                    <div key={genre} className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold">{genre}</span>
+                        <span className="text-xs font-black text-muted-foreground">{count}</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-surface-3 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(count / mediaStats.all.length) * 100}%` }}
+                          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: i * 0.06 }}
+                          className="h-full rounded-full bg-gradient-to-r from-primary/80 to-violet-400"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Platform breakdown */}
+            {mediaStats.topPlatforms.length > 0 && (
+              <div className="card-premium p-4 space-y-3">
+                <SectionHeader title="By Platform" />
+                <div className="flex flex-wrap gap-2">
+                  {mediaStats.topPlatforms.map(([platform, count]) => {
+                    const EMOJI: Record<string, string> = {
+                      netflix: '🔴', prime: '🔵', disney: '✨', hbo: '🟣',
+                      hotstar: '⭐', appletv: '🍎', peacock: '🦚', theatre: '🎭',
+                      youtube: '▶️', other: '📺', none: '❓'
+                    };
+                    return (
+                      <div key={platform} className="flex items-center gap-1.5 bg-surface-2 border border-border/20 rounded-xl px-3 py-2">
+                        <span className="text-base">{EMOJI[platform] ?? '📺'}</span>
+                        <div>
+                          <p className="text-[10px] font-black capitalize">{platform === 'none' ? 'Unknown' : platform}</p>
+                          <p className="text-[9px] text-muted-foreground">{count} title{count > 1 ? 's' : ''}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Movie vs Series split */}
+            {mediaStats.all.length > 0 && (() => {
+              const movies  = mediaStats.all.filter(m => m.type === 'movie').length;
+              const series  = mediaStats.all.filter(m => m.type === 'series').length;
+              const moviePct = Math.round((movies / mediaStats.all.length) * 100);
+              return (
+                <div className="card-premium p-4 space-y-3">
+                  <SectionHeader title="Movies vs Series" />
+                  <div className="flex items-center gap-3">
+                    <Film className="h-4 w-4 text-purple-400 shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex justify-between text-xs font-bold mb-1">
+                        <span className="text-purple-400">{movies} Movies</span>
+                        <span className="text-cyan-400">{series} Series</span>
+                      </div>
+                      <div className="h-2.5 w-full bg-surface-3 rounded-full overflow-hidden flex">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${moviePct}%` }}
+                          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                          className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-l-full"
+                        />
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${100 - moviePct}%` }}
+                          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+                          className="h-full bg-gradient-to-r from-cyan-500 to-teal-400 rounded-r-full"
+                        />
+                      </div>
+                    </div>
+                    <Tv className="h-4 w-4 text-cyan-400 shrink-0" />
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Top rated */}
+            {mediaStats.topRated.length > 0 && (
+              <div className="card-premium p-4 space-y-3">
+                <SectionHeader title="Top Rated" action="Watchlist" onAction={() => onNavigate('media')} />
+                <div className="space-y-2.5">
+                  {mediaStats.topRated.map((m, i) => (
+                    <div key={m.id} className="flex items-center gap-3">
+                      <span className="text-[10px] font-black text-muted-foreground w-4 shrink-0">#{i + 1}</span>
+                      {m.posterUrl
+                        ? <img src={m.posterUrl} alt={m.title} className="h-10 w-7 object-cover rounded shrink-0 border border-white/10" />
+                        : <div className="h-10 w-7 rounded bg-surface-3 flex items-center justify-center text-muted-foreground shrink-0">{m.type === 'movie' ? <Film className="h-3.5 w-3.5" /> : <Tv className="h-3.5 w-3.5" />}</div>
+                      }
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold truncate">{m.title}</p>
+                        <div className="flex gap-0.5 mt-0.5">
+                          {Array.from({ length: 5 }).map((_, idx) => (
+                            <Star key={idx} className={cn('h-2.5 w-2.5', idx < (m.rating ?? 0) ? 'text-amber-400 fill-amber-400' : 'text-muted-foreground/20')} />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Empty state */}
+            {mediaStats.all.length === 0 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="card-premium p-10 flex flex-col items-center text-center gap-4"
+              >
+                <div className="w-16 h-16 rounded-3xl bg-primary/10 flex items-center justify-center animate-float-y">
+                  <Clapperboard className="h-8 w-8 text-primary" strokeWidth={1.5} />
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-base">No watchlist yet</h3>
+                  <p className="text-sm text-muted-foreground mt-1 max-w-xs">Head to the Watchlist tab to start logging movie and series recommendations!</p>
+                </div>
+              </motion.div>
+            )}
+
+            {/* CTA */}
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => onNavigate('media')}
+              className="w-full py-4 rounded-2xl bg-surface-2 border border-border/40 hover:bg-surface-3 transition-all flex items-center justify-center gap-2 group"
+            >
+              <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Go to Watchlist</span>
               <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" />
             </motion.button>
           </motion.div>

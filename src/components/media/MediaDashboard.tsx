@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Clapperboard, Plus, Search, Film, Tv, Star, Edit2, Trash2, 
-  Check, Play, User, Filter, X, ChevronRight, AlertCircle, Heart 
+  Check, Play, User, X, AlertCircle, Heart, Pin, PinOff,
+  Shuffle, Download, Loader2, ChevronDown, SlidersHorizontal
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { mediaService } from '@/lib/media-service';
 import { contactService } from '@/lib/contact-service';
 import { MediaRecommendation } from '@/types/media';
+import { PLATFORM_CONFIG, PLATFORM_LIST } from './platformConfig';
 import { cn } from '@/lib/utils';
 import { haptics } from '@/lib/haptics';
 import { audio } from '@/lib/audio';
@@ -27,6 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { MediaEntryForm } from './MediaEntryForm';
+import { generateWatchlistPDF } from '@/lib/media-pdf';
 
 const PRESET_GENRES = [
   'Action', 'Comedy', 'Drama', 'Sci-Fi', 'Fantasy', 
@@ -35,30 +38,38 @@ const PRESET_GENRES = [
 ];
 
 export function MediaDashboard() {
-  const [mediaList, setMediaList] = useState<MediaRecommendation[]>(() => mediaService.getMedia());
-  const [contacts, setContacts] = useState(() => contactService.getContacts());
+  const [mediaList, setMediaList]   = useState<MediaRecommendation[]>(() => mediaService.getMedia());
+  const [contacts, setContacts]     = useState(() => contactService.getContacts());
 
   // Search & Filters
-  const [search, setSearch] = useState('');
-  const [activeType, setActiveType] = useState<'all' | 'movie' | 'series'>('all');
+  const [search, setSearch]             = useState('');
+  const [activeType, setActiveType]     = useState<'all' | 'movie' | 'series'>('all');
   const [activeStatus, setActiveStatus] = useState<'all' | 'to_watch' | 'watching' | 'watched'>('all');
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [selectedGenres, setSelectedGenres]     = useState<string[]>([]);
   const [selectedFriendId, setSelectedFriendId] = useState<string>('all');
+  const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
+  const [filtersOpen, setFiltersOpen]           = useState(true);
 
   // Modal Dialogs
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen]   = useState(false);
   const [editingItem, setEditingItem] = useState<MediaRecommendation | null>(null);
 
-  // Settle / Rate modal
-  const [isRateOpen, setIsRateOpen] = useState(false);
-  const [ratingItem, setRatingItem] = useState<MediaRecommendation | null>(null);
-  const [rateStars, setRateStars] = useState(5);
-  const [rateNotes, setRateNotes] = useState('');
+  // Rate modal
+  const [isRateOpen, setIsRateOpen]   = useState(false);
+  const [ratingItem, setRatingItem]   = useState<MediaRecommendation | null>(null);
+  const [rateStars, setRateStars]     = useState(5);
+  const [rateNotes, setRateNotes]     = useState('');
 
   // Delete confirm modal
   const [deletingItem, setDeletingItem] = useState<MediaRecommendation | null>(null);
 
-  // Load Data
+  // Surprise Me modal
+  const [surpriseItem, setSurpriseItem]   = useState<MediaRecommendation | null>(null);
+  const [isSurpriseOpen, setIsSurpriseOpen] = useState(false);
+
+  // PDF export
+  const [isExporting, setIsExporting] = useState(false);
+
   const loadData = () => {
     setMediaList(mediaService.getMedia());
     setContacts(contactService.getContacts());
@@ -67,49 +78,51 @@ export function MediaDashboard() {
   useEffect(() => {
     loadData();
     window.addEventListener('media-updated', loadData);
-    window.addEventListener('expenses-updated', loadData); // contacts might update
+    window.addEventListener('expenses-updated', loadData);
     return () => {
       window.removeEventListener('media-updated', loadData);
       window.removeEventListener('expenses-updated', loadData);
     };
   }, []);
 
-  // Filtered List
+  // Contact map for PDF
+  const contactMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    contacts.forEach(c => { m[c.id] = c.name; });
+    return m;
+  }, [contacts]);
+
+  // Filtered + sorted list (pinned first)
   const filteredList = useMemo(() => {
-    return mediaList.filter(item => {
-      // Search
-      const matchesSearch = item.title.toLowerCase().includes(search.toLowerCase()) || 
-        (item.notes && item.notes.toLowerCase().includes(search.toLowerCase()));
-      
-      // Type
-      const matchesType = activeType === 'all' || item.type === activeType;
+    return mediaList
+      .filter(item => {
+        const matchesSearch = item.title.toLowerCase().includes(search.toLowerCase()) || 
+          (item.notes && item.notes.toLowerCase().includes(search.toLowerCase()));
+        const matchesType     = activeType === 'all' || item.type === activeType;
+        const matchesStatus   = activeStatus === 'all' || item.status === activeStatus;
+        const matchesGenres   = selectedGenres.length === 0 || selectedGenres.every(g => item.genres.includes(g));
+        const matchesFriend   = selectedFriendId === 'all' ||
+          (selectedFriendId === 'self' && !item.recommendedBy) ||
+          item.recommendedBy === selectedFriendId;
+        const matchesPlatform = selectedPlatform === 'all' ||
+          (selectedPlatform === 'none' && !item.platform) ||
+          item.platform === selectedPlatform;
+        return matchesSearch && matchesType && matchesStatus && matchesGenres && matchesFriend && matchesPlatform;
+      })
+      .sort((a, b) => {
+        // Pinned always first
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+  }, [mediaList, search, activeType, activeStatus, selectedGenres, selectedFriendId, selectedPlatform]);
 
-      // Status
-      const matchesStatus = activeStatus === 'all' || item.status === activeStatus;
+  const stats = useMemo(() => ({
+    toWatch:  mediaList.filter(m => m.status === 'to_watch').length,
+    watching: mediaList.filter(m => m.status === 'watching').length,
+    watched:  mediaList.filter(m => m.status === 'watched').length,
+  }), [mediaList]);
 
-      // Genres (All selected genres must match)
-      const matchesGenres = selectedGenres.length === 0 || 
-        selectedGenres.every(g => item.genres.includes(g));
-
-      // Recommender
-      const matchesFriend = selectedFriendId === 'all' || 
-        (selectedFriendId === 'self' && !item.recommendedBy) ||
-        item.recommendedBy === selectedFriendId;
-
-      return matchesSearch && matchesType && matchesStatus && matchesGenres && matchesFriend;
-    });
-  }, [mediaList, search, activeType, activeStatus, selectedGenres, selectedFriendId]);
-
-  // Aggregate stats
-  const stats = useMemo(() => {
-    return {
-      toWatch: mediaList.filter(m => m.status === 'to_watch').length,
-      watching: mediaList.filter(m => m.status === 'watching').length,
-      watched: mediaList.filter(m => m.status === 'watched').length,
-    };
-  }, [mediaList]);
-
-  // All genres across the current list for filter suggestions
   const allExistingGenres = useMemo(() => {
     const set = new Set<string>(PRESET_GENRES);
     mediaList.forEach(item => item.genres.forEach(g => set.add(g)));
@@ -117,29 +130,15 @@ export function MediaDashboard() {
   }, [mediaList]);
 
   // Handlers
-  const handleOpenAdd = () => {
-    setEditingItem(null);
-    setIsFormOpen(true);
-    haptics.selection();
-  };
-
-  const handleOpenEdit = (item: MediaRecommendation) => {
-    setEditingItem(item);
-    setIsFormOpen(true);
-    haptics.selection();
-  };
-
+  const handleOpenAdd = () => { setEditingItem(null); setIsFormOpen(true); haptics.selection(); };
+  const handleOpenEdit = (item: MediaRecommendation) => { setEditingItem(item); setIsFormOpen(true); haptics.selection(); };
   const handleSaveItem = (payload: Omit<MediaRecommendation, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (editingItem) {
-      mediaService.updateMedia({
-        ...editingItem,
-        ...payload,
-      });
+      mediaService.updateMedia({ ...editingItem, ...payload });
     } else {
       mediaService.addMedia(payload);
     }
   };
-
   const handleDeleteItem = () => {
     if (!deletingItem) return;
     mediaService.deleteMedia(deletingItem.id);
@@ -147,17 +146,12 @@ export function MediaDashboard() {
     setDeletingItem(null);
     haptics.medium();
   };
-
   const handleStartWatching = (item: MediaRecommendation) => {
     haptics.medium();
-    mediaService.updateMedia({
-      ...item,
-      status: 'watching'
-    });
+    mediaService.updateMedia({ ...item, status: 'watching' });
     toast.info(`Started watching "${item.title}"! 🍿`);
     audio.shimmer();
   };
-
   const handleOpenRate = (item: MediaRecommendation) => {
     setRatingItem(item);
     setRateStars(item.rating || 5);
@@ -165,37 +159,56 @@ export function MediaDashboard() {
     setIsRateOpen(true);
     haptics.selection();
   };
-
   const handleSaveRate = () => {
     if (!ratingItem) return;
     haptics.success();
-    
-    mediaService.updateMedia({
-      ...ratingItem,
-      status: 'watched',
-      rating: rateStars,
-      notes: rateNotes.trim() || ratingItem.notes
-    });
-
+    mediaService.updateMedia({ ...ratingItem, status: 'watched', rating: rateStars, notes: rateNotes.trim() || ratingItem.notes });
     toast.success(`Completed "${ratingItem.title}"! 🎬`);
     setIsRateOpen(false);
-
-    // Confetti burst
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 }
-    });
+    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     audio.shimmer();
   };
 
+  // ── Toggle Pin ──────────────────────────────────────────────────────
+  const handleTogglePin = (item: MediaRecommendation) => {
+    haptics.medium();
+    mediaService.updateMedia({ ...item, pinned: !item.pinned });
+    toast.success(item.pinned ? `Unpinned "${item.title}"` : `Pinned "${item.title}" to top 📌`);
+  };
+
+  // ── Surprise Me ────────────────────────────────────────────────────
+  const handleSurpriseMe = () => {
+    const pool = mediaList.filter(m => m.status === 'to_watch');
+    if (pool.length === 0) {
+      toast.info("Your To Watch list is empty! Add some recommendations first 🎬");
+      return;
+    }
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    haptics.success();
+    audio.shimmer();
+    setSurpriseItem(pick);
+    setIsSurpriseOpen(true);
+  };
+
+  // ── PDF Export ─────────────────────────────────────────────────────
+  const handleExportPDF = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      await generateWatchlistPDF(mediaList, contactMap);
+      toast.success('Watchlist exported as PDF 🎬');
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to export PDF');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // ── Genre filter ───────────────────────────────────────────────────
   const handleToggleFilterGenre = (genre: string) => {
     haptics.light();
-    if (selectedGenres.includes(genre)) {
-      setSelectedGenres(prev => prev.filter(g => g !== genre));
-    } else {
-      setSelectedGenres(prev => [...prev, genre]);
-    }
+    setSelectedGenres(prev => prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre]);
   };
 
   const getFriendName = (id?: string) => {
@@ -207,8 +220,8 @@ export function MediaDashboard() {
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-500">
       
-      {/* ── Title Header ───────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-1">
+      {/* ── Title Header ──────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-1">
         <div>
           <h1 className="text-3xl font-black tracking-tight flex items-center gap-2">
             <Clapperboard className="h-8 w-8 text-primary" />
@@ -217,16 +230,38 @@ export function MediaDashboard() {
           <p className="text-xs text-muted-foreground mt-1">Track movie and series recommendations from your friends</p>
         </div>
         
-        <Button
-          onClick={handleOpenAdd}
-          className="h-10 px-5 rounded-2xl text-xs font-bold gap-2 bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20 shrink-0 self-start sm:self-auto"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Add Recommendation</span>
-        </Button>
+        <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+          {/* Surprise Me */}
+          <Button
+            onClick={handleSurpriseMe}
+            className="h-9 px-4 rounded-2xl text-xs font-bold gap-1.5 bg-amber-500/15 text-amber-400 border border-amber-500/20 hover:bg-amber-500/25 shadow-none shrink-0"
+          >
+            <Shuffle className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Surprise Me</span>
+          </Button>
+
+          {/* Export PDF */}
+          <Button
+            onClick={handleExportPDF}
+            disabled={isExporting || mediaList.length === 0}
+            className="h-9 px-4 rounded-2xl text-xs font-bold gap-1.5 bg-muted/30 text-muted-foreground border border-border/30 hover:bg-muted/50 shadow-none shrink-0"
+          >
+            {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">Export PDF</span>
+          </Button>
+
+          {/* Add */}
+          <Button
+            onClick={handleOpenAdd}
+            className="h-9 px-4 rounded-2xl text-xs font-bold gap-2 bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20 shrink-0"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add</span>
+          </Button>
+        </div>
       </div>
 
-      {/* ── Bento Stats Cards ──────────────────────────────────────── */}
+      {/* ── Bento Stats ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3">
         <div className="glass rounded-3xl p-4 border border-border/30 flex flex-col justify-between h-24">
           <div className="h-8 w-8 rounded-xl bg-muted/40 flex items-center justify-center text-muted-foreground shrink-0">
@@ -260,116 +295,234 @@ export function MediaDashboard() {
         </div>
       </div>
 
-      {/* ── Search & Filter Controls ────────────────────────────────── */}
-      <div className="glass rounded-3xl p-4 sm:p-5 border border-border/30 space-y-4">
-        
-        <div className="flex flex-col md:flex-row gap-3">
-          {/* Search bar */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search title, notes..."
-              className="pl-10 h-10 rounded-xl bg-background/50 border-border/40 text-xs font-bold"
-            />
-          </div>
+      {/* ── Search & Filter Controls ──────────────────────────────────── */}
+      {(() => {
+        const activeFilterCount =
+          (activeStatus !== 'all' ? 1 : 0) +
+          (selectedPlatform !== 'all' ? 1 : 0) +
+          selectedGenres.length +
+          (activeType !== 'all' ? 1 : 0) +
+          (selectedFriendId !== 'all' ? 1 : 0);
 
-          <div className="flex flex-wrap sm:flex-nowrap gap-2.5">
-            {/* Friend Filter */}
-            <select
-              value={selectedFriendId}
-              onChange={e => setSelectedFriendId(e.target.value)}
-              className="bg-background/50 border border-border/40 hover:bg-muted/60 transition-colors text-xs font-bold rounded-xl px-3 py-2.5 outline-none cursor-pointer text-foreground flex-1 sm:flex-initial"
-            >
-              <option value="all">All Friends</option>
-              <option value="self">Self Logged</option>
-              {contacts.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+        return (
+          <div className="glass rounded-3xl border border-border/30 overflow-hidden">
 
-            {/* Media Type Tabs */}
-            <div className="flex bg-muted/30 p-1 rounded-xl border border-border/10 shrink-0">
-              {(['all', 'movie', 'series'] as const).map(type => (
+            {/* ── Top row: search + friend + type + filter toggle ── */}
+            <div className="flex flex-col md:flex-row gap-3 p-4 sm:p-5">
+              {/* Search bar */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search title, notes..."
+                  className="pl-10 pr-9 h-10 rounded-xl bg-background/50 border-border/40 text-xs font-bold"
+                />
+                <AnimatePresence>
+                  {search && (
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.6 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.6 }}
+                      transition={{ duration: 0.15 }}
+                      onClick={() => { haptics.light(); setSearch(''); }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-muted/60 hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                    </motion.button>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              <div className="flex flex-wrap sm:flex-nowrap gap-2.5">
+                {/* Friend Filter */}
+                <select
+                  value={selectedFriendId}
+                  onChange={e => setSelectedFriendId(e.target.value)}
+                  className="bg-background/50 border border-border/40 hover:bg-muted/60 transition-colors text-xs font-bold rounded-xl px-3 py-2.5 outline-none cursor-pointer text-foreground flex-1 sm:flex-initial"
+                >
+                  <option value="all">All Friends</option>
+                  <option value="self">Self Logged</option>
+                  {contacts.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+
+                {/* Media Type Tabs */}
+                <div className="flex bg-muted/30 p-1 rounded-xl border border-border/10 shrink-0">
+                  {(['all', 'movie', 'series'] as const).map(type => (
+                    <button
+                      key={type}
+                      onClick={() => { haptics.light(); setActiveType(type); }}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
+                        activeType === type ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Filter Toggle Button */}
                 <button
-                  key={type}
-                  onClick={() => { haptics.light(); setActiveType(type); }}
+                  onClick={() => { haptics.light(); setFiltersOpen(o => !o); }}
                   className={cn(
-                    "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
-                    activeType === type 
-                      ? "bg-card text-foreground shadow-sm" 
-                      : "text-muted-foreground hover:text-foreground"
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all shrink-0",
+                    filtersOpen
+                      ? "bg-primary/10 border-primary/20 text-primary"
+                      : "bg-background/20 border-border/30 text-muted-foreground hover:text-foreground hover:bg-muted/30"
                   )}
                 >
-                  {type}
+                  <SlidersHorizontal className="h-3 w-3" />
+                  <span className="hidden sm:inline">Filters</span>
+                  {activeFilterCount > 0 && (
+                    <span className="h-4 min-w-[16px] px-1 rounded-full bg-primary text-white text-[9px] font-black flex items-center justify-center">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                  <motion.span
+                    animate={{ rotate: filtersOpen ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="inline-flex"
+                  >
+                    <ChevronDown className="h-3 w-3" />
+                  </motion.span>
                 </button>
-              ))}
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Status Tabs */}
-        <div className="flex flex-wrap gap-1.5 border-t border-border/10 pt-3">
-          {(['all', 'to_watch', 'watching', 'watched'] as const).map(status => {
-            const label = status === 'all' ? 'All Status' : status === 'to_watch' ? 'To Watch' : status === 'watching' ? 'Watching' : 'Watched';
-            return (
-              <button
-                key={status}
-                onClick={() => { haptics.light(); setActiveStatus(status); }}
-                className={cn(
-                  "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border",
-                  activeStatus === status
-                    ? "bg-primary/10 border-primary/20 text-primary"
-                    : "bg-background/20 border-border/30 text-muted-foreground hover:text-foreground hover:bg-background/30"
-                )}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Genre filters (Horizontal tags) */}
-        <div className="space-y-1.5 border-t border-border/10 pt-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">Filter by Genre</span>
-            {selectedGenres.length > 0 && (
-              <button 
-                onClick={() => { haptics.medium(); setSelectedGenres([]); }}
-                className="text-[9px] font-bold text-destructive hover:underline uppercase tracking-wide"
-              >
-                Clear Genres ({selectedGenres.length})
-              </button>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {allExistingGenres.map(genre => {
-              const isSelected = selectedGenres.includes(genre);
-              return (
-                <button
-                  key={genre}
-                  onClick={() => handleToggleFilterGenre(genre)}
-                  className={cn(
-                    "px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border",
-                    isSelected
-                      ? "bg-primary text-white border-transparent"
-                      : "bg-muted/20 border-border/10 text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-                  )}
+            {/* ── Collapsible filter body ── */}
+            <AnimatePresence initial={false}>
+              {filtersOpen && (
+                <motion.div
+                  key="filter-body"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                  className="overflow-hidden"
                 >
-                  {genre}
-                </button>
-              );
-            })}
+                  <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-4 border-t border-border/10">
+
+                    {/* Status Tabs */}
+                    <div className="flex flex-wrap gap-1.5 pt-3">
+                      {(['all', 'to_watch', 'watching', 'watched'] as const).map(status => {
+                        const label = status === 'all' ? 'All Status' : status === 'to_watch' ? 'To Watch' : status === 'watching' ? 'Watching' : 'Watched';
+                        return (
+                          <button
+                            key={status}
+                            onClick={() => { haptics.light(); setActiveStatus(status); }}
+                            className={cn(
+                              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border",
+                              activeStatus === status
+                                ? "bg-primary/10 border-primary/20 text-primary"
+                                : "bg-background/20 border-border/30 text-muted-foreground hover:text-foreground hover:bg-background/30"
+                            )}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Platform filter */}
+                    <div className="flex flex-wrap gap-1.5 border-t border-border/10 pt-3">
+                      <button
+                        onClick={() => { haptics.light(); setSelectedPlatform('all'); }}
+                        className={cn(
+                          "px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border",
+                          selectedPlatform === 'all'
+                            ? "bg-primary/10 border-primary/20 text-primary"
+                            : "bg-background/20 border-border/30 text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        All Platforms
+                      </button>
+                      {PLATFORM_LIST.map(p => (
+                        <button
+                          key={p.key}
+                          onClick={() => { haptics.light(); setSelectedPlatform(selectedPlatform === p.key ? 'all' : p.key); }}
+                          className={cn(
+                            "px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border flex items-center gap-1",
+                            selectedPlatform === p.key
+                              ? `${p.color} ${p.textColor} ${p.borderColor}`
+                              : "bg-background/20 border-border/30 text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          <span>{p.emoji}</span>
+                          <span>{p.label}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Genre filters */}
+                    <div className="space-y-1.5 border-t border-border/10 pt-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">Filter by Genre</span>
+                        {selectedGenres.length > 0 && (
+                          <button
+                            onClick={() => { haptics.medium(); setSelectedGenres([]); }}
+                            className="text-[9px] font-bold text-destructive hover:underline uppercase tracking-wide"
+                          >
+                            Clear Genres ({selectedGenres.length})
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {allExistingGenres.map(genre => {
+                          const isSelected = selectedGenres.includes(genre);
+                          return (
+                            <button
+                              key={genre}
+                              onClick={() => handleToggleFilterGenre(genre)}
+                              className={cn(
+                                "px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border",
+                                isSelected
+                                  ? "bg-primary text-white border-transparent"
+                                  : "bg-muted/20 border-border/10 text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                              )}
+                            >
+                              {genre}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Clear all filters */}
+                    {activeFilterCount > 0 && (
+                      <div className="pt-1">
+                        <button
+                          onClick={() => {
+                            haptics.medium();
+                            setActiveStatus('all');
+                            setSelectedPlatform('all');
+                            setSelectedGenres([]);
+                            setActiveType('all');
+                            setSelectedFriendId('all');
+                            setSearch('');
+                          }}
+                          className="text-[10px] font-bold text-destructive/80 hover:text-destructive uppercase tracking-wider hover:underline transition-colors"
+                        >
+                          ✕ Clear all filters ({activeFilterCount})
+                        </button>
+                      </div>
+                    )}
+
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
           </div>
-        </div>
+        );
+      })()}
 
-      </div>
-
-      {/* ── Recommendations Grid ───────────────────────────────────── */}
+      {/* ── Recommendations Grid ──────────────────────────────────────── */}
       <AnimatePresence mode="popLayout">
         {filteredList.length === 0 ? (
-          <motion.div 
+          <motion.div
             key="media-empty"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -382,34 +535,26 @@ export function MediaDashboard() {
             <div>
               <p className="font-bold text-base">No Recommendations Found</p>
               <p className="text-xs text-muted-foreground max-w-xs mt-1 px-4">
-                {mediaList.length === 0 
-                  ? "Your watchlist is empty. Ask friends for their favorite movies & series and log them here! 🎬" 
+                {mediaList.length === 0
+                  ? "Your watchlist is empty. Ask friends for their favorite movies & series and log them here! 🎬"
                   : "No items match your active search filter constraints. Try clearing filters."}
               </p>
             </div>
             {mediaList.length === 0 && (
-              <Button
-                onClick={handleOpenAdd}
-                className="rounded-xl h-9 text-xs font-bold bg-primary text-white mt-2 px-4"
-              >
+              <Button onClick={handleOpenAdd} className="rounded-xl h-9 text-xs font-bold bg-primary text-white mt-2 px-4">
                 Log First Recommendation
               </Button>
             )}
           </motion.div>
         ) : (
-          <motion.div 
-            key="media-grid"
-            layout
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-          >
+          <motion.div key="media-grid" layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredList.map(item => {
               const isMovie = item.type === 'movie';
               const friendName = getFriendName(item.recommendedBy);
-              
-              // Dynamic gradient background style based on category
-              const borderGradient = isMovie 
-                ? "hover:border-purple-500/40 from-purple-500/5" 
+              const borderGradient = isMovie
+                ? "hover:border-purple-500/40 from-purple-500/5"
                 : "hover:border-cyan-500/40 from-cyan-500/5";
+              const platformInfo = item.platform ? PLATFORM_CONFIG[item.platform] : null;
 
               return (
                 <motion.div
@@ -420,42 +565,85 @@ export function MediaDashboard() {
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
                   className={cn(
-                    "glass rounded-2xl border border-border/20 p-4 flex flex-col justify-between gap-3 transition-all bg-gradient-to-br to-transparent shadow-none hover:bg-card/75 relative overflow-hidden group",
-                    borderGradient
+                    "glass rounded-2xl border border-border/20 flex flex-col justify-between gap-3 transition-all bg-gradient-to-br to-transparent shadow-none hover:bg-card/75 relative overflow-hidden group",
+                    borderGradient,
+                    item.pinned && "ring-1 ring-primary/30 border-primary/20"
                   )}
                 >
-                  <div className="space-y-2 relative z-10">
-                    <div className="flex items-start justify-between gap-2">
-                      <h4 className="font-bold text-sm leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-1">
-                        {item.title}
-                      </h4>
+                  {/* Poster backdrop if available */}
+                  {item.posterUrl && (
+                    <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
+                      <img
+                        src={item.posterUrl}
+                        alt=""
+                        className="absolute top-0 right-0 h-full w-2/5 object-cover opacity-10 blur-sm"
+                        style={{ maskImage: 'linear-gradient(to left, rgba(0,0,0,0.4), transparent)' }}
+                      />
+                    </div>
+                  )}
 
-                      <span className={cn(
-                        "text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border shadow-sm shrink-0 flex items-center gap-1",
-                        isMovie 
-                          ? "bg-purple-500/10 border-purple-500/20 text-purple-400" 
-                          : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400"
-                      )}>
-                        {isMovie ? <Film className="h-2 w-2" /> : <Tv className="h-2 w-2" />}
-                        {item.type}
-                      </span>
+                  <div className="space-y-2 relative z-10 p-4 pb-0">
+                    {/* Pin badge */}
+                    {item.pinned && (
+                      <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center">
+                        <Pin className="h-2.5 w-2.5 text-primary" />
+                      </div>
+                    )}
+
+                    {/* Poster + Title row */}
+                    <div className="flex items-start gap-2.5">
+                      {item.posterUrl && (
+                        <img
+                          src={item.posterUrl}
+                          alt={item.title}
+                          className="h-14 w-10 rounded-lg object-cover shadow-md shrink-0 border border-white/10"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-bold text-sm leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-2">
+                            {item.title}
+                            {item.releaseYear && <span className="text-muted-foreground font-normal ml-1">({item.releaseYear})</span>}
+                          </h4>
+                          <span className={cn(
+                            "text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border shadow-sm shrink-0 flex items-center gap-1",
+                            isMovie
+                              ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
+                              : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400"
+                          )}>
+                            {isMovie ? <Film className="h-2 w-2" /> : <Tv className="h-2 w-2" />}
+                            {item.type}
+                          </span>
+                        </div>
+
+                        {/* Platform badge */}
+                        {platformInfo && (
+                          <span className={cn(
+                            "inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded-full border mt-1",
+                            platformInfo.color, platformInfo.textColor, platformInfo.borderColor
+                          )}>
+                            <span>{platformInfo.emoji}</span>
+                            {platformInfo.label}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Genres */}
                     {item.genres.length > 0 && (
                       <div className="flex flex-wrap gap-1">
-                        {item.genres.map(g => (
-                          <span 
-                            key={g}
-                            className="bg-muted/30 border border-border/5 text-muted-foreground rounded px-1.5 py-0.5 text-[8px] font-semibold"
-                          >
+                        {item.genres.slice(0, 3).map(g => (
+                          <span key={g} className="bg-muted/30 border border-border/5 text-muted-foreground rounded px-1.5 py-0.5 text-[8px] font-semibold">
                             {g}
                           </span>
                         ))}
+                        {item.genres.length > 3 && (
+                          <span className="bg-muted/20 text-muted-foreground rounded px-1.5 py-0.5 text-[8px]">+{item.genres.length - 3}</span>
+                        )}
                       </div>
                     )}
 
-                    {/* Citations */}
+                    {/* Recommender */}
                     <div className="flex items-center gap-1 text-[10px] text-muted-foreground/80 pt-0.5">
                       <User className="h-3 w-3 text-muted-foreground/60 shrink-0" />
                       <span className="truncate">
@@ -476,8 +664,8 @@ export function MediaDashboard() {
                   </div>
 
                   {/* Card Footer */}
-                  <div className="border-t border-border/10 pt-2.5 flex items-center justify-between gap-2 mt-auto relative z-10">
-                    {/* Status Display & Toggle Action */}
+                  <div className="border-t border-border/10 pt-2.5 px-4 pb-3 flex items-center justify-between gap-2 mt-auto relative z-10">
+                    {/* Status / Action */}
                     <div>
                       {item.status === 'to_watch' && (
                         <Button
@@ -488,7 +676,6 @@ export function MediaDashboard() {
                           <span>Watch</span>
                         </Button>
                       )}
-
                       {item.status === 'watching' && (
                         <Button
                           onClick={() => handleOpenRate(item)}
@@ -498,7 +685,6 @@ export function MediaDashboard() {
                           <span>Complete</span>
                         </Button>
                       )}
-
                       {item.status === 'watched' && (
                         <div className="flex flex-col items-start">
                           <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1">
@@ -507,14 +693,12 @@ export function MediaDashboard() {
                           {item.rating && (
                             <div className="flex gap-0.5 mt-0.5">
                               {Array.from({ length: 5 }).map((_, i) => (
-                                <Star 
-                                  key={i} 
+                                <Star
+                                  key={i}
                                   className={cn(
-                                    "h-2.5 w-2.5 shrink-0", 
-                                    i < (item.rating || 0) 
-                                      ? "text-amber-400 fill-amber-400" 
-                                      : "text-muted-foreground/20"
-                                  )} 
+                                    "h-2.5 w-2.5 shrink-0",
+                                    i < (item.rating || 0) ? "text-amber-400 fill-amber-400" : "text-muted-foreground/20"
+                                  )}
                                 />
                               ))}
                             </div>
@@ -523,8 +707,21 @@ export function MediaDashboard() {
                       )}
                     </div>
 
-                    {/* Edit / Delete Buttons */}
-                    <div className="flex items-center gap-1">
+                    {/* Actions */}
+                    <div className="flex items-center gap-0.5">
+                      {/* Pin toggle */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleTogglePin(item)}
+                        className={cn(
+                          "h-7 w-7 rounded-lg hover:bg-muted/30 transition-colors",
+                          item.pinned ? "text-primary hover:text-primary/80" : "text-muted-foreground hover:text-foreground"
+                        )}
+                        title={item.pinned ? 'Unpin' : 'Pin to top'}
+                      >
+                        {item.pinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -544,7 +741,7 @@ export function MediaDashboard() {
                     </div>
                   </div>
 
-                  {/* Aesthetic light streak backdrop on hover */}
+                  {/* Light streak */}
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out pointer-events-none" />
                 </motion.div>
               );
@@ -553,7 +750,7 @@ export function MediaDashboard() {
         )}
       </AnimatePresence>
 
-      {/* ── Dialog Form Modal (Add/Edit) ─────────────────────────── */}
+      {/* ── Dialog Form Modal ─────────────────────────────────────────── */}
       <MediaEntryForm
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
@@ -562,7 +759,7 @@ export function MediaDashboard() {
         isEdit={!!editingItem}
       />
 
-      {/* ── Settle Rate & Review Modal (Mark Watched) ────────────── */}
+      {/* ── Rate & Review Modal ───────────────────────────────────────── */}
       <AlertDialog open={isRateOpen} onOpenChange={setIsRateOpen}>
         <AlertDialogContent className="rounded-3xl border-border/40 glass max-w-[90vw] sm:max-w-md">
           <AlertDialogHeader>
@@ -574,9 +771,7 @@ export function MediaDashboard() {
               Give your final review for "{ratingItem?.title}" to complete this recommendation.
             </AlertDialogDescription>
           </AlertDialogHeader>
-
           <div className="py-2 space-y-4 text-left">
-            {/* Stars */}
             <div className="space-y-1.5 text-center py-2 bg-black/10 border border-white/5 rounded-2xl">
               <label className="text-[9px] font-black uppercase tracking-wider text-muted-foreground block mb-2">How was it?</label>
               <div className="flex justify-center gap-2">
@@ -587,20 +782,11 @@ export function MediaDashboard() {
                     onClick={() => { haptics.light(); setRateStars(stars); }}
                     className="p-1 hover:scale-110 transition-transform"
                   >
-                    <Star
-                      className={cn(
-                        "h-8 w-8 transition-colors",
-                        stars <= rateStars 
-                          ? "text-amber-400 fill-amber-400 drop-shadow-[0_0_5px_rgba(251,191,36,0.3)]" 
-                          : "text-muted-foreground/30"
-                      )}
-                    />
+                    <Star className={cn("h-8 w-8 transition-colors", stars <= rateStars ? "text-amber-400 fill-amber-400 drop-shadow-[0_0_5px_rgba(251,191,36,0.3)]" : "text-muted-foreground/30")} />
                   </button>
                 ))}
               </div>
             </div>
-
-            {/* Notes */}
             <div className="space-y-1.5">
               <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Notes / Final Thoughts</Label>
               <Textarea
@@ -611,20 +797,16 @@ export function MediaDashboard() {
               />
             </div>
           </div>
-
           <AlertDialogFooter className="gap-2">
             <AlertDialogCancel className="rounded-xl border-white/10 hover:bg-white/5">Cancel</AlertDialogCancel>
-            <Button
-              onClick={handleSaveRate}
-              className="rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white border-none text-xs font-bold px-4"
-            >
+            <Button onClick={handleSaveRate} className="rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white border-none text-xs font-bold px-4">
               Complete Watch
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ── Confirm Delete Dialog ────────────────────────────────── */}
+      {/* ── Confirm Delete Dialog ─────────────────────────────────────── */}
       <AlertDialog open={deletingItem !== null} onOpenChange={open => !open && setDeletingItem(null)}>
         <AlertDialogContent className="rounded-3xl border-border/40 glass max-w-[90vw] sm:max-w-sm">
           <AlertDialogHeader>
@@ -636,19 +818,138 @@ export function MediaDashboard() {
               Are you sure you want to remove <strong>"{deletingItem?.title}"</strong> from your watchlist? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-
           <AlertDialogFooter className="gap-2">
             <AlertDialogCancel className="rounded-xl border-white/10 hover:bg-white/5">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteItem}
-              className="rounded-xl bg-destructive hover:bg-destructive/90 text-white border-none text-xs font-bold px-4"
-            >
+            <AlertDialogAction onClick={handleDeleteItem} className="rounded-xl bg-destructive hover:bg-destructive/90 text-white border-none text-xs font-bold px-4">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* ── Surprise Me Modal ─────────────────────────────────────────── */}
+      <AnimatePresence>
+        {isSurpriseOpen && surpriseItem && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+              onClick={() => setIsSurpriseOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.5, y: 60, rotate: -8 }}
+              animate={{ opacity: 1, scale: 1, y: 0, rotate: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 40 }}
+              transition={{ type: 'spring', damping: 18, stiffness: 280 }}
+              className="relative z-10 glass rounded-[2.5rem] border border-border/40 p-8 mx-6 max-w-sm w-full overflow-hidden shadow-2xl text-center"
+            >
+              {/* Glow orb */}
+              <div className="absolute -top-10 -right-10 h-40 w-40 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-10 -left-10 h-40 w-40 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="relative z-10">
+                <motion.div
+                  initial={{ rotate: -20, scale: 0 }}
+                  animate={{ rotate: 0, scale: 1 }}
+                  transition={{ delay: 0.1, type: 'spring', damping: 12 }}
+                  className="text-5xl mb-4"
+                >
+                  🎲
+                </motion.div>
+
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-400 mb-3">Tonight's Pick</p>
+
+                {/* Poster */}
+                {surpriseItem.posterUrl && (
+                  <motion.img
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    src={surpriseItem.posterUrl}
+                    alt={surpriseItem.title}
+                    className="h-36 w-24 object-cover rounded-2xl mx-auto mb-4 shadow-2xl border border-white/10"
+                  />
+                )}
+
+                <motion.h2
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.25 }}
+                  className="text-2xl font-black text-foreground mb-1"
+                >
+                  {surpriseItem.title}
+                </motion.h2>
+                {surpriseItem.releaseYear && (
+                  <p className="text-muted-foreground text-sm mb-2">{surpriseItem.releaseYear}</p>
+                )}
+
+                <div className="flex flex-wrap justify-center gap-1.5 mb-5 mt-2">
+                  <span className={cn(
+                    "text-[8px] font-black uppercase px-2 py-1 rounded-full border",
+                    surpriseItem.type === 'movie'
+                      ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
+                      : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400"
+                  )}>
+                    {surpriseItem.type === 'movie' ? '🎬' : '📺'} {surpriseItem.type}
+                  </span>
+                  {surpriseItem.platform && PLATFORM_CONFIG[surpriseItem.platform] && (
+                    <span className={cn(
+                      "text-[8px] font-bold px-2 py-1 rounded-full border",
+                      PLATFORM_CONFIG[surpriseItem.platform].color,
+                      PLATFORM_CONFIG[surpriseItem.platform].textColor,
+                      PLATFORM_CONFIG[surpriseItem.platform].borderColor,
+                    )}>
+                      {PLATFORM_CONFIG[surpriseItem.platform].emoji} {PLATFORM_CONFIG[surpriseItem.platform].label}
+                    </span>
+                  )}
+                  {surpriseItem.genres.slice(0, 2).map(g => (
+                    <span key={g} className="text-[8px] px-2 py-1 rounded-full bg-muted/30 border border-border/10 text-muted-foreground">{g}</span>
+                  ))}
+                </div>
+
+                {surpriseItem.recommendedBy && (
+                  <p className="text-xs text-muted-foreground mb-5">
+                    Recommended by <span className="text-foreground font-bold">{getFriendName(surpriseItem.recommendedBy)}</span>
+                  </p>
+                )}
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setIsSurpriseOpen(false)}
+                    className="flex-1 h-11 rounded-2xl bg-muted/30 text-muted-foreground border border-border/30 hover:bg-muted/50 text-xs font-bold"
+                  >
+                    Not today
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      handleStartWatching(surpriseItem);
+                      setIsSurpriseOpen(false);
+                    }}
+                    className="flex-1 h-11 rounded-2xl bg-primary text-white hover:bg-primary/90 text-xs font-bold gap-1.5 shadow-lg shadow-primary/20"
+                  >
+                    <Play className="h-3.5 w-3.5 fill-white/30" />
+                    Let's watch!
+                  </Button>
+                </div>
+
+                <button
+                  onClick={() => {
+                    const pool = mediaList.filter(m => m.status === 'to_watch' && m.id !== surpriseItem.id);
+                    if (pool.length === 0) { toast.info('No other options!'); return; }
+                    haptics.light();
+                    setSurpriseItem(pool[Math.floor(Math.random() * pool.length)]);
+                  }}
+                  className="mt-3 text-[10px] font-bold text-muted-foreground hover:text-foreground underline transition-colors"
+                >
+                  🔀 Pick a different one
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
