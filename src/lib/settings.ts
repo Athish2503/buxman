@@ -21,7 +21,7 @@ const defaultSettings: AppSettings = {
   glassIntensity: 0.6,
   budgets: [],
   hapticsEnabled: true,
-  navOrder: ['dashboard', 'expenses', 'splits', 'food', 'reimbursements', 'trips', 'vehicle', 'analytics', 'settings'],
+  navOrder: ['dashboard', 'expenses', 'splits', 'media', 'food', 'reimbursements', 'trips', 'vehicle', 'analytics', 'settings'],
   upiId: '',
   googleDriveClientId: '',
   googleDriveBackupEnabled: false,

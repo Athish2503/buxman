@@ -47,6 +47,7 @@ import {
   TripsModule,
   SplitsModule,
 } from '@/components/dashboard';
+import { MediaDashboard } from '@/components/media/MediaDashboard';
 import { Tab, NAV_ITEMS_CONFIG } from '@/lib/nav-config';
 
 
@@ -217,6 +218,7 @@ const Index = () => {
         );
       case 'trips':    return <TripsModule />;
       case 'splits':   return <SplitsModule />;
+      case 'media':    return <MediaDashboard />;
       case 'vehicle':
         return (
           <GarageModule

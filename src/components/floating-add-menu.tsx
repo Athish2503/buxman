@@ -1,7 +1,7 @@
 import { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
-import { Plus, Receipt, Camera, X, Utensils, Fuel } from 'lucide-react';
+import { Plus, Receipt, Camera, X, Utensils, Fuel, Clapperboard } from 'lucide-react';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { toast } from 'sonner';
 
@@ -12,6 +12,9 @@ import { cn } from '@/lib/utils';
 import { ExpenseForm } from './expense-form';
 import { VehicleLogForm } from './vehicle-log-form';
 import { DiningEntryForm } from './food/DiningEntryForm';
+import { MediaEntryForm } from './media/MediaEntryForm';
+import { mediaService } from '@/lib/media-service';
+import { audio } from '@/lib/audio';
 
 interface FloatingAddMenuProps {
   onAddExpense: (expense: Expense) => void;
@@ -30,10 +33,11 @@ interface FabAction {
 }
 
 const ACTIONS: FabAction[] = [
-  { id: 'snap',    label: 'Wallet',  icon: Camera,  color: '#34d399', gradient: 'linear-gradient(135deg, #34d399, #059669)', x: -105, y: -45  },
-  { id: 'fuel',    label: 'Fuel',    icon: Fuel,    color: '#22d3ee', gradient: 'linear-gradient(135deg, #22d3ee, #0284c7)', x: -48,  y: -118 },
-  { id: 'expense', label: 'Expense', icon: Receipt,  color: '#f59e0b', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)', x:  48,  y: -118 },
-  { id: 'dining',  label: 'Dining',  icon: Utensils, color: '#f472b6', gradient: 'linear-gradient(135deg, #f472b6, #db2777)', x:  105, y: -45  },
+  { id: 'snap',      label: 'Wallet',    icon: Camera,       color: '#34d399', gradient: 'linear-gradient(135deg, #34d399, #059669)', x: -115, y: -35  },
+  { id: 'fuel',      label: 'Fuel',      icon: Fuel,         color: '#22d3ee', gradient: 'linear-gradient(135deg, #22d3ee, #0284c7)', x: -65,  y: -105 },
+  { id: 'expense',   label: 'Expense',   icon: Receipt,      color: '#f59e0b', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)', x:  0,    y: -130 },
+  { id: 'dining',    label: 'Dining',    icon: Utensils,     color: '#f472b6', gradient: 'linear-gradient(135deg, #f472b6, #db2777)', x:  65,   y: -105 },
+  { id: 'watchlist', label: 'Watchlist', icon: Clapperboard, color: '#a855f7', gradient: 'linear-gradient(135deg, #a855f7, #7c3aed)', x:  115,  y: -35  },
 ];
 
 export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange }: FloatingAddMenuProps) {
@@ -41,6 +45,7 @@ export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange }: F
   const [showExpenseForm,  setShowExpenseForm]  = useState(false);
   const [showFuelForm,     setShowFuelForm]     = useState(false);
   const [showDiningForm,   setShowDiningForm]   = useState(false);
+  const [showMediaForm,    setShowMediaForm]    = useState(false);
   const [fabRect,          setFabRect]          = useState<DOMRect | null>(null);
   const fabRef = useRef<HTMLDivElement>(null);
 
@@ -107,6 +112,7 @@ export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange }: F
     } else if (id === 'fuel')    { setShowFuelForm(true); }
     else if (id === 'expense')   { setShowExpenseForm(true); }
     else if (id === 'dining')    { setShowDiningForm(true); }
+    else if (id === 'watchlist') { setShowMediaForm(true); }
   };
 
   const portalContent = (
@@ -227,6 +233,13 @@ export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange }: F
         onOpenChange={setShowDiningForm}
         onSubmit={() => { setShowDiningForm(false); window.dispatchEvent(new CustomEvent('dining-updated')); }}
         trigger={<div className="hidden" />}
+      />
+      <MediaEntryForm
+        open={showMediaForm}
+        onOpenChange={setShowMediaForm}
+        onSubmit={(item) => {
+          mediaService.addMedia(item);
+        }}
       />
     </>
   );

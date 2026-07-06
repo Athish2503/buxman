@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Info, Check, Send, Share2, ChevronDown, ChevronUp, 
   AlertCircle, Wallet, ArrowUpRight, ArrowDownLeft, Calendar, 
-  Receipt, CheckCircle2, User, RefreshCw, QrCode, Copy
+  Receipt, CheckCircle2, User, RefreshCw, QrCode, Copy, Plus
 } from 'lucide-react';
 import { Expense } from '@/types/expense';
 import { Trip } from '@/types/split';
@@ -70,6 +70,116 @@ export function SplitsModule() {
   // Interactive Copy State
   const [copiedUpi, setCopiedUpi] = useState(false);
 
+  // Direct IOU States
+  const [isIouOpen, setIsIouOpen] = useState(false);
+  const [iouType, setIouType] = useState<'you_owe' | 'owes_you'>('you_owe');
+  const [iouContactId, setIouContactId] = useState<string>('');
+  const [iouNewContactName, setIouNewContactName] = useState<string>('');
+  const [iouAmount, setIouAmount] = useState<number>(0);
+  const [iouDescription, setIouDescription] = useState<string>('');
+  const [iouDate, setIouDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [isSavingIou, setIsSavingIou] = useState(false);
+  const [contactsKey, setContactsKey] = useState(0);
+
+  const handleSaveIou = async () => {
+    if (iouAmount <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+    
+    let targetContactId = iouContactId;
+    if (targetContactId === 'new') {
+      if (!iouNewContactName.trim()) {
+        toast.error("Please enter friend's name");
+        return;
+      }
+      const newContact = contactService.addContact({ name: iouNewContactName.trim() });
+      targetContactId = newContact.id;
+      setContactsKey(prev => prev + 1);
+    }
+    
+    if (!targetContactId) {
+      toast.error('Please select a friend');
+      return;
+    }
+
+    setIsSavingIou(true);
+    haptics.medium();
+
+    try {
+      const contactObj = contactService.getContacts().find(c => c.id === targetContactId);
+      const contactName = contactObj?.name || 'Friend';
+      
+      let expenseObj: Expense;
+      if (iouType === 'you_owe') {
+        expenseObj = {
+          id: crypto.randomUUID(),
+          vendor: iouDescription.trim() || `Direct Debt (You Owe ${contactName})`,
+          amount: iouAmount,
+          date: iouDate,
+          category: 'Others',
+          description: `Direct IOU logged: You owe ${contactName}`,
+          status: 'approved',
+          currency: 'INR',
+          isReimbursement: false,
+          paidBy: targetContactId,
+          split: {
+            totalAmount: iouAmount,
+            splitType: 'exact',
+            members: [],
+            userPaid: false,
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+      } else {
+        expenseObj = {
+          id: crypto.randomUUID(),
+          vendor: iouDescription.trim() || `Direct Debt (${contactName} Owes You)`,
+          amount: iouAmount,
+          date: iouDate,
+          category: 'Others',
+          description: `Direct IOU logged: ${contactName} owes you`,
+          status: 'approved',
+          currency: 'INR',
+          isReimbursement: false,
+          paidBy: 'user',
+          split: {
+            totalAmount: iouAmount,
+            splitType: 'exact',
+            members: [
+              {
+                contactId: targetContactId,
+                amount: iouAmount,
+                paid: false,
+              }
+            ],
+            userPaid: true,
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+      }
+
+      storageService.addExpense(expenseObj);
+      toast.success('IOU debt logged successfully');
+      
+      setIsIouOpen(false);
+      setIouContactId('');
+      setIouNewContactName('');
+      setIouAmount(0);
+      setIouDescription('');
+      setIouDate(new Date().toISOString().split('T')[0]);
+      
+      audio.success();
+      haptics.success();
+    } catch (e) {
+      toast.error('Failed to log IOU');
+    } finally {
+      setIsSavingIou(false);
+    }
+  };
+
   const handleCopyLink = (upiUrl: string) => {
     navigator.clipboard.writeText(upiUrl);
     setCopiedUpi(true);
@@ -79,7 +189,7 @@ export function SplitsModule() {
     setTimeout(() => setCopiedUpi(false), 2000);
   };
 
-  const contacts = useMemo(() => contactService.getContacts(), [expenses]);
+  const contacts = useMemo(() => contactService.getContacts(), [expenses, contactsKey]);
 
   useEffect(() => {
     if (isQuickQrOpen) {
@@ -420,8 +530,19 @@ export function SplitsModule() {
           <p className="text-xs text-muted-foreground mt-1">See who owes you money and who you need to pay back</p>
         </div>
         
-        {/* Trip Filter & Quick QR */}
+        {/* Trip Filter & Quick QR & Log IOU */}
         <div className="flex flex-wrap items-center gap-2.5">
+          <Button
+            onClick={() => {
+              haptics.selection();
+              setIsIouOpen(true);
+            }}
+            className="h-9 px-4 rounded-xl text-xs font-bold gap-2 bg-primary text-white hover:bg-primary/90 animate-in fade-in zoom-in-95 duration-300"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Log IOU</span>
+          </Button>
+
           <Button
             onClick={() => {
               haptics.selection();
@@ -1014,6 +1135,155 @@ export function SplitsModule() {
                 Save UPI & Close
               </Button>
             )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Log Direct IOU / Debt Modal ─────────────────────────── */}
+      <AlertDialog open={isIouOpen} onOpenChange={setIsIouOpen}>
+        <AlertDialogContent className="rounded-3xl border-border/40 glass max-w-[90vw] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold flex items-center gap-2">
+              <Users className="h-6 w-6 text-primary" />
+              <span>Log Direct IOU / Debt</span>
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground text-xs">
+              Log a direct balance between you and a friend without splitting a bill.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="py-2 space-y-4 text-left">
+            {/* Direction selector */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Transaction Type
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIouType('you_owe')}
+                  className={cn(
+                    "h-10 rounded-xl text-xs font-bold transition-all border border-transparent shadow-sm flex items-center justify-center gap-1.5",
+                    iouType === 'you_owe' 
+                      ? "bg-rose-500 hover:bg-rose-600 text-white font-black" 
+                      : "bg-muted/40 hover:bg-muted/60 text-muted-foreground"
+                  )}
+                >
+                  <ArrowDownLeft className="h-4 w-4" />
+                  You Owe Them
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIouType('owes_you')}
+                  className={cn(
+                    "h-10 rounded-xl text-xs font-bold transition-all border border-transparent shadow-sm flex items-center justify-center gap-1.5",
+                    iouType === 'owes_you' 
+                      ? "bg-emerald-500 hover:bg-emerald-600 text-white font-black" 
+                      : "bg-muted/40 hover:bg-muted/60 text-muted-foreground"
+                  )}
+                >
+                  <ArrowUpRight className="h-4 w-4" />
+                  They Owe You
+                </Button>
+              </div>
+            </div>
+
+            {/* Friend Selector */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Select Friend
+              </label>
+              <select
+                value={iouContactId}
+                onChange={e => {
+                  setIouContactId(e.target.value);
+                  if (e.target.value !== 'new') {
+                    setIouNewContactName('');
+                  }
+                }}
+                className="w-full bg-background/50 border border-border/40 hover:bg-muted/60 transition-colors text-xs font-bold rounded-xl px-3 py-2.5 outline-none cursor-pointer text-foreground"
+              >
+                <option value="">Select a Friend...</option>
+                {contacts.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+                <option value="new">+ Add New Friend...</option>
+              </select>
+            </div>
+
+            {/* Inline New Contact Input */}
+            {iouContactId === 'new' && (
+              <div className="space-y-1.5 animate-in slide-in-from-top-1 duration-200">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  New Friend's Name
+                </label>
+                <Input
+                  value={iouNewContactName}
+                  onChange={e => setIouNewContactName(e.target.value)}
+                  placeholder="Enter name"
+                  className="h-9 text-xs rounded-xl bg-background/50 border-border/40 font-bold"
+                />
+              </div>
+            )}
+
+            {/* Amount Input */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Amount (INR)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-2 text-xs font-mono text-muted-foreground">₹</span>
+                <Input
+                  type="number"
+                  value={iouAmount || ''}
+                  onChange={e => {
+                    const val = parseFloat(e.target.value);
+                    setIouAmount(isNaN(val) ? 0 : val);
+                  }}
+                  placeholder="0.00"
+                  className="pl-7 h-9 text-xs rounded-xl bg-background/50 border-border/40 font-mono font-bold text-foreground"
+                />
+              </div>
+            </div>
+
+            {/* Description Input */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                For / Description
+              </label>
+              <Input
+                value={iouDescription}
+                onChange={e => setIouDescription(e.target.value)}
+                placeholder="e.g. Uber ride, dinner, cash loan"
+                className="h-9 text-xs rounded-xl bg-background/50 border-border/40 font-bold"
+              />
+            </div>
+
+            {/* Date Input */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Date
+              </label>
+              <Input
+                type="date"
+                value={iouDate}
+                onChange={e => setIouDate(e.target.value)}
+                className="h-9 text-xs rounded-xl bg-background/50 border-border/40 font-mono text-foreground font-bold"
+              />
+            </div>
+          </div>
+
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-xl border-white/10 hover:bg-white/5">Cancel</AlertDialogCancel>
+            <Button
+              onClick={handleSaveIou}
+              disabled={isSavingIou || (!iouContactId && iouContactId !== 'new') || (iouContactId === 'new' && !iouNewContactName.trim()) || iouAmount <= 0}
+              className="rounded-xl bg-primary hover:bg-primary/90 text-white border-none text-xs font-bold px-4"
+            >
+              {isSavingIou ? 'Saving...' : 'Log IOU'}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

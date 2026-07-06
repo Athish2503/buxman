@@ -450,7 +450,7 @@ export const ExperienceCard = forwardRef<HTMLDivElement, ExperienceCardProps>(({
 
   // Expanded View via Portal
   const expandedOverlay = (
-    <div className="fixed inset-0 z-40 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

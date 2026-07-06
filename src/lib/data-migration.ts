@@ -22,6 +22,7 @@ export interface FullExportData {
   templates?: any[];
   meta?: any;
   theme?: string;
+  mediaRecommendations?: any[];
 }
 
 const safeParse = (key: string, fallback: any) => {
@@ -58,6 +59,7 @@ export const dataMigrationService = {
       templates: safeParse('reimburse_templates_v1', []),
       meta: safeParse('reimburse_meta_v1', null),
       theme: localStorage.getItem('reimburse_theme') || 'dark',
+      mediaRecommendations: safeParse('reimburse_media_recommendations_v1', []),
     };
     return data;
   },
@@ -107,6 +109,7 @@ export const dataMigrationService = {
     addEntities('TEMPLATES', data.templates || []);
     if (data.meta) addEntities('META', [data.meta]);
     if (data.theme) addEntities('THEME', [{ value: data.theme }]);
+    addEntities('MEDIA_RECOMMENDATIONS', data.mediaRecommendations || []);
 
     return lines.join('\n');
   },
@@ -133,7 +136,8 @@ export const dataMigrationService = {
       recurring: [],
       templates: [],
       meta: null,
-      theme: 'dark'
+      theme: 'dark',
+      mediaRecommendations: []
     };
 
     let currentHeaders: string[] = [];
@@ -220,6 +224,7 @@ export const dataMigrationService = {
         else if (currentType === 'TEMPLATES') data.templates?.push(rowData);
         else if (currentType === 'META') data.meta = rowData;
         else if (currentType === 'THEME') data.theme = rowData.value;
+        else if (currentType === 'MEDIA_RECOMMENDATIONS') data.mediaRecommendations?.push(rowData);
       }
     });
 
@@ -270,6 +275,7 @@ export const dataMigrationService = {
       await syncKey('reimburse_templates_v1', data.templates);
       await syncKey('reimburse_meta_v1', data.meta);
       await syncKey('reimburse_theme', data.theme);
+      await syncKey('reimburse_media_recommendations_v1', data.mediaRecommendations);
 
       console.log('[Data Migration] Import successful');
       return true;

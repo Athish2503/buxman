@@ -4,9 +4,9 @@ import { hexToHsl } from '@/lib/utils';
 
 export function ThemeEngine() {
   useEffect(() => {
+    const root = document.documentElement;
     const applyTheme = () => {
       const settings = settingsService.get();
-      const root = document.documentElement;
       
       // Apply Accent Color
       if (settings.accentColor) {
