@@ -4,9 +4,11 @@ import { Contact, ExpenseSplit, SplitType, SplitMember } from '@/types/split';
 import { ContactSelector } from './ContactSelector';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Users, Info, Check } from 'lucide-react';
+import { Users, Info, Check, Radio } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { contactService } from '@/lib/contact-service';
+import { ContactlessExchangeModal } from '@/components/nfc/ContactlessExchangeModal';
+import { NfcExchangePayload } from '@/types/nfc';
 
 interface SplitBillSectionProps {
   amount: number;
@@ -42,6 +44,8 @@ export function SplitBillSection({
     return initial;
   });
   const [userPaid, setUserPaid] = useState<boolean>(initialSplit?.userPaid || false);
+  const [isNfcModalOpen, setIsNfcModalOpen] = useState<boolean>(false);
+  const [nfcPayload, setNfcPayload] = useState<NfcExchangePayload | undefined>(undefined);
 
   const handleTogglePaid = (contactId: string) => {
     setPaidMembers(prev => ({
@@ -354,6 +358,31 @@ export function SplitBillSection({
             </div>
           )}
 
+          {selectedContactIds.length > 0 && (
+            <div className="pt-1 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  const share = amount / (selectedContactIds.length + 1);
+                  setNfcPayload({
+                    type: 'SPLIT_DEBT',
+                    vendor: 'Split Bill',
+                    totalAmount: amount,
+                    oweAmount: share,
+                    category: 'Split',
+                    date: new Date().toISOString(),
+                    senderName: 'You'
+                  });
+                  setIsNfcModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-semibold hover:bg-cyan-500/20 transition-all shadow-sm active:scale-95"
+              >
+                <Radio className="h-3.5 w-3.5 text-cyan-400 animate-pulse" />
+                Tap Phone to Share Debt
+              </button>
+            </div>
+          )}
+
           <div className="flex items-start gap-2 p-3 rounded-xl bg-primary/5 text-[10px] text-muted-foreground leading-relaxed">
             <Info className="h-3 w-3 shrink-0 text-primary mt-0.5" />
             <p>
@@ -362,6 +391,13 @@ export function SplitBillSection({
           </div>
         </motion.div>
       )}
+
+      <ContactlessExchangeModal
+        isOpen={isNfcModalOpen}
+        onClose={() => setIsNfcModalOpen(false)}
+        initialPayload={nfcPayload}
+        defaultMode="beam"
+      />
     </div>
   );
 }

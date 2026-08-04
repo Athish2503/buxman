@@ -3,9 +3,10 @@ import { format } from 'date-fns';
 import { 
   X, Calendar, Tag, FileText, Camera, ZoomIn, 
   Trash2, Edit, Users, Receipt, ArrowLeft, 
-  Share2, IndianRupee, Briefcase, Clock
+  Share2, IndianRupee, Briefcase, Clock, Radio
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { useState } from 'react';
 import { Expense, ExpenseStatus } from '@/types/expense';
 import { getCategoryConfig } from '@/lib/categories';
 import { formatCurrency, cn, rewardBurst } from '@/lib/utils';
@@ -15,6 +16,7 @@ import { haptics } from '@/lib/haptics';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { contactService } from '@/lib/contact-service';
 import { scheduleSplitReminders } from '@/lib/split-reminders';
+import { ContactlessExchangeModal } from '@/components/nfc/ContactlessExchangeModal';
 
 interface ExpenseDetailViewProps {
   expense: Expense | null;
@@ -34,6 +36,7 @@ const STATUS_CONFIG: Record<ExpenseStatus, { label: string; icon: string; color:
 export function ExpenseDetailView({ expense, onClose, onEdit, onDelete, onUpdateExpense }: ExpenseDetailViewProps) {
   const isMobile = useIsMobile();
   const contacts = contactService.getContacts();
+  const [isNfcOpen, setIsNfcOpen] = useState(false);
 
   if (!expense) return null;
 
@@ -337,6 +340,17 @@ export function ExpenseDetailView({ expense, onClose, onEdit, onDelete, onUpdate
           </Button>
           <Button 
             variant="outline" 
+            className="h-14 w-14 rounded-2xl border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 shadow-xl"
+            title="Beam Expense via NFC"
+            onClick={() => {
+              haptics.medium();
+              setIsNfcOpen(true);
+            }}
+          >
+            <Radio className="h-5 w-5 animate-pulse" />
+          </Button>
+          <Button 
+            variant="outline" 
             className="h-14 w-14 rounded-2xl border-white/10 bg-card hover:bg-white/5 text-foreground shadow-xl"
             onClick={() => {
               // Handle Share/Export
@@ -357,6 +371,16 @@ export function ExpenseDetailView({ expense, onClose, onEdit, onDelete, onUpdate
           </Button>
         </div>
       </div>
+
+      <ContactlessExchangeModal
+        isOpen={isNfcOpen}
+        onClose={() => setIsNfcOpen(false)}
+        initialPayload={{
+          type: 'EXPENSE_IMPORT',
+          expense
+        }}
+        defaultMode="beam"
+      />
     </div>
   );
 

@@ -5,9 +5,10 @@ import {
   Receipt, ChevronDown, CheckSquare, Square, X,
   SlidersHorizontal, FileText, FileSpreadsheet, Briefcase,
   MoreVertical, ArrowUpDown, Tag, Share2, ZoomIn, RefreshCw,
-  Camera, Calendar, Users
+  Camera, Calendar, Users, Radio
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ContactlessExchangeModal } from '@/components/nfc/ContactlessExchangeModal';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -81,6 +82,7 @@ export function ExpenseList({
   );
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
+  const [nfcReceiveOpen, setNfcReceiveOpen] = useState(false);
 
   // Slide-to-select variables
   const isSlidingRef = useRef(false);
@@ -500,12 +502,31 @@ export function ExpenseList({
             <Square className="h-4.5 w-4.5" />
           )}
         </Button>
+
+        <Button 
+          variant="outline" 
+          size="icon" 
+          onClick={() => {
+            haptics.selection();
+            setNfcReceiveOpen(true);
+          }} 
+          className="h-10 w-10 shrink-0 rounded-lg bg-cyan-500/10 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20"
+          title="Receive Contactless Expense (NFC)"
+        >
+          <Radio className="h-4 w-4 animate-pulse" />
+        </Button>
         <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
           <SheetTrigger asChild>
             <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 rounded-lg bg-card border-border"><SlidersHorizontal className="h-4 w-4" /></Button>
           </SheetTrigger>
           <SheetContent side="bottom" className="bg-card rounded-t-2xl border-t border-border pb-12"><FilterPanel /></SheetContent>
         </Sheet>
+
+        <ContactlessExchangeModal
+          isOpen={nfcReceiveOpen}
+          onClose={() => setNfcReceiveOpen(false)}
+          defaultMode="receive"
+        />
       </div>
 
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">

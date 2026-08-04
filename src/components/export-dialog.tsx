@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { FileText, Download, Share2, X, MessageSquare, ArrowRight } from 'lucide-react';
+import { FileText, Download, Share2, X, MessageSquare, ArrowRight, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { haptics } from '@/lib/haptics';
+import { ContactlessExchangeModal } from '@/components/nfc/ContactlessExchangeModal';
+import { NfcReportPayload } from '@/types/nfc';
 
 interface ExportDialogProps {
   isOpen: boolean;
@@ -18,6 +20,7 @@ interface ExportDialogProps {
 export function ExportDialog({ isOpen, onClose, onConfirm, title, count }: ExportDialogProps) {
   const [message, setMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isNfcOpen, setIsNfcOpen] = useState(false);
 
   const handleAction = async () => {
     setIsProcessing(true);
@@ -60,6 +63,20 @@ export function ExportDialog({ isOpen, onClose, onConfirm, title, count }: Expor
               </p>
             </div>
 
+            <div className="pt-1 flex justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.medium();
+                  setIsNfcOpen(true);
+                }}
+                className="w-full py-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-bold flex items-center justify-center gap-2 hover:bg-cyan-500/20 transition-all shadow-sm active:scale-98"
+              >
+                <Radio className="h-4 w-4 text-cyan-400 animate-pulse" />
+                Beam Report via Phone Tap (NFC)
+              </button>
+            </div>
+
             <div className="grid grid-cols-2 gap-3 pt-2">
               <Button 
                 variant="outline" 
@@ -83,6 +100,20 @@ export function ExportDialog({ isOpen, onClose, onConfirm, title, count }: Expor
         {/* Decorative background element */}
         <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
       </DialogContent>
+
+      <ContactlessExchangeModal
+        isOpen={isNfcOpen}
+        onClose={() => setIsNfcOpen(false)}
+        initialPayload={{
+          type: 'REIMBURSEMENT_REPORT',
+          reportTitle: title,
+          totalAmount: 0,
+          currency: 'INR',
+          itemCount: count,
+          senderName: 'You'
+        }}
+        defaultMode="beam"
+      />
     </Dialog>
   );
 }

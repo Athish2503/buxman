@@ -1,7 +1,7 @@
 import { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
-import { Plus, Receipt, Camera, X, Utensils, Fuel, Clapperboard } from 'lucide-react';
+import { Plus, Receipt, Camera, X, Utensils, Fuel, Clapperboard, Radio } from 'lucide-react';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { toast } from 'sonner';
 
@@ -15,6 +15,7 @@ import { DiningEntryForm } from './food/DiningEntryForm';
 import { MediaEntryForm } from './media/MediaEntryForm';
 import { mediaService } from '@/lib/media-service';
 import { audio } from '@/lib/audio';
+import { ContactlessExchangeModal } from '@/components/nfc/ContactlessExchangeModal';
 
 interface FloatingAddMenuProps {
   onAddExpense: (expense: Expense) => void;
@@ -113,6 +114,7 @@ export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange }: F
     else if (id === 'expense')   { setShowExpenseForm(true); }
     else if (id === 'dining')    { setShowDiningForm(true); }
     else if (id === 'watchlist') { setShowMediaForm(true); }
+    else if (id === 'nfc')       { setShowNfcModal(true); }
   };
 
   const portalContent = (
