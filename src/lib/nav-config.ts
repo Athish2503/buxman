@@ -1,13 +1,14 @@
 import {
   LayoutDashboard, Receipt, BarChart3, Settings,
-  Car, Briefcase, Utensils, Plane, Users, Clapperboard
+  Car, Briefcase, Utensils, Plane, Users, Clapperboard, Dumbbell
 } from 'lucide-react';
 
-export type Tab = 'dashboard' | 'expenses' | 'food' | 'reimbursements' | 'trips' | 'vehicle' | 'analytics' | 'settings' | 'splits' | 'media';
+export type Tab = 'dashboard' | 'expenses' | 'gym' | 'food' | 'reimbursements' | 'trips' | 'vehicle' | 'analytics' | 'settings' | 'splits' | 'media';
 
 export const NAV_ITEMS_CONFIG: Record<Tab, { id: Tab; label: string; icon: any }> = {
   dashboard:      { id: 'dashboard',      label: 'Home',     icon: LayoutDashboard },
   expenses:       { id: 'expenses',       label: 'Expenses', icon: Receipt         },
+  gym:            { id: 'gym',            label: 'Gym',      icon: Dumbbell        },
   splits:         { id: 'splits',         label: 'Splits',   icon: Users           },
   media:          { id: 'media',          label: 'Watchlist', icon: Clapperboard    },
   food:           { id: 'food',           label: 'Dining',   icon: Utensils        },
@@ -17,4 +18,5 @@ export const NAV_ITEMS_CONFIG: Record<Tab, { id: Tab; label: string; icon: any }
   analytics:      { id: 'analytics',      label: 'Charts',   icon: BarChart3       },
   settings:       { id: 'settings',       label: 'Settings', icon: Settings        },
 };
+
 

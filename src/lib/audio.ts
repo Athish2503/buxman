@@ -155,6 +155,43 @@ class AudioService {
       // Silence fails
     }
   }
+
+  /**
+   * Notification sound / timer chime alert (melodic 3-tone chime)
+   */
+  async playNotificationSound() {
+    try {
+      const ctx = this.init();
+      if (ctx.state === 'suspended') await ctx.resume();
+      
+      const now = ctx.currentTime;
+      const tones = [
+        { freq: 523.25, time: now },        // C5
+        { freq: 659.25, time: now + 0.12 },  // E5
+        { freq: 783.99, time: now + 0.24 },  // G5
+      ];
+
+      tones.forEach(({ freq, time }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, time);
+
+        gain.gain.setValueAtTime(0, time);
+        gain.gain.linearRampToValueAtTime(0.06, time + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(time);
+        osc.stop(time + 0.15);
+      });
+    } catch (e) {
+      // Silence fails
+    }
+  }
 }
 
 export const audio = new AudioService();

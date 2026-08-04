@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Reorder, motion } from 'framer-motion';
-import { GripVertical, Save } from 'lucide-react';
+import { Reorder } from 'framer-motion';
+import { GripVertical, Save, Plus, Check } from 'lucide-react';
 import { SubModuleHeader } from './Common';
 import { settingsService } from '@/lib/settings';
 import { NAV_ITEMS_CONFIG, Tab } from '@/lib/nav-config';
+import { ALL_FAB_ACTIONS } from '@/components/floating-add-menu';
 import { cn } from '@/lib/utils';
 import { haptics } from '@/lib/haptics';
 import { toast } from 'sonner';
@@ -14,22 +15,41 @@ interface NavigationSettingsModuleProps {
 
 export function NavigationSettingsModule({ onBack }: NavigationSettingsModuleProps) {
   const [items, setItems] = useState<Tab[]>([]);
+  const [enabledFabActions, setEnabledFabActions] = useState<string[]>([]);
 
   useEffect(() => {
     const settings = settingsService.get();
+    const allKeys = Object.keys(NAV_ITEMS_CONFIG) as Tab[];
     if (settings.navOrder && settings.navOrder.length > 0) {
-      setItems(settings.navOrder as Tab[]);
+      const current = settings.navOrder as Tab[];
+      const missing = allKeys.filter(t => !current.includes(t));
+      setItems([...current, ...missing]);
     } else {
-      setItems(Object.keys(NAV_ITEMS_CONFIG) as Tab[]);
+      setItems(allKeys);
     }
+    setEnabledFabActions(settings.fabActions || ALL_FAB_ACTIONS.map(a => a.id));
   }, []);
+
+  const toggleFabAction = (id: string) => {
+    haptics.selection();
+    if (enabledFabActions.includes(id)) {
+      if (enabledFabActions.length <= 1) {
+        toast.error('Select at least 1 FAB shortcut action');
+        return;
+      }
+      setEnabledFabActions(enabledFabActions.filter(a => a !== id));
+    } else {
+      setEnabledFabActions([...enabledFabActions, id]);
+    }
+  };
 
   const handleSave = () => {
     const settings = settingsService.get();
     settings.navOrder = items;
+    settings.fabActions = enabledFabActions;
     settingsService.save(settings);
     haptics.success();
-    toast.success('Navigation layout saved');
+    toast.success('Navigation & FAB layout saved');
     onBack();
   };
 
@@ -39,12 +59,72 @@ export function NavigationSettingsModule({ onBack }: NavigationSettingsModulePro
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-      <SubModuleHeader title="Navigation Layout" onBack={onBack} />
+    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 pb-12">
+      <SubModuleHeader title="Navigation & FAB Customizer" onBack={onBack} />
       
+      {/* ── SECTION 1: FAB QUICK ACTIONS CUSTOMIZER ── */}
       <div className="bg-surface-2 p-5 rounded-3xl border border-white/5 space-y-4">
-        <div className="space-y-1 mb-6">
-          <h3 className="text-sm font-bold">Customize Menu</h3>
+        <div className="space-y-1">
+          <h3 className="text-sm font-bold flex items-center gap-2 text-foreground">
+            <Plus className="w-4 h-4 text-emerald-400" />
+            Floating Add Menu (`+`) Shortcuts
+          </h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Choose which module shortcuts appear when you click the floating plus (`+`) button.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+          {ALL_FAB_ACTIONS.map((action) => {
+            const Icon = action.icon;
+            const isChecked = enabledFabActions.includes(action.id);
+            return (
+              <button
+                key={action.id}
+                type="button"
+                onClick={() => toggleFabAction(action.id)}
+                className={cn(
+                  'flex items-center justify-between p-3 rounded-2xl border transition-all text-left',
+                  isChecked
+                    ? 'bg-card border-emerald-500/40 shadow-sm'
+                    : 'bg-muted/20 border-transparent opacity-60 hover:opacity-100'
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-white shrink-0"
+                    style={{ background: action.gradient }}
+                  >
+                    <Icon className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-foreground">{action.label}</p>
+                    <span className="text-[10px] text-muted-foreground">
+                      {isChecked ? 'Enabled on +' : 'Disabled'}
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  className={cn(
+                    'w-6 h-6 rounded-full flex items-center justify-center transition-all',
+                    isChecked
+                      ? 'bg-emerald-500 text-white'
+                      : 'border border-border/50 text-transparent'
+                  )}
+                >
+                  <Check className="w-3.5 h-3.5" />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── SECTION 2: BOTTOM NAV REORDER ── */}
+      <div className="bg-surface-2 p-5 rounded-3xl border border-white/5 space-y-4">
+        <div className="space-y-1 mb-4">
+          <h3 className="text-sm font-bold text-foreground">Bottom Nav Menu Layout</h3>
           <p className="text-xs text-muted-foreground leading-relaxed">
             Drag to reorder. The first 4 items appear in the bottom navigation bar. 
             The rest will be available in the "More" overflow menu.
@@ -111,9 +191,9 @@ export function NavigationSettingsModule({ onBack }: NavigationSettingsModulePro
 
       <button
         onClick={handleSave}
-        className="w-full py-4 rounded-2xl bg-gradient-primary text-white font-bold text-sm shadow-glow flex items-center justify-center gap-2 press-scale"
+        className="w-full py-4 rounded-2xl bg-gradient-brand text-white font-bold text-sm shadow-glow flex items-center justify-center gap-2 press-scale"
       >
-        <Save className="w-4 h-4" /> Save Layout
+        <Save className="w-4 h-4" /> Save Layout & Shortcuts
       </button>
     </div>
   );

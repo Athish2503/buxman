@@ -75,4 +75,5 @@ export interface AppSettings {
   googleDriveLastBackup?: string;
   googleDriveLinkedEmail?: string;
   omdbApiKey?: string;
+  fabActions?: string[];
 }

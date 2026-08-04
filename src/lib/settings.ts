@@ -21,7 +21,8 @@ const defaultSettings: AppSettings = {
   glassIntensity: 0.6,
   budgets: [],
   hapticsEnabled: true,
-  navOrder: ['dashboard', 'expenses', 'splits', 'media', 'food', 'reimbursements', 'trips', 'vehicle', 'analytics', 'settings'],
+  navOrder: ['dashboard', 'expenses', 'gym', 'splits', 'media', 'food', 'reimbursements', 'trips', 'vehicle', 'analytics', 'settings'],
+  fabActions: ['expense', 'gym', 'snap', 'fuel', 'dining', 'watchlist'],
   upiId: '',
   googleDriveClientId: '',
   googleDriveBackupEnabled: false,
@@ -53,6 +54,7 @@ export const settingsService = {
         billedTo: { ...defaultSettings.billedTo, ...parsed.billedTo },
         billedFrom: { ...defaultSettings.billedFrom, ...parsed.billedFrom },
         budgets: parsed.budgets || [],
+        fabActions: parsed.fabActions || defaultSettings.fabActions,
         navOrder: (() => {
           const currentOrder = parsed.navOrder || defaultSettings.navOrder;
           const missing = defaultSettings.navOrder.filter(t => !currentOrder.includes(t));

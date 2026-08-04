@@ -23,6 +23,15 @@ export interface FullExportData {
   meta?: any;
   theme?: string;
   mediaRecommendations?: any[];
+
+  // Gym Module Data
+  gymExercises?: any[];
+  gymRoutines?: any[];
+  gymWorkoutLogs?: any[];
+  gymActiveWorkout?: any;
+  gymBodyMetrics?: any[];
+  gymProgressPhotos?: any[];
+  gymUnitPref?: string;
 }
 
 const safeParse = (key: string, fallback: any) => {
@@ -60,6 +69,15 @@ export const dataMigrationService = {
       meta: safeParse('reimburse_meta_v1', null),
       theme: localStorage.getItem('reimburse_theme') || 'dark',
       mediaRecommendations: safeParse('reimburse_media_recommendations_v1', []),
+
+      // Gym Module Export
+      gymExercises: safeParse('pixel_gym_exercises', []),
+      gymRoutines: safeParse('pixel_gym_routines', []),
+      gymWorkoutLogs: safeParse('pixel_gym_workout_logs', []),
+      gymActiveWorkout: safeParse('pixel_gym_active_workout', null),
+      gymBodyMetrics: safeParse('pixel_gym_body_metrics', []),
+      gymProgressPhotos: safeParse('pixel_gym_progress_photos', []),
+      gymUnitPref: localStorage.getItem('pixel_gym_unit_pref') || 'kg',
     };
     return data;
   },
@@ -111,6 +129,14 @@ export const dataMigrationService = {
     if (data.theme) addEntities('THEME', [{ value: data.theme }]);
     addEntities('MEDIA_RECOMMENDATIONS', data.mediaRecommendations || []);
 
+    // Gym Entities
+    addEntities('GYM_EXERCISES', data.gymExercises || []);
+    addEntities('GYM_ROUTINES', data.gymRoutines || []);
+    addEntities('GYM_WORKOUT_LOGS', data.gymWorkoutLogs || []);
+    addEntities('GYM_BODY_METRICS', data.gymBodyMetrics || []);
+    addEntities('GYM_PROGRESS_PHOTOS', data.gymProgressPhotos || []);
+    if (data.gymUnitPref) addEntities('GYM_UNIT_PREF', [{ value: data.gymUnitPref }]);
+
     return lines.join('\n');
   },
 
@@ -137,7 +163,15 @@ export const dataMigrationService = {
       templates: [],
       meta: null,
       theme: 'dark',
-      mediaRecommendations: []
+      mediaRecommendations: [],
+
+      gymExercises: [],
+      gymRoutines: [],
+      gymWorkoutLogs: [],
+      gymActiveWorkout: null,
+      gymBodyMetrics: [],
+      gymProgressPhotos: [],
+      gymUnitPref: 'kg',
     };
 
     let currentHeaders: string[] = [];
@@ -158,10 +192,6 @@ export const dataMigrationService = {
         currentHeaders = parts.slice(2);
       } else if (rowType === 'DATA' && currentType === entityType) {
         // Simple CSV parser for quoted values
-        const rowData: any = {};
-        
-        // Re-join the values because split(',') breaks on quoted commas
-        // This is a naive parser but works for our internal format
         const valuesLine = parts.slice(2).join(',');
         const values: string[] = [];
         let currentVal = '';
@@ -185,13 +215,13 @@ export const dataMigrationService = {
         }
         values.push(currentVal);
 
+        const rowData: any = {};
         currentHeaders.forEach((header, index) => {
           let val = values[index];
           if (val === undefined || val === '') {
             rowData[header] = null;
           } else {
             try {
-              // Try to parse as JSON if it looks like an object/array
               if (val.startsWith('{') || val.startsWith('[')) {
                 rowData[header] = JSON.parse(val);
               } else if (!isNaN(Number(val)) && val.trim() !== '') {
@@ -225,6 +255,12 @@ export const dataMigrationService = {
         else if (currentType === 'META') data.meta = rowData;
         else if (currentType === 'THEME') data.theme = rowData.value;
         else if (currentType === 'MEDIA_RECOMMENDATIONS') data.mediaRecommendations?.push(rowData);
+        else if (currentType === 'GYM_EXERCISES') data.gymExercises?.push(rowData);
+        else if (currentType === 'GYM_ROUTINES') data.gymRoutines?.push(rowData);
+        else if (currentType === 'GYM_WORKOUT_LOGS') data.gymWorkoutLogs?.push(rowData);
+        else if (currentType === 'GYM_BODY_METRICS') data.gymBodyMetrics?.push(rowData);
+        else if (currentType === 'GYM_PROGRESS_PHOTOS') data.gymProgressPhotos?.push(rowData);
+        else if (currentType === 'GYM_UNIT_PREF') data.gymUnitPref = rowData.value;
       }
     });
 
@@ -276,6 +312,22 @@ export const dataMigrationService = {
       await syncKey('reimburse_meta_v1', data.meta);
       await syncKey('reimburse_theme', data.theme);
       await syncKey('reimburse_media_recommendations_v1', data.mediaRecommendations);
+
+      // Sync Gym module data
+      await syncKey('pixel_gym_exercises', data.gymExercises);
+      await syncKey('pixel_gym_routines', data.gymRoutines);
+      await syncKey('pixel_gym_workout_logs', data.gymWorkoutLogs);
+      await syncKey('pixel_gym_active_workout', data.gymActiveWorkout);
+      await syncKey('pixel_gym_body_metrics', data.gymBodyMetrics);
+      await syncKey('pixel_gym_progress_photos', data.gymProgressPhotos);
+      await syncKey('pixel_gym_unit_pref', data.gymUnitPref);
+
+      // Notify UI listeners
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('gym-updated'));
+        window.dispatchEvent(new Event('settings-updated'));
+        window.dispatchEvent(new Event('expenses-updated'));
+      }
 
       console.log('[Data Migration] Import successful');
       return true;
@@ -357,7 +409,6 @@ export const dataMigrationService = {
       const handler = async (event: any) => {
         window.removeEventListener('file-picked', handler);
         if (event.detail && event.detail.content) {
-          // Detect format from content
           const content = event.detail.content;
           const format = content.trim().startsWith('{') ? 'json' : 'csv';
           const success = await this.importData(content, format);
@@ -370,13 +421,10 @@ export const dataMigrationService = {
       window.addEventListener('file-picked', handler);
       (window as any).NativeBridge.pickFile();
       
-      // Safety timeout
       setTimeout(() => {
         window.removeEventListener('file-picked', handler);
         resolve(false);
-      }, 60000); // 1 minute timeout for user to pick file
+      }, 60000);
     });
   }
 };
-
-

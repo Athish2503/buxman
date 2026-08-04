@@ -47,6 +47,7 @@ import {
   TripsModule,
   SplitsModule,
 } from '@/components/dashboard';
+import { GymDashboard } from '@/components/gym/GymDashboard';
 import { MediaDashboard } from '@/components/media/MediaDashboard';
 import { Tab, NAV_ITEMS_CONFIG } from '@/lib/nav-config';
 
@@ -68,7 +69,10 @@ const Index = () => {
   const { theme, toggle: toggleTheme } = useTheme();
   const [navOrder, setNavOrder] = useState<Tab[]>(() => {
     const settings = settingsService.get();
-    return (settings.navOrder as Tab[]) || (Object.keys(NAV_ITEMS_CONFIG) as Tab[]);
+    const currentOrder = (settings.navOrder as Tab[]) || (Object.keys(NAV_ITEMS_CONFIG) as Tab[]);
+    const allKeys = Object.keys(NAV_ITEMS_CONFIG) as Tab[];
+    const missing = allKeys.filter(t => !currentOrder.includes(t));
+    return [...currentOrder, ...missing];
   });
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
 
@@ -77,7 +81,12 @@ const Index = () => {
     
     const handleSettingsUpdate = () => {
       const settings = settingsService.get();
-      if (settings.navOrder) setNavOrder(settings.navOrder as Tab[]);
+      if (settings.navOrder) {
+        const currentOrder = settings.navOrder as Tab[];
+        const allKeys = Object.keys(NAV_ITEMS_CONFIG) as Tab[];
+        const missing = allKeys.filter(t => !currentOrder.includes(t));
+        setNavOrder([...currentOrder, ...missing]);
+      }
     };
     const handleExpensesUpdate = () => {
       setExpenses(storageService.getExpenses());
@@ -92,13 +101,24 @@ const Index = () => {
       }
     };
 
+    // Handle dynamic navigation events
+    const handleAppNavigate = (e: Event) => {
+      const targetTab = (e as CustomEvent).detail;
+      if (targetTab && typeof targetTab === 'string') {
+        setActiveTab(targetTab as Tab);
+        haptics.selection();
+      }
+    };
+
     window.addEventListener('settings-updated', handleSettingsUpdate);
     window.addEventListener('expenses-updated', handleExpensesUpdate);
     window.addEventListener('app-deep-link', handleDeepLink);
+    window.addEventListener('app-navigate', handleAppNavigate);
     return () => {
       window.removeEventListener('settings-updated', handleSettingsUpdate);
       window.removeEventListener('expenses-updated', handleExpensesUpdate);
       window.removeEventListener('app-deep-link', handleDeepLink);
+      window.removeEventListener('app-navigate', handleAppNavigate);
     };
   }, []);
 
@@ -203,6 +223,8 @@ const Index = () => {
             onBatchStatus={handleBatchStatus}
           />
         );
+      case 'gym':
+        return <GymDashboard />;
       case 'food':          return <DiningDashboard />;
       case 'reimbursements':
         return (
@@ -349,6 +371,7 @@ const Index = () => {
                   onAddExpense={handleAddExpense}
                   onFuelSuccess={() => setLogs(fuelService.getLogs())}
                   onOpenChange={setIsFabOpen}
+                  onNavigate={navigate}
                 />
               </div>
 
