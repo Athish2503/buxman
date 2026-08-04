@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Clapperboard, Plus, Search, Film, Tv, Star, Edit2, Trash2, 
   Check, Play, User, X, AlertCircle, Heart, Pin, PinOff,
-  Shuffle, Download, Loader2, ChevronDown, SlidersHorizontal
+  Shuffle, Download, Loader2, ChevronDown, SlidersHorizontal, Info
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { MediaEntryForm } from './MediaEntryForm';
+import { MediaDetailModal } from './MediaDetailModal';
 import { generateWatchlistPDF } from '@/lib/media-pdf';
 
 const PRESET_GENRES = [
@@ -54,6 +55,10 @@ export function MediaDashboard() {
   const [isFormOpen, setIsFormOpen]   = useState(false);
   const [editingItem, setEditingItem] = useState<MediaRecommendation | null>(null);
 
+  // Detail Modal
+  const [selectedDetailItem, setSelectedDetailItem] = useState<MediaRecommendation | null>(null);
+  const [isDetailOpen, setIsDetailOpen]             = useState(false);
+
   // Rate modal
   const [isRateOpen, setIsRateOpen]   = useState(false);
   const [ratingItem, setRatingItem]   = useState<MediaRecommendation | null>(null);
@@ -66,6 +71,24 @@ export function MediaDashboard() {
   // Surprise Me modal
   const [surpriseItem, setSurpriseItem]   = useState<MediaRecommendation | null>(null);
   const [isSurpriseOpen, setIsSurpriseOpen] = useState(false);
+  const [isShuffling, setIsShuffling]     = useState(false);
+
+  const handlePickDifferent = () => {
+    if (!surpriseItem) return;
+    const pool = mediaList.filter(m => m.status === 'to_watch' && m.id !== surpriseItem.id);
+    if (pool.length === 0) {
+      toast.info('No other unwatched recommendations!');
+      return;
+    }
+    haptics.medium();
+    audio.tick();
+    setIsShuffling(true);
+    setTimeout(() => {
+      const next = pool[Math.floor(Math.random() * pool.length)];
+      setSurpriseItem(next);
+      setIsShuffling(false);
+    }, 200);
+  };
 
   // PDF export
   const [isExporting, setIsExporting] = useState(false);
@@ -130,6 +153,11 @@ export function MediaDashboard() {
   }, [mediaList]);
 
   // Handlers
+  const handleOpenDetail = (item: MediaRecommendation) => {
+    setSelectedDetailItem(item);
+    setIsDetailOpen(true);
+    haptics.selection();
+  };
   const handleOpenAdd = () => { setEditingItem(null); setIsFormOpen(true); haptics.selection(); };
   const handleOpenEdit = (item: MediaRecommendation) => { setEditingItem(item); setIsFormOpen(true); haptics.selection(); };
   const handleSaveItem = (payload: Omit<MediaRecommendation, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -564,8 +592,9 @@ export function MediaDashboard() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
+                  onClick={() => handleOpenDetail(item)}
                   className={cn(
-                    "glass rounded-2xl border border-border/20 flex flex-col justify-between gap-3 transition-all bg-gradient-to-br to-transparent shadow-none hover:bg-card/75 relative overflow-hidden group",
+                    "glass rounded-2xl border border-border/20 flex flex-col justify-between gap-3 transition-all bg-gradient-to-br to-transparent shadow-none hover:bg-card/75 relative overflow-hidden group cursor-pointer active:scale-[0.99]",
                     borderGradient,
                     item.pinned && "ring-1 ring-primary/30 border-primary/20"
                   )}
@@ -591,13 +620,19 @@ export function MediaDashboard() {
                     )}
 
                     {/* Poster + Title row */}
-                    <div className="flex items-start gap-2.5">
-                      {item.posterUrl && (
+                    <div className="flex items-start gap-3">
+                      {item.posterUrl ? (
                         <img
                           src={item.posterUrl}
                           alt={item.title}
-                          className="h-14 w-10 rounded-lg object-cover shadow-md shrink-0 border border-white/10"
+                          referrerPolicy="no-referrer"
+                          className="h-16 w-11 rounded-lg object-cover shadow-md shrink-0 border border-white/10"
+                          onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                         />
+                      ) : (
+                        <div className="h-16 w-11 rounded-lg bg-muted/40 flex items-center justify-center text-muted-foreground shrink-0 border border-border/20">
+                          {isMovie ? <Film className="h-4 w-4" /> : <Tv className="h-4 w-4" />}
+                        </div>
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
@@ -616,16 +651,23 @@ export function MediaDashboard() {
                           </span>
                         </div>
 
-                        {/* Platform badge */}
-                        {platformInfo && (
-                          <span className={cn(
-                            "inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded-full border mt-1",
-                            platformInfo.color, platformInfo.textColor, platformInfo.borderColor
-                          )}>
-                            <span>{platformInfo.emoji}</span>
-                            {platformInfo.label}
-                          </span>
-                        )}
+                        {/* IMDb Badge & Platform badge */}
+                        <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                          {item.imdbRating && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-amber-400 bg-amber-400/10 border border-amber-400/20 px-1.5 py-0.5 rounded-md">
+                              <Star className="h-2.5 w-2.5 fill-amber-400" /> {item.imdbRating}
+                            </span>
+                          )}
+                          {platformInfo && (
+                            <span className={cn(
+                              "inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded-full border",
+                              platformInfo.color, platformInfo.textColor, platformInfo.borderColor
+                            )}>
+                              <platformInfo.icon className="h-3 w-3 shrink-0" />
+                              {platformInfo.label}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -669,7 +711,7 @@ export function MediaDashboard() {
                     <div>
                       {item.status === 'to_watch' && (
                         <Button
-                          onClick={() => handleStartWatching(item)}
+                          onClick={(e) => { e.stopPropagation(); handleStartWatching(item); }}
                           className="h-7 rounded-lg bg-primary/10 border border-primary/20 hover:bg-primary/20 text-primary text-[9px] font-black uppercase tracking-wider gap-1 px-2.5"
                         >
                           <Play className="h-2.5 w-2.5 fill-primary/25" />
@@ -678,7 +720,7 @@ export function MediaDashboard() {
                       )}
                       {item.status === 'watching' && (
                         <Button
-                          onClick={() => handleOpenRate(item)}
+                          onClick={(e) => { e.stopPropagation(); handleOpenRate(item); }}
                           className="h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 text-amber-400 text-[9px] font-black uppercase tracking-wider gap-1 px-2.5 animate-pulse"
                         >
                           <Check className="h-2.5 w-2.5" />
@@ -709,11 +751,20 @@ export function MediaDashboard() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-0.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => { e.stopPropagation(); handleOpenDetail(item); }}
+                        className="h-7 w-7 rounded-lg hover:bg-muted/30 text-muted-foreground hover:text-foreground"
+                        title="View Full Details"
+                      >
+                        <Info className="h-3 w-3" />
+                      </Button>
                       {/* Pin toggle */}
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleTogglePin(item)}
+                        onClick={(e) => { e.stopPropagation(); handleTogglePin(item); }}
                         className={cn(
                           "h-7 w-7 rounded-lg hover:bg-muted/30 transition-colors",
                           item.pinned ? "text-primary hover:text-primary/80" : "text-muted-foreground hover:text-foreground"
@@ -725,7 +776,7 @@ export function MediaDashboard() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleOpenEdit(item)}
+                        onClick={(e) => { e.stopPropagation(); handleOpenEdit(item); }}
                         className="h-7 w-7 rounded-lg hover:bg-muted/30 text-muted-foreground hover:text-foreground"
                       >
                         <Edit2 className="h-3 w-3" />
@@ -733,7 +784,7 @@ export function MediaDashboard() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setDeletingItem(item)}
+                        onClick={(e) => { e.stopPropagation(); setDeletingItem(item); }}
                         className="h-7 w-7 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
                       >
                         <Trash2 className="h-3 w-3" />
@@ -749,6 +800,19 @@ export function MediaDashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Detail Modal ──────────────────────────────────────────────── */}
+      <MediaDetailModal
+        item={selectedDetailItem}
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+        onEdit={(item) => handleOpenEdit(item)}
+        onDelete={(item) => setDeletingItem(item)}
+        onTogglePin={(item) => handleTogglePin(item)}
+        onStartWatching={(item) => handleStartWatching(item)}
+        onRate={(item) => handleOpenRate(item)}
+        contactName={getFriendName(selectedDetailItem?.recommendedBy)}
+      />
 
       {/* ── Dialog Form Modal ─────────────────────────────────────────── */}
       <MediaEntryForm
@@ -827,124 +891,156 @@ export function MediaDashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ── Surprise Me Modal ─────────────────────────────────────────── */}
+      {/* ── Surprise Me Modal ──────────────────────────────────────────────── */}
       <AnimatePresence>
         {isSurpriseOpen && surpriseItem && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="fixed inset-0 z-[9999] grid place-items-center p-3 sm:p-4 pointer-events-auto overflow-hidden">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+              className="fixed inset-0 bg-black/80 backdrop-blur-md"
               onClick={() => setIsSurpriseOpen(false)}
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.5, y: 60, rotate: -8 }}
-              animate={{ opacity: 1, scale: 1, y: 0, rotate: 0 }}
-              exit={{ opacity: 0, scale: 0.8, y: 40 }}
-              transition={{ type: 'spring', damping: 18, stiffness: 280 }}
-              className="relative z-10 glass rounded-[2.5rem] border border-border/40 p-8 mx-6 max-w-sm w-full overflow-hidden shadow-2xl text-center"
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 15 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 340 }}
+              className="relative z-10 glass rounded-3xl border border-border/40 p-4 sm:p-5 w-[88vw] max-w-[310px] max-h-[85vh] overflow-y-auto no-scrollbar shadow-2xl text-center flex flex-col items-center"
             >
-              {/* Glow orb */}
-              <div className="absolute -top-10 -right-10 h-40 w-40 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute -bottom-10 -left-10 h-40 w-40 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
+              {/* Glow ambient background orbs */}
+              <div className="absolute -top-10 -right-10 h-32 w-32 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-10 -left-10 h-32 w-32 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
 
-              <div className="relative z-10">
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => setIsSurpriseOpen(false)}
+                className="absolute top-3 right-3 h-6 w-6 rounded-full bg-muted/40 hover:bg-muted/70 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors z-20"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+
+              <div className="relative z-10 flex flex-col items-center w-full">
+                {/* Animated 3D Rolling Dice */}
                 <motion.div
-                  initial={{ rotate: -20, scale: 0 }}
-                  animate={{ rotate: 0, scale: 1 }}
-                  transition={{ delay: 0.1, type: 'spring', damping: 12 }}
-                  className="text-5xl mb-4"
+                  animate={isShuffling ? { rotate: [0, -180, 360], scale: [1, 1.3, 0.9, 1] } : { rotate: 0, scale: 1 }}
+                  transition={{ duration: 0.35, ease: "easeInOut" }}
+                  className="text-2xl mb-0.5 flex items-center justify-center"
                 >
                   🎲
                 </motion.div>
 
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-400 mb-3">Tonight's Pick</p>
+                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-400 mb-1.5">Tonight's Pick</span>
 
-                {/* Poster */}
-                {surpriseItem.posterUrl && (
-                  <motion.img
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    src={surpriseItem.posterUrl}
-                    alt={surpriseItem.title}
-                    className="h-36 w-24 object-cover rounded-2xl mx-auto mb-4 shadow-2xl border border-white/10"
-                  />
-                )}
+                {/* Animated Card Content (Smooth Card Swap) */}
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={surpriseItem.id}
+                    initial={{ opacity: 0, scale: 0.9, rotateY: -75 }}
+                    animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, rotateY: 75 }}
+                    transition={{ duration: 0.22, ease: "easeInOut" }}
+                    className="flex flex-col items-center w-full"
+                  >
+                    {/* Poster image */}
+                    {surpriseItem.posterUrl ? (
+                      <img
+                        src={surpriseItem.posterUrl}
+                        alt={surpriseItem.title}
+                        referrerPolicy="no-referrer"
+                        className="h-24 w-16 object-cover rounded-xl shadow-lg border border-white/10 mb-2"
+                        onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    ) : (
+                      <div className="h-24 w-16 rounded-xl bg-muted/40 flex items-center justify-center text-muted-foreground border border-border/20 mb-2">
+                        {surpriseItem.type === 'movie' ? <Film className="h-5 w-5" /> : <Tv className="h-5 w-5" />}
+                      </div>
+                    )}
 
-                <motion.h2
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.25 }}
-                  className="text-2xl font-black text-foreground mb-1"
-                >
-                  {surpriseItem.title}
-                </motion.h2>
-                {surpriseItem.releaseYear && (
-                  <p className="text-muted-foreground text-sm mb-2">{surpriseItem.releaseYear}</p>
-                )}
+                    {/* Title & Year */}
+                    <h2 className="text-base font-black text-foreground leading-tight line-clamp-1 max-w-[200px]">
+                      {surpriseItem.title}
+                    </h2>
+                    {surpriseItem.releaseYear && (
+                      <p className="text-muted-foreground text-[10px] font-semibold mt-0.5">{surpriseItem.releaseYear}</p>
+                    )}
 
-                <div className="flex flex-wrap justify-center gap-1.5 mb-5 mt-2">
-                  <span className={cn(
-                    "text-[8px] font-black uppercase px-2 py-1 rounded-full border",
-                    surpriseItem.type === 'movie'
-                      ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
-                      : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400"
-                  )}>
-                    {surpriseItem.type === 'movie' ? '🎬' : '📺'} {surpriseItem.type}
-                  </span>
-                  {surpriseItem.platform && PLATFORM_CONFIG[surpriseItem.platform] && (
-                    <span className={cn(
-                      "text-[8px] font-bold px-2 py-1 rounded-full border",
-                      PLATFORM_CONFIG[surpriseItem.platform].color,
-                      PLATFORM_CONFIG[surpriseItem.platform].textColor,
-                      PLATFORM_CONFIG[surpriseItem.platform].borderColor,
-                    )}>
-                      {PLATFORM_CONFIG[surpriseItem.platform].emoji} {PLATFORM_CONFIG[surpriseItem.platform].label}
-                    </span>
-                  )}
-                  {surpriseItem.genres.slice(0, 2).map(g => (
-                    <span key={g} className="text-[8px] px-2 py-1 rounded-full bg-muted/30 border border-border/10 text-muted-foreground">{g}</span>
-                  ))}
-                </div>
+                    {/* Badges row */}
+                    <div className="flex flex-wrap justify-center items-center gap-1 my-2">
+                      <span className={cn(
+                        "text-[8px] font-black uppercase px-2 py-0.5 rounded-full border flex items-center gap-1",
+                        surpriseItem.type === 'movie'
+                          ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
+                          : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400"
+                      )}>
+                        {surpriseItem.type === 'movie' ? <Film className="h-2.5 w-2.5" /> : <Tv className="h-2.5 w-2.5" />}
+                        {surpriseItem.type}
+                      </span>
 
-                {surpriseItem.recommendedBy && (
-                  <p className="text-xs text-muted-foreground mb-5">
-                    Recommended by <span className="text-foreground font-bold">{getFriendName(surpriseItem.recommendedBy)}</span>
-                  </p>
-                )}
+                      {surpriseItem.imdbRating && (
+                        <span className="text-[8px] font-black text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                          <Star className="h-2.5 w-2.5 fill-amber-400" /> {surpriseItem.imdbRating}
+                        </span>
+                      )}
 
-                <div className="flex gap-2">
+                      {surpriseItem.platform && PLATFORM_CONFIG[surpriseItem.platform] && (() => {
+                        const pInfo = PLATFORM_CONFIG[surpriseItem.platform];
+                        const Icon = pInfo.icon;
+                        return (
+                          <span className={cn(
+                            "text-[8px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1",
+                            pInfo.color, pInfo.textColor, pInfo.borderColor
+                          )}>
+                            <Icon className="h-2.5 w-2.5 shrink-0" />
+                            {pInfo.label}
+                          </span>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Recommended By Friend */}
+                    {surpriseItem.recommendedBy && (
+                      <p className="text-[9px] text-muted-foreground mb-2">
+                        Recommended by <span className="text-foreground font-bold">{getFriendName(surpriseItem.recommendedBy)}</span>
+                      </p>
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+
+                {/* Action buttons */}
+                <div className="grid grid-cols-2 gap-2 w-full mt-1">
                   <Button
+                    type="button"
                     onClick={() => setIsSurpriseOpen(false)}
-                    className="flex-1 h-11 rounded-2xl bg-muted/30 text-muted-foreground border border-border/30 hover:bg-muted/50 text-xs font-bold"
+                    className="h-8.5 rounded-xl bg-muted/40 text-muted-foreground hover:text-foreground border border-border/30 hover:bg-muted/60 text-[11px] font-bold"
                   >
                     Not today
                   </Button>
                   <Button
+                    type="button"
                     onClick={() => {
                       handleStartWatching(surpriseItem);
                       setIsSurpriseOpen(false);
                     }}
-                    className="flex-1 h-11 rounded-2xl bg-primary text-white hover:bg-primary/90 text-xs font-bold gap-1.5 shadow-lg shadow-primary/20"
+                    className="h-8.5 rounded-xl bg-primary text-white hover:bg-primary/90 text-[11px] font-bold gap-1 shadow-md shadow-primary/20"
                   >
-                    <Play className="h-3.5 w-3.5 fill-white/30" />
+                    <Play className="h-3 w-3 fill-white/30" />
                     Let's watch!
                   </Button>
                 </div>
 
-                <button
-                  onClick={() => {
-                    const pool = mediaList.filter(m => m.status === 'to_watch' && m.id !== surpriseItem.id);
-                    if (pool.length === 0) { toast.info('No other options!'); return; }
-                    haptics.light();
-                    setSurpriseItem(pool[Math.floor(Math.random() * pool.length)]);
-                  }}
-                  className="mt-3 text-[10px] font-bold text-muted-foreground hover:text-foreground underline transition-colors"
+                {/* Pick different shuffle button */}
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handlePickDifferent}
+                  className="mt-2.5 text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1.5 py-1 px-3.5 rounded-full hover:bg-amber-400/10 transition-all border border-amber-400/20 bg-amber-400/5 shadow-sm"
                 >
-                  🔀 Pick a different one
-                </button>
+                  <Shuffle className={cn("h-3 w-3 transition-transform duration-300", isShuffling && "rotate-180")} />
+                  <span>Pick a different one</span>
+                </motion.button>
               </div>
             </motion.div>
           </div>

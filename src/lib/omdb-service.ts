@@ -18,6 +18,8 @@ export interface OmdbSearchResponse {
   Error?: string;
 }
 
+import { MediaPlatform } from '@/types/media';
+
 export interface OmdbDetailResult {
   imdbID: string;
   Title: string;
@@ -26,6 +28,14 @@ export interface OmdbDetailResult {
   Type: string;
   Poster: string;
   imdbRating: string;
+  Plot?: string;
+  Director?: string;
+  Actors?: string;
+  Runtime?: string;
+  Rated?: string;
+  Awards?: string;
+  Production?: string;
+  Website?: string;
   Response: 'True' | 'False';
 }
 
@@ -36,32 +46,48 @@ export interface MediaSearchSuggestion {
   type: 'movie' | 'series';
   posterUrl: string | null;
   genres: string[];
+  imdbRating?: string;
+  plot?: string;
+  director?: string;
+  actors?: string;
+  runtime?: string;
+  rated?: string;
+  awards?: string;
+  platform?: MediaPlatform;
 }
 
 const BASE = 'https://www.omdbapi.com';
 
+function detectPlatform(data: OmdbDetailResult): MediaPlatform | undefined {
+  const text = `${data.Production || ''} ${data.Website || ''} ${data.Plot || ''} ${data.Title || ''}`.toLowerCase();
+  if (text.includes('netflix')) return 'netflix';
+  if (text.includes('prime video') || text.includes('amazon studios') || text.includes('amazon prime') || text.includes('primevideo')) return 'prime';
+  if (text.includes('disney') || text.includes('marvel studios') || text.includes('pixar')) return 'disney';
+  if (text.includes('hbo') || text.includes('max.com') || text.includes('warner bros')) return 'hbo';
+  if (text.includes('hotstar') || text.includes('star india') || text.includes('jio')) return 'hotstar';
+  if (text.includes('apple tv') || text.includes('apple.com') || text.includes('apple original')) return 'appletv';
+  if (text.includes('peacock') || text.includes('universal pictures')) return 'peacock';
+  if (text.includes('youtube')) return 'youtube';
+  return undefined;
+}
+
 /** Extract just the bare API key, even if the user accidentally pasted a full OMDb URL. */
 function sanitizeKey(raw: string): string {
   const trimmed = raw.trim();
-  // If it looks like a URL, pull the apikey= query param out of it
   if (trimmed.startsWith('http')) {
     try {
       const url = new URL(trimmed);
       const extracted = url.searchParams.get('apikey');
       if (extracted && extracted.trim()) return extracted.trim();
-    } catch {
-      // not a valid URL — fall through to raw value
-    }
+    } catch {}
   }
   return trimmed;
 }
 
 function getKey(): string {
-  // 1. User-configured key in Settings takes precedence
   const settings = settingsService.get();
   const settingsKey = settings.omdbApiKey;
   if (settingsKey && settingsKey.trim()) return sanitizeKey(settingsKey);
-  // 2. Fall back to bundled .env key
   if (ENV_OMDB_KEY && ENV_OMDB_KEY.trim()) return sanitizeKey(ENV_OMDB_KEY);
   return '';
 }
@@ -116,7 +142,7 @@ export const omdbService = {
     if (!key) return null;
 
     try {
-      const params = new URLSearchParams({ apikey: key, i: imdbId, plot: 'short' });
+      const params = new URLSearchParams({ apikey: key, i: imdbId, plot: 'full' });
       const res = await fetch(`${BASE}/?${params.toString()}`);
       if (!res.ok) return null;
 
@@ -134,6 +160,14 @@ export const omdbService = {
         type: (data.Type === 'series' ? 'series' : 'movie') as 'movie' | 'series',
         posterUrl: data.Poster !== 'N/A' ? data.Poster : null,
         genres,
+        imdbRating: data.imdbRating && data.imdbRating !== 'N/A' ? data.imdbRating : undefined,
+        plot: data.Plot && data.Plot !== 'N/A' ? data.Plot : undefined,
+        director: data.Director && data.Director !== 'N/A' ? data.Director : undefined,
+        actors: data.Actors && data.Actors !== 'N/A' ? data.Actors : undefined,
+        runtime: data.Runtime && data.Runtime !== 'N/A' ? data.Runtime : undefined,
+        rated: data.Rated && data.Rated !== 'N/A' ? data.Rated : undefined,
+        awards: data.Awards && data.Awards !== 'N/A' ? data.Awards : undefined,
+        platform: detectPlatform(data),
       };
     } catch {
       return null;

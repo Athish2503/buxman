@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, forwardRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
-import { X, Plus, Film, Tv, Check, Star, User, Clapperboard, Search, Loader2, Pin } from 'lucide-react';
+import { X, Plus, Film, Tv, Check, Star, User, Clapperboard, Search, Loader2, Pin, ChevronDown, ChevronUp } from 'lucide-react';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { SwipeToAdd } from '@/components/ui/swipe-to-add';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,23 +31,27 @@ export interface MediaEntryFormProps {
   isEdit?: boolean;
 }
 
-function FormBody({
-  onSubmit,
-  initialData,
-  isEdit = false,
-  onDone,
-}: Omit<MediaEntryFormProps, 'open' | 'onOpenChange'> & { onDone?: () => void }) {
-  const [title, setTitle]         = useState(initialData?.title || '');
-  const [type, setType]           = useState<'movie' | 'series'>(initialData?.type || 'movie');
-  const [selectedFriendId, setSelectedFriendId] = useState(initialData?.recommendedBy || '');
-  const [genres, setGenres]       = useState<string[]>(initialData?.genres || []);
-  const [customGenre, setCustomGenre] = useState('');
-  const [status, setStatus]       = useState<'to_watch' | 'watching' | 'watched'>(initialData?.status || 'to_watch');
+const FormBody = forwardRef<HTMLDivElement, Omit<MediaEntryFormProps, 'open' | 'onOpenChange'> & { onDone?: () => void }>(
+  function FormBody({ onSubmit, initialData, isEdit = false, onDone }, ref) {
+    const [title, setTitle]         = useState(initialData?.title || '');
+    const [type, setType]           = useState<'movie' | 'series'>(initialData?.type || 'movie');
+    const [selectedFriendId, setSelectedFriendId] = useState(initialData?.recommendedBy || '');
+    const [genres, setGenres]       = useState<string[]>(initialData?.genres || []);
+    const [customGenre, setCustomGenre] = useState('');
+    const [status, setStatus]       = useState<'to_watch' | 'watching' | 'watched'>(initialData?.status || 'to_watch');
   const [rating, setRating]       = useState<number>(initialData?.rating || 5);
   const [notes, setNotes]         = useState(initialData?.notes || '');
   const [platform, setPlatform]   = useState<MediaPlatform | ''>(initialData?.platform || '');
   const [posterUrl, setPosterUrl] = useState(initialData?.posterUrl || '');
   const [releaseYear, setReleaseYear] = useState(initialData?.releaseYear || '');
+  const [imdbId, setImdbId]       = useState(initialData?.imdbId || '');
+  const [imdbRating, setImdbRating] = useState(initialData?.imdbRating || '');
+  const [plot, setPlot]           = useState(initialData?.plot || '');
+  const [director, setDirector]   = useState(initialData?.director || '');
+  const [actors, setActors]       = useState(initialData?.actors || '');
+  const [runtime, setRuntime]     = useState(initialData?.runtime || '');
+  const [rated, setRated]         = useState(initialData?.rated || '');
+  const [awards, setAwards]       = useState(initialData?.awards || '');
 
   // OMDb search
   const [suggestions, setSuggestions]     = useState<MediaSearchSuggestion[]>([]);
@@ -66,6 +69,7 @@ function FormBody({
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [success, setSuccess]           = useState(false);
+  const [showFullDetails, setShowFullDetails] = useState(false);
 
   // ── OMDb debounced search ────────────────────────────────────────────
   const triggerSearch = useCallback((query: string) => {
@@ -92,25 +96,31 @@ function FormBody({
     triggerSearch(val);
   };
 
-  const handlePickSuggestion = async (s: MediaSearchSuggestion) => {
-    haptics.medium();
-    setTitle(s.title);
-    setType(s.type);
-    setPosterUrl(s.posterUrl || '');
-    setReleaseYear(s.year || '');
-    setShowSuggestions(false);
+    const handlePickSuggestion = async (s: MediaSearchSuggestion) => {
+      haptics.medium();
+      setTitle(s.title);
+      setType(s.type);
+      setPosterUrl(s.posterUrl || '');
+      setReleaseYear(s.year || '');
+      setImdbId(s.imdbId);
+      setShowSuggestions(false);
 
-    // Fetch full detail (genres)
-    if (s.genres.length === 0) {
+      // Fetch full detail (genres, plot, director, actors, rating, runtime, platform)
       const detail = await omdbService.getDetail(s.imdbId);
-      if (detail?.genres && detail.genres.length > 0) {
-        setGenres(detail.genres);
+      if (detail) {
+        if (detail.genres && detail.genres.length > 0) setGenres(detail.genres);
         if (detail.posterUrl) setPosterUrl(detail.posterUrl);
+        if (detail.year) setReleaseYear(detail.year);
+        if (detail.imdbRating) setImdbRating(detail.imdbRating);
+        if (detail.plot) setPlot(detail.plot);
+        if (detail.director) setDirector(detail.director);
+        if (detail.actors) setActors(detail.actors);
+        if (detail.runtime) setRuntime(detail.runtime);
+        if (detail.rated) setRated(detail.rated);
+        if (detail.awards) setAwards(detail.awards);
+        if (detail.platform) setPlatform(detail.platform);
       }
-    } else {
-      setGenres(s.genres);
-    }
-  };
+    };
 
   // Close suggestions on outside click
   useEffect(() => {
@@ -172,6 +182,14 @@ function FormBody({
         platform: platform || undefined,
         posterUrl: posterUrl || undefined,
         releaseYear: releaseYear || undefined,
+        imdbId: imdbId || undefined,
+        imdbRating: imdbRating || undefined,
+        plot: plot || undefined,
+        director: director || undefined,
+        actors: actors || undefined,
+        runtime: runtime || undefined,
+        rated: rated || undefined,
+        awards: awards || undefined,
       };
 
       setSuccess(true);
@@ -179,13 +197,13 @@ function FormBody({
       audio.success();
       toast.success(isEdit ? 'Recommendation updated' : 'Recommendation added to Watchlist');
 
-      await new Promise(r => setTimeout(r, 850));
-
       if (!isEdit) {
         rewardBurst();
         setTitle(''); setType('movie'); setSelectedFriendId('');
         setGenres([]); setNotes(''); setStatus('to_watch');
         setPlatform(''); setPosterUrl(''); setReleaseYear('');
+        setImdbId(''); setImdbRating(''); setPlot('');
+        setDirector(''); setActors(''); setRuntime(''); setRated(''); setAwards('');
       }
 
       onSubmit(payload);
@@ -193,13 +211,14 @@ function FormBody({
       onDone?.();
     } catch (error) {
       console.error(error);
+      toast.error('Failed to save recommendation');
     } finally {
       setIsProcessing(false);
     }
   };
 
   return (
-    <div className="flex flex-col gap-5 py-1">
+    <div ref={ref} className="flex flex-col gap-5 py-1">
 
       {/* ── Title with OMDb autocomplete ─────────────────────────────── */}
       <div className="space-y-1.5">
@@ -254,7 +273,7 @@ function FormBody({
                       i !== 0 && 'border-t border-border/10'
                     )}
                   >
-                    {/* Poster thumb */}
+                    {/* Poster thumb with onError fallback */}
                     <div className="h-10 w-7 rounded-md overflow-hidden bg-muted/30 shrink-0 flex items-center justify-center">
                       {s.posterUrl ? (
                         <img
@@ -262,7 +281,9 @@ function FormBody({
                           alt={s.title}
                           referrerPolicy="no-referrer"
                           className="h-full w-full object-cover"
-                          onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; (e.currentTarget.parentElement as HTMLElement).innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-muted-foreground/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>'; }}
+                          onError={e => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                          }}
                         />
                       ) : (
                         <Film className="h-3.5 w-3.5 text-muted-foreground/50" />
@@ -290,25 +311,87 @@ function FormBody({
           </AnimatePresence>
         </div>
 
-        {/* Poster preview if auto-filled */}
-        {posterUrl && (
+        {/* Poster & Rich OMDb Preview Card if auto-filled */}
+        {(posterUrl || plot || imdbRating) && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            className="flex items-center gap-3 mt-2 p-2 rounded-xl bg-muted/20 border border-border/20"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-3.5 rounded-2xl bg-muted/20 border border-amber-400/20 space-y-2.5 relative"
           >
-            <img src={posterUrl} alt="Poster" referrerPolicy="no-referrer" className="h-14 w-10 rounded-lg object-cover shadow-lg" />
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-wider text-amber-400">Poster fetched</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{title}{releaseYear ? ` (${releaseYear})` : ''}</p>
+            <div className="flex items-start gap-3">
+              {posterUrl ? (
+                <img
+                  src={posterUrl}
+                  alt="Poster"
+                  referrerPolicy="no-referrer"
+                  className="h-24 w-16 rounded-xl object-cover shadow-md border border-white/10 shrink-0"
+                  onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                />
+              ) : (
+                <div className="h-24 w-16 rounded-xl bg-muted/40 flex items-center justify-center text-muted-foreground shrink-0 border border-border/20">
+                  <Film className="h-6 w-6" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0 pr-6">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-amber-400 border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 rounded-full">
+                    OMDb Details
+                  </span>
+                  {imdbRating && (
+                    <span className="text-[10px] font-black text-amber-400 flex items-center gap-1 bg-amber-400/10 px-1.5 py-0.5 rounded-full">
+                      <Star className="h-3 w-3 fill-amber-400" /> {imdbRating}
+                    </span>
+                  )}
+                  {runtime && <span className="text-[10px] font-bold text-muted-foreground">{runtime}</span>}
+                  {rated && <span className="text-[9px] font-bold text-amber-400 border border-amber-400/20 px-1 rounded">{rated}</span>}
+                </div>
+                <h4 className="text-xs font-black text-foreground mt-1 line-clamp-1">{title} {releaseYear ? `(${releaseYear})` : ''}</h4>
+                {director && <p className="text-[10px] font-bold text-muted-foreground truncate mt-0.5">Dir: {director}</p>}
+                {actors && <p className="text-[10px] text-muted-foreground truncate">Cast: {actors}</p>}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPosterUrl(''); setReleaseYear(''); setImdbId('');
+                  setImdbRating(''); setPlot(''); setDirector(''); setActors('');
+                  setRuntime(''); setRated(''); setAwards('');
+                }}
+                className="absolute top-3 right-3 h-6 w-6 rounded-full bg-muted/40 flex items-center justify-center text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => { setPosterUrl(''); setReleaseYear(''); }}
-              className="ml-auto h-6 w-6 rounded-full bg-muted/30 flex items-center justify-center text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3 w-3" />
-            </button>
+            {/* Scrollable Synopsis (No truncation!) */}
+            {plot && (
+              <div className="space-y-1">
+                <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground block">Plot Synopsis</span>
+                <div className="text-[11px] text-foreground/90 leading-relaxed italic bg-background/60 p-2.5 rounded-xl border border-border/20 max-h-36 overflow-y-auto select-text" style={{ overscrollBehavior: 'contain' }}>
+                  "{plot}"
+                </div>
+              </div>
+            )}
+
+            {/* Toggle expand full cast / awards details */}
+            {(director || actors || awards) && (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowFullDetails(o => !o)}
+                  className="text-[10px] font-bold text-amber-400 flex items-center gap-1 hover:underline"
+                >
+                  <span>{showFullDetails ? 'Hide Extra Details' : 'View Full Details & Cast'}</span>
+                  {showFullDetails ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
+
+                {showFullDetails && (
+                  <div className="mt-2 space-y-1.5 text-[10px] text-muted-foreground bg-background/40 p-2.5 rounded-xl border border-border/10 animate-in fade-in duration-200">
+                    {director && <p><span className="font-bold text-foreground">Director:</span> {director}</p>}
+                    {actors && <p><span className="font-bold text-foreground">Cast:</span> {actors}</p>}
+                    {awards && <p className="text-amber-300"><span className="font-bold text-foreground">Awards:</span> {awards}</p>}
+                  </div>
+                )}
+              </div>
+            )}
           </motion.div>
         )}
       </div>
@@ -363,6 +446,7 @@ function FormBody({
           </button>
           {PLATFORM_LIST.map(p => {
             const isSelected = platform === p.key;
+            const Icon = p.icon;
             return (
               <button
                 key={p.key}
@@ -375,7 +459,7 @@ function FormBody({
                     : 'bg-transparent border-border/20 text-muted-foreground hover:bg-muted/20'
                 )}
               >
-                <span>{p.emoji}</span>
+                <Icon className="h-3.5 w-3.5 shrink-0" />
                 <span>{p.label}</span>
               </button>
             );
@@ -584,18 +668,35 @@ function FormBody({
         />
       </div>
 
-      {/* ── Swipe to Save ────────────────────────────────────────────── */}
+      {/* ── Save Action Button ────────────────────────────────────────── */}
       <div className="pt-2">
-        <SwipeToAdd
-          onConfirm={handleFormSubmit}
-          isSubmitting={isProcessing}
-          success={success}
-          label={isEdit ? 'Swipe to Update Watchlist' : 'Swipe to Save Watchlist'}
-        />
+        <Button
+          type="button"
+          disabled={isProcessing}
+          onClick={handleFormSubmit}
+          className="w-full h-12 rounded-2xl bg-gradient-primary text-white font-bold text-sm shadow-lg shadow-primary/25 flex items-center justify-center gap-2 hover:opacity-95 active:scale-[0.98] transition-all"
+        >
+          {isProcessing ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin text-white" />
+              <span>{isEdit ? 'Updating Watchlist...' : 'Saving Watchlist...'}</span>
+            </>
+          ) : success ? (
+            <>
+              <Check className="h-5 w-5 text-white" />
+              <span>{isEdit ? 'Updated!' : 'Saved to Watchlist!'}</span>
+            </>
+          ) : (
+            <>
+              <Clapperboard className="h-4 w-4 text-white" />
+              <span>{isEdit ? 'Update Recommendation' : 'Save Recommendation'}</span>
+            </>
+          )}
+        </Button>
       </div>
     </div>
   );
-}
+});
 
 export function MediaEntryForm({
   open,
@@ -634,10 +735,6 @@ export function MediaEntryForm({
 
           {isMobile ? (
             <motion.div
-              drag="y"
-              dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={{ top: 0, bottom: 0.8 }}
-              onDragEnd={(_, info) => { if (info.offset.y > 100) onOpenChange(false); }}
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}

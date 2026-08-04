@@ -22,8 +22,15 @@ export interface MediaRecommendation {
   // New fields
   platform?: MediaPlatform;
   pinned?: boolean;
-  posterUrl?: string;  // Poster image URL from OMDb
-  releaseYear?: string; // e.g. "2023"
+  // OMDb rich details
+  imdbId?: string;
+  imdbRating?: string;  // e.g. "8.6/10"
+  plot?: string;        // Synopsis from OMDb
+  director?: string;    // e.g. "Christopher Nolan"
+  actors?: string;      // e.g. "Leonardo DiCaprio, Joseph Gordon-Levitt"
+  runtime?: string;     // e.g. "148 min"
+  rated?: string;       // e.g. "PG-13"
+  awards?: string;      // e.g. "Won 4 Oscars"
   createdAt: string;
   updatedAt: string;
 }
