@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Info, Check, Send, Share2, ChevronDown, ChevronUp, 
   AlertCircle, Wallet, ArrowUpRight, ArrowDownLeft, Calendar, 
-  Receipt, CheckCircle2, User, RefreshCw, QrCode, Copy, Plus
+  Receipt, CheckCircle2, User, RefreshCw, QrCode, Copy, Plus,
+  Pencil, Trash2, Search, X
 } from 'lucide-react';
 import { Expense } from '@/types/expense';
 import { Trip } from '@/types/split';
@@ -20,6 +21,8 @@ import { toast } from 'sonner';
 import QRCode from 'qrcode';
 import confetti from 'canvas-confetti';
 import { audio } from '@/lib/audio';
+import { FriendSearchSelector } from '@/components/split/FriendSearchSelector';
+import { ExpenseForm } from '@/components/expense-form';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,6 +57,7 @@ export function SplitsModule() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [selectedTripId, setSelectedTripId] = useState<string>('all');
   const [expandedPersonId, setExpandedPersonId] = useState<string | null>(null);
+  const [friendFilter, setFriendFilter] = useState('');
   
   // Settle Up Dialog State
   const [settlePerson, setSettlePerson] = useState<PersonBalance | null>(null);
@@ -74,12 +78,27 @@ export function SplitsModule() {
   const [isIouOpen, setIsIouOpen] = useState(false);
   const [iouType, setIouType] = useState<'you_owe' | 'owes_you'>('you_owe');
   const [iouContactId, setIouContactId] = useState<string>('');
-  const [iouNewContactName, setIouNewContactName] = useState<string>('');
   const [iouAmount, setIouAmount] = useState<number>(0);
   const [iouDescription, setIouDescription] = useState<string>('');
   const [iouDate, setIouDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [isSavingIou, setIsSavingIou] = useState(false);
-  const [contactsKey, setContactsKey] = useState(0);
+
+  // Edit Direct IOU States
+  const [editingUnpaid, setEditingUnpaid] = useState<UnpaidSplit | null>(null);
+  const [isEditIouOpen, setIsEditIouOpen] = useState(false);
+  const [editIouType, setEditIouType] = useState<'you_owe' | 'owes_you'>('you_owe');
+  const [editIouContactId, setEditIouContactId] = useState<string>('');
+  const [editIouAmount, setEditIouAmount] = useState<number>(0);
+  const [editIouDescription, setEditIouDescription] = useState<string>('');
+  const [editIouDate, setEditIouDate] = useState<string>('');
+  const [isSavingEditIou, setIsSavingEditIou] = useState(false);
+
+  // Edit Full Split Expense State
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [isEditExpenseOpen, setIsEditExpenseOpen] = useState(false);
+
+  // Delete Confirmation State
+  const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
 
   const handleSaveIou = async () => {
     if (iouAmount <= 0) {
@@ -87,18 +106,7 @@ export function SplitsModule() {
       return;
     }
     
-    let targetContactId = iouContactId;
-    if (targetContactId === 'new') {
-      if (!iouNewContactName.trim()) {
-        toast.error("Please enter friend's name");
-        return;
-      }
-      const newContact = contactService.addContact({ name: iouNewContactName.trim() });
-      targetContactId = newContact.id;
-      setContactsKey(prev => prev + 1);
-    }
-    
-    if (!targetContactId) {
+    if (!iouContactId) {
       toast.error('Please select a friend');
       return;
     }
@@ -107,7 +115,7 @@ export function SplitsModule() {
     haptics.medium();
 
     try {
-      const contactObj = contactService.getContacts().find(c => c.id === targetContactId);
+      const contactObj = contactService.getContacts().find(c => c.id === iouContactId);
       const contactName = contactObj?.name || 'Friend';
       
       let expenseObj: Expense;
@@ -122,7 +130,7 @@ export function SplitsModule() {
           status: 'approved',
           currency: 'INR',
           isReimbursement: false,
-          paidBy: targetContactId,
+          paidBy: iouContactId,
           split: {
             totalAmount: iouAmount,
             splitType: 'exact',
@@ -149,7 +157,7 @@ export function SplitsModule() {
             splitType: 'exact',
             members: [
               {
-                contactId: targetContactId,
+                contactId: iouContactId,
                 amount: iouAmount,
                 paid: false,
               }
@@ -166,7 +174,6 @@ export function SplitsModule() {
       
       setIsIouOpen(false);
       setIouContactId('');
-      setIouNewContactName('');
       setIouAmount(0);
       setIouDescription('');
       setIouDate(new Date().toISOString().split('T')[0]);
@@ -180,6 +187,93 @@ export function SplitsModule() {
     }
   };
 
+  const handleEditUnpaid = (unpaid: UnpaidSplit, contactId: string) => {
+    haptics.light();
+    const exp = unpaid.expense;
+    const isDirectIou = exp.vendor.includes('Direct Debt') || exp.description?.includes('Direct IOU logged:');
+
+    if (isDirectIou) {
+      setEditingUnpaid(unpaid);
+      setEditIouType(unpaid.type === 'you_lent' ? 'owes_you' : 'you_owe');
+      setEditIouContactId(contactId);
+      setEditIouAmount(unpaid.shareAmount || exp.amount);
+      setEditIouDescription(exp.vendor.replace(/^Direct Debt \([^)]+\)/, '').trim() || exp.description || '');
+      setEditIouDate(exp.date);
+      setIsEditIouOpen(true);
+    } else {
+      setEditingExpense(exp);
+      setIsEditExpenseOpen(true);
+    }
+  };
+
+  const handleSaveEditIou = () => {
+    if (!editingUnpaid || editIouAmount <= 0 || !editIouContactId) {
+      toast.error('Please enter valid IOU details');
+      return;
+    }
+
+    setIsSavingEditIou(true);
+    try {
+      const contactObj = contacts.find(c => c.id === editIouContactId);
+      const contactName = contactObj?.name || 'Friend';
+
+      const updatedExpense: Expense = {
+        ...editingUnpaid.expense,
+        amount: editIouAmount,
+        date: editIouDate,
+        vendor: editIouDescription.trim() || (editIouType === 'you_owe' ? `Direct Debt (You Owe ${contactName})` : `Direct Debt (${contactName} Owes You)`),
+        description: `Direct IOU logged: ${editIouType === 'you_owe' ? `You owe ${contactName}` : `${contactName} owes you`}`,
+        paidBy: editIouType === 'you_owe' ? editIouContactId : 'user',
+        split: editIouType === 'you_owe'
+          ? {
+              totalAmount: editIouAmount,
+              splitType: 'exact',
+              members: [],
+              userPaid: false,
+            }
+          : {
+              totalAmount: editIouAmount,
+              splitType: 'exact',
+              members: [
+                {
+                  contactId: editIouContactId,
+                  amount: editIouAmount,
+                  paid: false,
+                }
+              ],
+              userPaid: true,
+            },
+        updatedAt: new Date().toISOString(),
+      };
+
+      storageService.updateExpense(updatedExpense);
+      toast.success('IOU updated successfully');
+      setIsEditIouOpen(false);
+      setEditingUnpaid(null);
+      audio.success();
+      haptics.success();
+    } catch (e) {
+      toast.error('Failed to update IOU');
+    } finally {
+      setIsSavingEditIou(false);
+    }
+  };
+
+  const handleDeleteExpense = (expenseId: string) => {
+    haptics.warning();
+    storageService.deleteExpense(expenseId);
+    toast.success('IOU / Split Expense deleted');
+    setDeletingExpenseId(null);
+    if (editingUnpaid?.expenseId === expenseId) {
+      setIsEditIouOpen(false);
+      setEditingUnpaid(null);
+    }
+    if (editingExpense?.id === expenseId) {
+      setIsEditExpenseOpen(false);
+      setEditingExpense(null);
+    }
+  };
+
   const handleCopyLink = (upiUrl: string) => {
     navigator.clipboard.writeText(upiUrl);
     setCopiedUpi(true);
@@ -189,7 +283,7 @@ export function SplitsModule() {
     setTimeout(() => setCopiedUpi(false), 2000);
   };
 
-  const contacts = useMemo(() => contactService.getContacts(), [expenses, contactsKey]);
+  const contacts = useMemo(() => contactService.getContacts(), [expenses]);
 
   useEffect(() => {
     if (isQuickQrOpen) {
@@ -288,7 +382,6 @@ export function SplitsModule() {
   const peopleBalances = useMemo(() => {
     const balances: Record<string, PersonBalance> = {};
 
-    // Initialize all contacts
     contacts.forEach(c => {
       balances[c.id] = {
         contactId: c.id,
@@ -302,13 +395,11 @@ export function SplitsModule() {
     expenses.forEach(expense => {
       if (!expense.split) return;
       
-      // Filter by tripId if a specific trip is selected
       if (selectedTripId !== 'all' && expense.tripId !== selectedTripId) return;
 
       const payerId = expense.paidBy || 'user';
       
       if (payerId === 'user') {
-        // User paid. Other members owe the user if they haven't paid.
         expense.split.members.forEach(member => {
           if (!member.paid) {
             if (!balances[member.contactId]) {
@@ -335,8 +426,6 @@ export function SplitsModule() {
           }
         });
       } else {
-        // A contact paid.
-        // The user owes the contact if userPaid is false.
         const sumOthers = expense.split.members.reduce((acc, m) => acc + m.amount, 0);
         const userShare = expense.amount - sumOthers;
         
@@ -366,11 +455,20 @@ export function SplitsModule() {
       }
     });
 
-    // Filter to only people with active unpaid expenses and sort by absolute balance
     return Object.values(balances)
       .filter(p => p.unpaidExpenses.length > 0)
       .sort((a, b) => Math.abs(b.netBalance) - Math.abs(a.netBalance));
   }, [expenses, contacts, selectedTripId]);
+
+  // Filter balances by search query
+  const filteredPeopleBalances = useMemo(() => {
+    if (!friendFilter.trim()) return peopleBalances;
+    const q = friendFilter.toLowerCase().trim();
+    return peopleBalances.filter(p =>
+      p.contactName.toLowerCase().includes(q) ||
+      p.unpaidExpenses.some(u => u.expenseVendor.toLowerCase().includes(q))
+    );
+  }, [peopleBalances, friendFilter]);
 
   // Overall totals
   const totalYouAreOwed = useMemo(() => {
@@ -394,7 +492,6 @@ export function SplitsModule() {
     if (!updatedExpense.split) return;
 
     if (unpaid.type === 'you_lent') {
-      // Mark member as paid
       const members = updatedExpense.split.members.map(m => {
         if (m.contactId === contactId) {
           return { ...m, paid: true };
@@ -406,7 +503,6 @@ export function SplitsModule() {
         members
       };
     } else {
-      // Mark user as paid
       updatedExpense.split = {
         ...updatedExpense.split,
         userPaid: true
@@ -416,16 +512,6 @@ export function SplitsModule() {
     storageService.updateExpense(updatedExpense);
     toast.success('Split marked as paid');
     haptics.success();
-  };
-
-  const handleSendReminder = (unpaid: UnpaidSplit, contactId: string) => {
-    haptics.light();
-    scheduleSplitReminders(unpaid.expense);
-    
-    const name = contacts.find(c => c.id === contactId)?.name || 'Contact';
-    toast.success(`Reminder notification queued for ${name}`, {
-      description: `They will receive an OS alert shortly.`
-    });
   };
 
   const handleWhatsAppReminder = (unpaid: UnpaidSplit, contactId: string) => {
@@ -490,7 +576,6 @@ export function SplitsModule() {
     setSettlePerson(null);
     setExpandedPersonId(null);
     
-    // Play celebratory sounds and confetti
     audio.shimmer();
     confetti({
       particleCount: 120,
@@ -520,6 +605,7 @@ export function SplitsModule() {
           pointer-events: none;
         }
       `}</style>
+      
       {/* ── Title Header ───────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-1">
         <div>
@@ -527,7 +613,7 @@ export function SplitsModule() {
             <Users className="h-8 w-8 text-primary" />
             <span>Split Bills</span>
           </h1>
-          <p className="text-xs text-muted-foreground mt-1">See who owes you money and who you need to pay back</p>
+          <p className="text-xs text-muted-foreground mt-1">See who owes you money, log direct IOUs, and edit split bills</p>
         </div>
         
         {/* Trip Filter & Quick QR & Log IOU */}
@@ -641,28 +727,51 @@ export function SplitsModule() {
 
       {/* ── People & Balances List ─────────────────────────────────── */}
       <div className="space-y-3">
-        <h2 className="text-sm font-display font-bold px-1 flex items-center gap-2 text-muted-foreground">
-          <span>Balances by Friend</span>
-          <span className="text-[10px] bg-muted/50 px-2 py-0.5 rounded-full font-mono text-foreground shrink-0">
-            {peopleBalances.length}
-          </span>
-        </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+          <h2 className="text-sm font-display font-bold flex items-center gap-2 text-muted-foreground">
+            <span>Balances by Friend</span>
+            <span className="text-[10px] bg-muted/50 px-2 py-0.5 rounded-full font-mono text-foreground shrink-0">
+              {filteredPeopleBalances.length}
+            </span>
+          </h2>
 
-        {peopleBalances.length === 0 ? (
+          {/* Quick Friend Search Bar */}
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              value={friendFilter}
+              onChange={e => setFriendFilter(e.target.value)}
+              placeholder="Search friend balances..."
+              className="pl-8 pr-7 h-8 text-xs rounded-xl bg-background/50 border-border/40 font-semibold"
+            />
+            {friendFilter && (
+              <button
+                onClick={() => setFriendFilter('')}
+                className="absolute right-2.5 top-2.5 h-3.5 w-3.5 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {filteredPeopleBalances.length === 0 ? (
           <div className="py-16 flex flex-col items-center justify-center text-center space-y-4 glass rounded-[2.5rem] border-2 border-dashed border-border/30">
             <div className="h-16 w-16 rounded-3xl bg-primary/10 flex items-center justify-center animate-pulse">
               <CheckCircle2 className="h-8 w-8 text-primary" />
             </div>
             <div>
-              <p className="font-bold text-base">All Settled Up!</p>
+              <p className="font-bold text-base">
+                {friendFilter ? `No balances found matching "${friendFilter}"` : 'All Settled Up!'}
+              </p>
               <p className="text-xs text-muted-foreground max-w-xs mt-1">
-                No unpaid split bills right now. Good job! 🌴
+                {friendFilter ? 'Try searching for another friend or bill name.' : 'No unpaid split bills right now. Good job! 🌴'}
               </p>
             </div>
           </div>
         ) : (
           <div className="grid gap-3">
-            {peopleBalances.map(person => {
+            {filteredPeopleBalances.map(person => {
               const isExpanded = expandedPersonId === person.contactId;
               const isOwed = person.netBalance > 0;
 
@@ -737,7 +846,7 @@ export function SplitsModule() {
                         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                       >
                         <div className="px-4 sm:px-5 pb-5 pt-1 border-t border-border/20 bg-black/10 space-y-3">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-2">Unpaid splits</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-2">Unpaid splits & IOUs</p>
                           
                           <div className="space-y-2.5">
                             {person.unpaidExpenses.map(unpaid => {
@@ -769,8 +878,8 @@ export function SplitsModule() {
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pl-12 sm:pl-0">
-                                    <div className="text-left sm:text-right">
+                                  <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pl-12 sm:pl-0">
+                                    <div className="text-left sm:text-right mr-1">
                                       <p className={cn(
                                         "font-mono font-bold text-sm",
                                         unpaid.type === 'you_lent' ? "text-emerald-400" : "text-rose-400"
@@ -786,25 +895,44 @@ export function SplitsModule() {
                                     </div>
 
                                     {/* Action Buttons */}
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1.5">
+                                      {/* Edit Button */}
+                                      <Button
+                                        onClick={() => handleEditUnpaid(unpaid, person.contactId)}
+                                        className="h-8 px-2.5 rounded-xl bg-muted/40 hover:bg-muted/70 text-foreground text-[10px] font-bold gap-1 transition-all border border-border/30"
+                                        title="Edit IOU or Split Bill"
+                                      >
+                                        <Pencil className="h-3 w-3 text-primary" />
+                                        <span className="hidden xs:inline">Edit</span>
+                                      </Button>
+
                                       {/* WhatsApp Reminder */}
                                       <Button
                                         onClick={() => handleWhatsAppReminder(unpaid, person.contactId)}
-                                        className="h-8 px-3 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 text-[10px] font-bold gap-1 transition-all border border-primary/20"
+                                        className="h-8 px-2.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 text-[10px] font-bold gap-1 transition-all border border-primary/20"
                                         title="Send WhatsApp Reminder"
                                       >
                                         <Share2 className="h-3 w-3" />
-                                        <span>Remind</span>
+                                        <span className="hidden sm:inline">Remind</span>
                                       </Button>
 
                                       {/* Mark Settled */}
                                       <Button
                                         onClick={() => handleMarkSplitPaid(unpaid, person.contactId)}
-                                        className="h-8 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold gap-1 transition-all border-none"
+                                        className="h-8 px-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold gap-1 transition-all border-none"
                                         title="Mark as paid"
                                       >
                                         <Check className="h-3 w-3" strokeWidth={3} />
                                         <span>Paid</span>
+                                      </Button>
+
+                                      {/* Delete Button */}
+                                      <Button
+                                        onClick={() => setDeletingExpenseId(unpaid.expenseId)}
+                                        className="h-8 w-8 p-0 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-all border border-rose-500/20 flex items-center justify-center shrink-0"
+                                        title="Delete IOU or Expense"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
                                       </Button>
                                     </div>
                                   </div>
@@ -827,7 +955,7 @@ export function SplitsModule() {
       <div className="flex items-start gap-2.5 p-4 rounded-2xl bg-primary/5 text-xs text-muted-foreground leading-relaxed border border-primary/10">
         <Info className="h-4.5 w-4.5 shrink-0 text-primary mt-0.5" />
         <p>
-          This page shows your unpaid split bills. Mark a bill as Paid when settled, or click Settle to clear all balances with a friend at once.
+          Search for friends, edit any direct IOU or split bill expense, mark bills as Paid when settled, or tap Settle to clear all balances at once.
         </p>
       </div>
 
@@ -848,7 +976,6 @@ export function SplitsModule() {
 
           {settlePerson && (
             <div className="py-2 space-y-4">
-              {/* Debt summary card */}
               <div className={cn(
                 "p-4 rounded-2xl border text-center space-y-1 bg-black/10",
                 settlePerson.netBalance > 0 ? "border-emerald-500/20" : "border-rose-500/20"
@@ -864,7 +991,6 @@ export function SplitsModule() {
                 </h4>
               </div>
 
-              {/* Settle amount input (manual override) */}
               <div className="space-y-2 text-left px-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                   Settle Amount (INR)
@@ -884,7 +1010,6 @@ export function SplitsModule() {
                 </div>
               </div>
 
-              {/* UPI section */}
               {(() => {
                 const isOwed = settlePerson.netBalance > 0;
                 const contactObj = contacts.find(c => c.id === settlePerson.contactId);
@@ -941,7 +1066,6 @@ export function SplitsModule() {
                   );
                 }
 
-                // If UPI ID exists, show QR code & Pay link
                 const upiUrl = `upi://pay?pa=${currentUpi}&pn=${encodeURIComponent(isOwed ? (settings.billedFrom.name || 'User') : settlePerson.contactName)}&am=${settleAmount.toFixed(2)}&cu=INR`;
 
                 return (
@@ -953,11 +1077,9 @@ export function SplitsModule() {
                     <div className="relative p-[3px] bg-gradient-to-tr from-primary via-violet-500 to-cyan-400 rounded-[22px] shadow-glow-sm shrink-0">
                       <div className="relative p-2 bg-white rounded-[19px] flex items-center justify-center overflow-hidden">
                         <canvas id="upi-qrcode-canvas" className="rounded-lg h-32 w-32" />
-                        {/* Center Logo Overlay */}
                         <div className="absolute inset-0 m-auto w-8 h-8 rounded-xl bg-gradient-brand flex items-center justify-center shadow-md border-2 border-white overflow-hidden z-10">
                           <img src="/logo.png" alt="Logo" className="h-4.5 w-4.5 object-contain" />
                         </div>
-                        {/* Animated Scanner Laser Line */}
                         <div className="scanner-line" />
                       </div>
                     </div>
@@ -1039,7 +1161,6 @@ export function SplitsModule() {
           </AlertDialogHeader>
 
           <div className="py-2 space-y-4 text-left">
-            {/* UPI ID input */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 Your UPI ID
@@ -1052,7 +1173,6 @@ export function SplitsModule() {
               />
             </div>
 
-            {/* Amount input */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 Request Amount (INR)
@@ -1072,17 +1192,14 @@ export function SplitsModule() {
               </div>
             </div>
 
-            {/* QR Code and Info */}
             {quickUpiId.trim() ? (
               <div className="p-4 rounded-2xl bg-muted/20 border border-border/20 flex flex-col items-center gap-3">
                 <div className="relative p-[3px] bg-gradient-to-tr from-primary via-violet-500 to-cyan-400 rounded-[22px] shadow-glow-sm shrink-0">
                   <div className="relative p-2 bg-white rounded-[19px] flex items-center justify-center overflow-hidden">
                     <canvas id="quick-upi-canvas" className="rounded-lg h-32 w-32" />
-                    {/* Center Logo Overlay */}
                     <div className="absolute inset-0 m-auto w-8 h-8 rounded-xl bg-gradient-brand flex items-center justify-center shadow-md border-2 border-white overflow-hidden z-10">
                       <img src="/logo.png" alt="Logo" className="h-4.5 w-4.5 object-contain" />
                     </div>
-                    {/* Animated Scanner Laser Line */}
                     <div className="scanner-line" />
                   </div>
                 </div>
@@ -1148,7 +1265,7 @@ export function SplitsModule() {
               <span>Log Direct IOU / Debt</span>
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground text-xs">
-              Log a direct balance between you and a friend without splitting a bill.
+              Search for a friend and log a direct balance without splitting a bill.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -1190,43 +1307,17 @@ export function SplitsModule() {
               </div>
             </div>
 
-            {/* Friend Selector */}
+            {/* Friend Search Selector */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 Select Friend
               </label>
-              <select
+              <FriendSearchSelector
                 value={iouContactId}
-                onChange={e => {
-                  setIouContactId(e.target.value);
-                  if (e.target.value !== 'new') {
-                    setIouNewContactName('');
-                  }
-                }}
-                className="w-full bg-background/50 border border-border/40 hover:bg-muted/60 transition-colors text-xs font-bold rounded-xl px-3 py-2.5 outline-none cursor-pointer text-foreground"
-              >
-                <option value="">Select a Friend...</option>
-                {contacts.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-                <option value="new">+ Add New Friend...</option>
-              </select>
+                onChange={(id) => setIouContactId(id as string)}
+                placeholder="Search friend by name, phone or UPI..."
+              />
             </div>
-
-            {/* Inline New Contact Input */}
-            {iouContactId === 'new' && (
-              <div className="space-y-1.5 animate-in slide-in-from-top-1 duration-200">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                  New Friend's Name
-                </label>
-                <Input
-                  value={iouNewContactName}
-                  onChange={e => setIouNewContactName(e.target.value)}
-                  placeholder="Enter name"
-                  className="h-9 text-xs rounded-xl bg-background/50 border-border/40 font-bold"
-                />
-              </div>
-            )}
 
             {/* Amount Input */}
             <div className="space-y-1.5">
@@ -1279,11 +1370,191 @@ export function SplitsModule() {
             <AlertDialogCancel className="rounded-xl border-white/10 hover:bg-white/5">Cancel</AlertDialogCancel>
             <Button
               onClick={handleSaveIou}
-              disabled={isSavingIou || (!iouContactId && iouContactId !== 'new') || (iouContactId === 'new' && !iouNewContactName.trim()) || iouAmount <= 0}
+              disabled={isSavingIou || !iouContactId || iouAmount <= 0}
               className="rounded-xl bg-primary hover:bg-primary/90 text-white border-none text-xs font-bold px-4"
             >
               {isSavingIou ? 'Saving...' : 'Log IOU'}
             </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Edit Direct IOU Modal ─────────────────────────── */}
+      <AlertDialog open={isEditIouOpen} onOpenChange={setIsEditIouOpen}>
+        <AlertDialogContent className="rounded-3xl border-border/40 glass max-w-[90vw] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Pencil className="h-5 w-5 text-primary" />
+                <span>Edit Direct IOU</span>
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (editingUnpaid) {
+                    setDeletingExpenseId(editingUnpaid.expenseId);
+                  }
+                }}
+                className="h-8 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl"
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+              </Button>
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground text-xs">
+              Update the friend, amount, or details for this direct debt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="py-2 space-y-4 text-left">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Transaction Type
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditIouType('you_owe')}
+                  className={cn(
+                    "h-10 rounded-xl text-xs font-bold transition-all border border-transparent shadow-sm flex items-center justify-center gap-1.5",
+                    editIouType === 'you_owe' 
+                      ? "bg-rose-500 hover:bg-rose-600 text-white font-black" 
+                      : "bg-muted/40 hover:bg-muted/60 text-muted-foreground"
+                  )}
+                >
+                  <ArrowDownLeft className="h-4 w-4" />
+                  You Owe Them
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditIouType('owes_you')}
+                  className={cn(
+                    "h-10 rounded-xl text-xs font-bold transition-all border border-transparent shadow-sm flex items-center justify-center gap-1.5",
+                    editIouType === 'owes_you' 
+                      ? "bg-emerald-500 hover:bg-emerald-600 text-white font-black" 
+                      : "bg-muted/40 hover:bg-muted/60 text-muted-foreground"
+                  )}
+                >
+                  <ArrowUpRight className="h-4 w-4" />
+                  They Owe You
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Friend
+              </label>
+              <FriendSearchSelector
+                value={editIouContactId}
+                onChange={(id) => setEditIouContactId(id as string)}
+                placeholder="Search friend..."
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Amount (INR)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-2 text-xs font-mono text-muted-foreground">₹</span>
+                <Input
+                  type="number"
+                  value={editIouAmount || ''}
+                  onChange={e => {
+                    const val = parseFloat(e.target.value);
+                    setEditIouAmount(isNaN(val) ? 0 : val);
+                  }}
+                  placeholder="0.00"
+                  className="pl-7 h-9 text-xs rounded-xl bg-background/50 border-border/40 font-mono font-bold text-foreground"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Description / Note
+              </label>
+              <Input
+                value={editIouDescription}
+                onChange={e => setEditIouDescription(e.target.value)}
+                placeholder="Description"
+                className="h-9 text-xs rounded-xl bg-background/50 border-border/40 font-bold"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Date
+              </label>
+              <Input
+                type="date"
+                value={editIouDate}
+                onChange={e => setEditIouDate(e.target.value)}
+                className="h-9 text-xs rounded-xl bg-background/50 border-border/40 font-mono text-foreground font-bold"
+              />
+            </div>
+          </div>
+
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-xl border-white/10 hover:bg-white/5">Cancel</AlertDialogCancel>
+            <Button
+              onClick={handleSaveEditIou}
+              disabled={isSavingEditIou || !editIouContactId || editIouAmount <= 0}
+              className="rounded-xl bg-primary hover:bg-primary/90 text-white border-none text-xs font-bold px-4"
+            >
+              {isSavingEditIou ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Edit Split Bill Expense Form ─────────────────────────── */}
+      {isEditExpenseOpen && editingExpense && (
+        <ExpenseForm
+          open={isEditExpenseOpen}
+          onOpenChange={setIsEditExpenseOpen}
+          initialData={editingExpense}
+          isEdit={true}
+          onSubmit={(updated) => {
+            storageService.updateExpense(updated);
+            toast.success('Split bill expense updated successfully');
+            setIsEditExpenseOpen(false);
+            setEditingExpense(null);
+            haptics.success();
+          }}
+        />
+      )}
+
+      {/* ── Delete Confirmation Dialog ─────────────────────────── */}
+      <AlertDialog open={!!deletingExpenseId} onOpenChange={(open) => {
+        if (!open) setDeletingExpenseId(null);
+      }}>
+        <AlertDialogContent className="rounded-3xl border-border/40 glass max-w-[90vw] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold text-rose-500 flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              <span>Delete IOU / Expense?</span>
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground text-xs leading-relaxed">
+              Are you sure you want to delete this IOU or split bill expense? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-xl border-white/10 hover:bg-white/5">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                if (deletingExpenseId) {
+                  handleDeleteExpense(deletingExpenseId);
+                }
+              }}
+              className="rounded-xl bg-rose-500 hover:bg-rose-600 text-white border-none font-bold text-xs"
+            >
+              Delete Expense
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

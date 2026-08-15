@@ -261,6 +261,7 @@ export function FloatingAddMenu({ onAddExpense, onFuelSuccess, onOpenChange, onN
       <VehicleLogForm
         open={showFuelForm}
         onOpenChange={setShowFuelForm}
+        onAddExpense={onAddExpense}
         onSuccess={() => {
           onFuelSuccess?.();
           setShowFuelForm(false);

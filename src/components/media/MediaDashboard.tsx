@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Clapperboard, Plus, Search, Film, Tv, Star, Edit2, Trash2, 
   Check, Play, User, X, AlertCircle, Heart, Pin, PinOff,
-  Shuffle, Download, Loader2, ChevronDown, SlidersHorizontal, Info
+  Shuffle, Download, Loader2, ChevronDown, SlidersHorizontal, Info,
+  LayoutGrid, Columns, ArrowRight, ArrowLeft, RotateCcw, PlusCircle,
+  FolderHeart, Bookmark, Layers
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { mediaService } from '@/lib/media-service';
 import { contactService } from '@/lib/contact-service';
-import { MediaRecommendation } from '@/types/media';
+import { MediaRecommendation, CustomMediaList } from '@/types/media';
 import { PLATFORM_CONFIG, PLATFORM_LIST } from './platformConfig';
 import { cn } from '@/lib/utils';
 import { haptics } from '@/lib/haptics';
@@ -30,6 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { MediaEntryForm } from './MediaEntryForm';
 import { MediaDetailModal } from './MediaDetailModal';
+import { ManageListsModal } from './ManageListsModal';
 import { generateWatchlistPDF } from '@/lib/media-pdf';
 
 const PRESET_GENRES = [
@@ -42,6 +45,12 @@ export function MediaDashboard() {
   const [mediaList, setMediaList]   = useState<MediaRecommendation[]>(() => mediaService.getMedia());
   const [contacts, setContacts]     = useState(() => contactService.getContacts());
 
+  // View Mode & Kanban
+  const [viewMode, setViewMode]                 = useState<'grid' | 'kanban'>('grid');
+  const [activeKanbanTab, setActiveKanbanTab]   = useState<'to_watch' | 'watching' | 'watched'>('to_watch');
+  const [draggedItemId, setDraggedItemId]       = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn]     = useState<string | null>(null);
+
   // Search & Filters
   const [search, setSearch]             = useState('');
   const [activeType, setActiveType]     = useState<'all' | 'movie' | 'series'>('all');
@@ -49,7 +58,21 @@ export function MediaDashboard() {
   const [selectedGenres, setSelectedGenres]     = useState<string[]>([]);
   const [selectedFriendId, setSelectedFriendId] = useState<string>('all');
   const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
+  const [selectedListId, setSelectedListId]     = useState<string>('all');
   const [filtersOpen, setFiltersOpen]           = useState(true);
+
+  // Custom Lists State
+  const [customLists, setCustomLists]           = useState<CustomMediaList[]>(() => mediaService.getCustomLists());
+  const [isManageListsOpen, setIsManageListsOpen] = useState(false);
+  const [manageListsItem, setManageListsItem]   = useState<MediaRecommendation | null>(null);
+  const [initialCreateList, setInitialCreateList] = useState(false);
+
+  const handleOpenManageLists = (item?: MediaRecommendation, createMode = false) => {
+    setManageListsItem(item || null);
+    setInitialCreateList(createMode);
+    setIsManageListsOpen(true);
+    haptics.selection();
+  };
 
   // Modal Dialogs
   const [isFormOpen, setIsFormOpen]   = useState(false);
@@ -96,14 +119,17 @@ export function MediaDashboard() {
   const loadData = () => {
     setMediaList(mediaService.getMedia());
     setContacts(contactService.getContacts());
+    setCustomLists(mediaService.getCustomLists());
   };
 
   useEffect(() => {
     loadData();
     window.addEventListener('media-updated', loadData);
+    window.addEventListener('media-lists-updated', loadData);
     window.addEventListener('expenses-updated', loadData);
     return () => {
       window.removeEventListener('media-updated', loadData);
+      window.removeEventListener('media-lists-updated', loadData);
       window.removeEventListener('expenses-updated', loadData);
     };
   }, []);
@@ -130,7 +156,12 @@ export function MediaDashboard() {
         const matchesPlatform = selectedPlatform === 'all' ||
           (selectedPlatform === 'none' && !item.platform) ||
           item.platform === selectedPlatform;
-        return matchesSearch && matchesType && matchesStatus && matchesGenres && matchesFriend && matchesPlatform;
+        const matchesList     = selectedListId === 'all' || (() => {
+          const list = customLists.find(l => l.id === selectedListId);
+          return list ? list.itemIds.includes(item.id) : false;
+        })();
+
+        return matchesSearch && matchesType && matchesStatus && matchesGenres && matchesFriend && matchesPlatform && matchesList;
       })
       .sort((a, b) => {
         // Pinned always first
@@ -138,7 +169,7 @@ export function MediaDashboard() {
         if (!a.pinned && b.pinned) return 1;
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
-  }, [mediaList, search, activeType, activeStatus, selectedGenres, selectedFriendId, selectedPlatform]);
+  }, [mediaList, search, activeType, activeStatus, selectedGenres, selectedFriendId, selectedPlatform, selectedListId, customLists]);
 
   const stats = useMemo(() => ({
     toWatch:  mediaList.filter(m => m.status === 'to_watch').length,
@@ -179,6 +210,23 @@ export function MediaDashboard() {
     mediaService.updateMedia({ ...item, status: 'watching' });
     toast.info(`Started watching "${item.title}"! 🍿`);
     audio.shimmer();
+  };
+  const handleMoveStatus = (item: MediaRecommendation, targetStatus: 'to_watch' | 'watching' | 'watched') => {
+    if (item.status === targetStatus) return;
+    if (targetStatus === 'watched') {
+      handleOpenRate(item);
+      return;
+    }
+    haptics.medium();
+    audio.tick();
+    mediaService.updateMedia({ ...item, status: targetStatus });
+    const targetLabel = targetStatus === 'to_watch' ? 'To Watch' : 'Watching';
+    toast.success(`Moved "${item.title}" to ${targetLabel}`);
+  };
+  const handleOpenAddWithStatus = (status: 'to_watch' | 'watching' | 'watched') => {
+    setEditingItem({ status } as MediaRecommendation);
+    setIsFormOpen(true);
+    haptics.selection();
   };
   const handleOpenRate = (item: MediaRecommendation) => {
     setRatingItem(item);
@@ -259,23 +307,46 @@ export function MediaDashboard() {
         </div>
         
         <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+          {/* Curated Lists */}
+          <Button
+            onClick={() => handleOpenManageLists(undefined, false)}
+            className="h-9 px-3 rounded-2xl text-xs font-bold gap-1.5 bg-purple-500/15 text-purple-300 border border-purple-500/20 hover:bg-purple-500/25 shadow-none shrink-0"
+          >
+            <FolderHeart className="h-3.5 w-3.5" />
+            <span>My Lists</span>
+            {customLists.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-purple-500/30 text-purple-200 text-[10px] font-black">
+                {customLists.length}
+              </span>
+            )}
+          </Button>
+
+          {/* Create List */}
+          <Button
+            onClick={() => handleOpenManageLists(undefined, true)}
+            className="h-9 px-3 rounded-2xl text-xs font-bold gap-1.5 bg-purple-500/10 text-purple-300 border border-purple-500/20 hover:bg-purple-500/20 shadow-none shrink-0"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span className="hidden xs:inline">New List</span>
+          </Button>
+
           {/* Surprise Me */}
           <Button
             onClick={handleSurpriseMe}
-            className="h-9 px-4 rounded-2xl text-xs font-bold gap-1.5 bg-amber-500/15 text-amber-400 border border-amber-500/20 hover:bg-amber-500/25 shadow-none shrink-0"
+            className="h-9 px-3 rounded-2xl text-xs font-bold gap-1.5 bg-amber-500/15 text-amber-400 border border-amber-500/20 hover:bg-amber-500/25 shadow-none shrink-0"
           >
             <Shuffle className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Surprise Me</span>
+            <span className="hidden md:inline">Surprise Me</span>
           </Button>
 
           {/* Export PDF */}
           <Button
             onClick={handleExportPDF}
             disabled={isExporting || mediaList.length === 0}
-            className="h-9 px-4 rounded-2xl text-xs font-bold gap-1.5 bg-muted/30 text-muted-foreground border border-border/30 hover:bg-muted/50 shadow-none shrink-0"
+            className="h-9 px-3 rounded-2xl text-xs font-bold gap-1.5 bg-muted/30 text-muted-foreground border border-border/30 hover:bg-muted/50 shadow-none shrink-0"
           >
             {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-            <span className="hidden sm:inline">Export PDF</span>
+            <span className="hidden md:inline">PDF</span>
           </Button>
 
           {/* Add */}
@@ -328,6 +399,7 @@ export function MediaDashboard() {
         const activeFilterCount =
           (activeStatus !== 'all' ? 1 : 0) +
           (selectedPlatform !== 'all' ? 1 : 0) +
+          (selectedListId !== 'all' ? 1 : 0) +
           selectedGenres.length +
           (activeType !== 'all' ? 1 : 0) +
           (selectedFriendId !== 'all' ? 1 : 0);
@@ -392,6 +464,32 @@ export function MediaDashboard() {
                   ))}
                 </div>
 
+                {/* View Mode (Grid vs Kanban) */}
+                <div className="flex bg-muted/30 p-1 rounded-xl border border-border/10 shrink-0">
+                  <button
+                    onClick={() => { haptics.light(); setViewMode('grid'); }}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
+                      viewMode === 'grid' ? "bg-card text-foreground shadow-sm font-bold" : "text-muted-foreground hover:text-foreground"
+                    )}
+                    title="Grid View"
+                  >
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Grid</span>
+                  </button>
+                  <button
+                    onClick={() => { haptics.light(); setViewMode('kanban'); }}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
+                      viewMode === 'kanban' ? "bg-primary text-white shadow-sm font-bold" : "text-muted-foreground hover:text-foreground"
+                    )}
+                    title="Kanban View"
+                  >
+                    <Columns className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Kanban</span>
+                  </button>
+                </div>
+
                 {/* Filter Toggle Button */}
                 <button
                   onClick={() => { haptics.light(); setFiltersOpen(o => !o); }}
@@ -452,6 +550,47 @@ export function MediaDashboard() {
                           </button>
                         );
                       })}
+                    </div>
+
+                    {/* Custom Lists Filter */}
+                    <div className="flex flex-wrap items-center gap-1.5 border-t border-border/10 pt-3">
+                      <button
+                        onClick={() => { haptics.light(); setSelectedListId('all'); }}
+                        className={cn(
+                          "px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border flex items-center gap-1",
+                          selectedListId === 'all'
+                            ? "bg-primary/10 border-primary/20 text-primary"
+                            : "bg-background/20 border-border/30 text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <Layers className="h-3 w-3" />
+                        <span>All Lists</span>
+                      </button>
+
+                      {customLists.map(list => (
+                        <button
+                          key={list.id}
+                          onClick={() => { haptics.light(); setSelectedListId(selectedListId === list.id ? 'all' : list.id); }}
+                          className={cn(
+                            "px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border flex items-center gap-1",
+                            selectedListId === list.id
+                              ? "bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm"
+                              : "bg-background/20 border-border/30 text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          <span>{list.emoji || '🍿'}</span>
+                          <span>{list.name}</span>
+                          <span className="text-[9px] opacity-60 font-mono">({list.itemIds.length})</span>
+                        </button>
+                      ))}
+
+                      <button
+                        onClick={() => handleOpenManageLists()}
+                        className="px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border border-dashed border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 flex items-center gap-1 sm:ml-auto"
+                      >
+                        <Plus className="h-3 w-3" />
+                        <span>Curate Lists</span>
+                      </button>
                     </div>
 
                     {/* Platform filter */}
@@ -526,6 +665,7 @@ export function MediaDashboard() {
                             haptics.medium();
                             setActiveStatus('all');
                             setSelectedPlatform('all');
+                            setSelectedListId('all');
                             setSelectedGenres([]);
                             setActiveType('all');
                             setSelectedFriendId('all');
@@ -547,7 +687,7 @@ export function MediaDashboard() {
         );
       })()}
 
-      {/* ── Recommendations Grid ──────────────────────────────────────── */}
+      {/* ── Recommendations Grid / Kanban View ────────────────────────── */}
       <AnimatePresence mode="popLayout">
         {filteredList.length === 0 ? (
           <motion.div
@@ -573,6 +713,366 @@ export function MediaDashboard() {
                 Log First Recommendation
               </Button>
             )}
+          </motion.div>
+        ) : viewMode === 'kanban' ? (
+          <motion.div
+            key="media-kanban"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-4"
+          >
+            {/* Mobile Tab Selector (Visible on mobile screens) */}
+            <div className="flex md:hidden bg-muted/20 p-1 rounded-2xl border border-border/20 overflow-x-auto gap-1">
+              {[
+                { id: 'to_watch' as const, label: 'To Watch', count: filteredList.filter(m => m.status === 'to_watch').length, color: 'text-amber-400 bg-amber-500/20 border-amber-500/30' },
+                { id: 'watching' as const, label: 'Watching', count: filteredList.filter(m => m.status === 'watching').length, color: 'text-primary bg-primary/20 border-primary/30' },
+                { id: 'watched' as const, label: 'Watched', count: filteredList.filter(m => m.status === 'watched').length, color: 'text-emerald-400 bg-emerald-500/20 border-emerald-500/30' },
+              ].map(tab => {
+                const isSelected = activeKanbanTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      haptics.light();
+                      setActiveKanbanTab(tab.id);
+                    }}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all border whitespace-nowrap",
+                      isSelected
+                        ? `${tab.color} shadow-sm font-black`
+                        : "bg-transparent border-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <span>{tab.label}</span>
+                    <span className={cn(
+                      "px-1.5 py-0.5 rounded-full text-[10px] font-black",
+                      isSelected ? "bg-white/20" : "bg-muted/40"
+                    )}>
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Kanban Columns (Responsive horizontal scroll container on mobile, 3-column grid on desktop) */}
+            <div className="flex md:grid md:grid-cols-3 gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-none">
+              {[
+                {
+                  id: 'to_watch' as const,
+                  title: 'To Watch',
+                  icon: Film,
+                  badgeColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                  columnBg: 'from-amber-500/5 via-transparent to-transparent',
+                  accentColor: 'border-amber-500/30',
+                  items: filteredList.filter(m => m.status === 'to_watch'),
+                },
+                {
+                  id: 'watching' as const,
+                  title: 'Watching',
+                  icon: Play,
+                  badgeColor: 'bg-primary/20 text-primary border-primary/30',
+                  columnBg: 'from-primary/5 via-transparent to-transparent',
+                  accentColor: 'border-primary/30',
+                  items: filteredList.filter(m => m.status === 'watching'),
+                },
+                {
+                  id: 'watched' as const,
+                  title: 'Watched',
+                  icon: Check,
+                  badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                  columnBg: 'from-emerald-500/5 via-transparent to-transparent',
+                  accentColor: 'border-emerald-500/30',
+                  items: filteredList.filter(m => m.status === 'watched'),
+                },
+              ].map(col => {
+                const isMobileActive = activeKanbanTab === col.id;
+                const isDragOver = dragOverColumn === col.id;
+
+                return (
+                  <div
+                    key={col.id}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragOverColumn(col.id);
+                    }}
+                    onDragLeave={() => setDragOverColumn(null)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOverColumn(null);
+                      const id = e.dataTransfer.getData('text/plain');
+                      if (id) {
+                        const targetItem = mediaList.find(m => m.id === id);
+                        if (targetItem) {
+                          handleMoveStatus(targetItem, col.id);
+                        }
+                      }
+                    }}
+                    className={cn(
+                      "w-[85vw] sm:w-[340px] shrink-0 snap-center md:w-auto md:shrink md:snap-align-none",
+                      "flex flex-col gap-3 glass rounded-3xl p-3.5 sm:p-4 border transition-all bg-gradient-to-b min-h-[480px]",
+                      col.columnBg,
+                      isDragOver ? "ring-2 ring-primary border-primary bg-primary/10" : col.accentColor,
+                      "hidden md:flex",
+                      isMobileActive && "!flex"
+                    )}
+                  >
+                    {/* Column Header */}
+                    <div className="flex items-center justify-between pb-2 border-b border-border/10">
+                      <div className="flex items-center gap-2">
+                        <div className={cn("h-7 w-7 rounded-xl flex items-center justify-center border shrink-0", col.badgeColor)}>
+                          <col.icon className="h-3.5 w-3.5" />
+                        </div>
+                        <h4 className="font-display font-black text-sm text-foreground">{col.title}</h4>
+                        <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-black border", col.badgeColor)}>
+                          {col.items.length}
+                        </span>
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleOpenAddWithStatus(col.id)}
+                        className="h-7 w-7 rounded-xl hover:bg-muted/40 text-muted-foreground hover:text-foreground"
+                        title={`Add new ${col.title} item`}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Column Items */}
+                    <div className="flex-1 space-y-3 overflow-y-auto max-h-[650px] pr-1 scrollbar-thin">
+                      {col.items.length === 0 ? (
+                        <div className="py-12 flex flex-col items-center justify-center text-center text-muted-foreground border-2 border-dashed border-border/20 rounded-2xl p-4">
+                          <Film className="h-6 w-6 opacity-30 mb-2" />
+                          <p className="text-xs font-bold opacity-60">No items in {col.title}</p>
+                          <button
+                            onClick={() => handleOpenAddWithStatus(col.id)}
+                            className="text-[10px] font-bold text-primary hover:underline mt-1"
+                          >
+                            + Add item
+                          </button>
+                        </div>
+                      ) : (
+                        col.items.map(item => {
+                          const isMovie = item.type === 'movie';
+                          const friendName = getFriendName(item.recommendedBy);
+                          const platformInfo = item.platform ? PLATFORM_CONFIG[item.platform] : null;
+
+                          return (
+                            <motion.div
+                              key={item.id}
+                              layout
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData('text/plain', item.id);
+                                setDraggedItemId(item.id);
+                              }}
+                              onDragEnd={() => setDraggedItemId(null)}
+                              onClick={() => handleOpenDetail(item)}
+                              className={cn(
+                                "glass rounded-2xl border border-border/20 p-3.5 flex flex-col gap-2.5 transition-all cursor-pointer relative group hover:border-primary/40 hover:bg-card/90 active:scale-[0.99]",
+                                item.pinned && "ring-1 ring-primary/40 border-primary/30",
+                                draggedItemId === item.id && "opacity-40 scale-95"
+                              )}
+                            >
+                              {/* Top row: Poster + Title + Type badge */}
+                              <div className="flex items-start gap-2.5">
+                                {item.posterUrl ? (
+                                  <img
+                                    src={item.posterUrl}
+                                    alt={item.title}
+                                    referrerPolicy="no-referrer"
+                                    className="h-14 w-10 rounded-lg object-cover shadow-sm shrink-0 border border-white/10"
+                                    onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                                  />
+                                ) : (
+                                  <div className="h-14 w-10 rounded-lg bg-muted/40 flex items-center justify-center text-muted-foreground shrink-0 border border-border/20">
+                                    {isMovie ? <Film className="h-3.5 w-3.5" /> : <Tv className="h-3.5 w-3.5" />}
+                                  </div>
+                                )}
+
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-1">
+                                    <h5 className="font-bold text-xs leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-2">
+                                      {item.title}
+                                    </h5>
+                                    {item.pinned && (
+                                      <Pin className="h-3 w-3 text-primary shrink-0 fill-primary/20" />
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                                    <span className={cn(
+                                      "text-[8px] font-black uppercase px-1.5 py-0.5 rounded border shrink-0",
+                                      isMovie
+                                        ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
+                                        : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400"
+                                    )}>
+                                      {item.type}
+                                    </span>
+                                    {item.releaseYear && (
+                                      <span className="text-[9px] font-semibold text-muted-foreground">{item.releaseYear}</span>
+                                    )}
+                                    {item.imdbRating && (
+                                      <span className="inline-flex items-center gap-0.5 text-[8px] font-black text-amber-400 bg-amber-400/10 border border-amber-400/20 px-1 rounded">
+                                        <Star className="h-2 w-2 fill-amber-400" /> {item.imdbRating}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Genres & Platform */}
+                              <div className="flex items-center justify-between gap-1 pt-1 border-t border-border/10 text-[9px]">
+                                {item.genres.length > 0 ? (
+                                  <span className="text-muted-foreground truncate max-w-[140px]">
+                                    {item.genres.slice(0, 2).join(', ')}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground/60 italic">No genre</span>
+                                )}
+
+                                {platformInfo && (
+                                  <span className={cn(
+                                    "inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded-full border shrink-0",
+                                    platformInfo.color, platformInfo.textColor, platformInfo.borderColor
+                                  )}>
+                                    <platformInfo.icon className="h-2.5 w-2.5" />
+                                    {platformInfo.label}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Recommender / Watched Rating */}
+                              <div className="flex items-center justify-between gap-2 text-[10px]">
+                                <div className="flex items-center gap-1 text-muted-foreground truncate">
+                                  <User className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">{item.recommendedBy ? friendName : 'Self'}</span>
+                                </div>
+
+                                {item.status === 'watched' && item.rating && (
+                                  <div className="flex gap-0.5 shrink-0">
+                                    {Array.from({ length: 5 }).map((_, i) => (
+                                      <Star
+                                        key={i}
+                                        className={cn(
+                                          "h-2.5 w-2.5",
+                                          i < (item.rating || 0) ? "text-amber-400 fill-amber-400" : "text-muted-foreground/20"
+                                        )}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Quick Move & Action Controls */}
+                              <div className="flex items-center justify-between gap-1 pt-2 border-t border-border/10">
+                                <div className="flex items-center gap-1">
+                                  {/* Left Move Button */}
+                                  {col.id === 'watching' && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={(e) => { e.stopPropagation(); handleMoveStatus(item, 'to_watch'); }}
+                                      className="h-6 w-6 rounded-lg hover:bg-muted/40 text-muted-foreground hover:text-foreground"
+                                      title="Move back to To Watch"
+                                    >
+                                      <ArrowLeft className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                  {col.id === 'watched' && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={(e) => { e.stopPropagation(); handleMoveStatus(item, 'watching'); }}
+                                      className="h-6 w-6 rounded-lg hover:bg-muted/40 text-muted-foreground hover:text-foreground"
+                                      title="Move back to Watching"
+                                    >
+                                      <ArrowLeft className="h-3 w-3" />
+                                    </Button>
+                                  )}
+
+                                  {/* Right Move / Action Button */}
+                                  {col.id === 'to_watch' && (
+                                    <Button
+                                      onClick={(e) => { e.stopPropagation(); handleStartWatching(item); }}
+                                      className="h-6 rounded-lg bg-primary/10 border border-primary/20 hover:bg-primary/20 text-primary text-[9px] font-black uppercase px-2 gap-1"
+                                    >
+                                      <Play className="h-2.5 w-2.5 fill-primary/20" />
+                                      <span>Watch</span>
+                                    </Button>
+                                  )}
+                                  {col.id === 'watching' && (
+                                    <Button
+                                      onClick={(e) => { e.stopPropagation(); handleOpenRate(item); }}
+                                      className="h-6 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase px-2 gap-1"
+                                    >
+                                      <Check className="h-2.5 w-2.5" />
+                                      <span>Complete</span>
+                                    </Button>
+                                  )}
+                                  {col.id === 'watched' && (
+                                    <Button
+                                      onClick={(e) => { e.stopPropagation(); handleMoveStatus(item, 'to_watch'); }}
+                                      className="h-6 rounded-lg bg-slate-500/10 border border-slate-500/20 hover:bg-slate-500/20 text-slate-300 text-[9px] font-bold px-2 gap-1"
+                                    >
+                                      <RotateCcw className="h-2.5 w-2.5" />
+                                      <span>Re-watch</span>
+                                    </Button>
+                                  )}
+
+                                  {col.id === 'to_watch' && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={(e) => { e.stopPropagation(); handleMoveStatus(item, 'watching'); }}
+                                      className="h-6 w-6 rounded-lg hover:bg-muted/40 text-muted-foreground hover:text-foreground"
+                                      title="Move to Watching"
+                                    >
+                                      <ArrowRight className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-0.5">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => { e.stopPropagation(); handleOpenManageLists(item); }}
+                                    className="h-6 w-6 rounded-lg hover:bg-muted/40 text-muted-foreground hover:text-primary transition-colors"
+                                    title="Add to Curated Lists"
+                                  >
+                                    <FolderHeart className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => { e.stopPropagation(); handleOpenEdit(item); }}
+                                    className="h-6 w-6 rounded-lg hover:bg-muted/40 text-muted-foreground hover:text-foreground"
+                                  >
+                                    <Edit2 className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => { e.stopPropagation(); setDeletingItem(item); }}
+                                    className="h-6 w-6 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </motion.div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </motion.div>
         ) : (
           <motion.div key="media-grid" layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -773,6 +1273,16 @@ export function MediaDashboard() {
                       >
                         {item.pinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
                       </Button>
+                      {/* Curated list action */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => { e.stopPropagation(); handleOpenManageLists(item); }}
+                        className="h-7 w-7 rounded-lg hover:bg-muted/30 text-muted-foreground hover:text-primary transition-colors"
+                        title="Add to Curated Lists"
+                      >
+                        <FolderHeart className="h-3 w-3" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -811,7 +1321,18 @@ export function MediaDashboard() {
         onTogglePin={(item) => handleTogglePin(item)}
         onStartWatching={(item) => handleStartWatching(item)}
         onRate={(item) => handleOpenRate(item)}
+        onManageLists={(item) => handleOpenManageLists(item)}
         contactName={getFriendName(selectedDetailItem?.recommendedBy)}
+      />
+
+      {/* ── Manage Custom Lists Modal ────────────────────────────────────── */}
+      <ManageListsModal
+        open={isManageListsOpen}
+        onOpenChange={setIsManageListsOpen}
+        targetItem={manageListsItem}
+        initialCreate={initialCreateList}
+        onSelectList={(list) => setSelectedListId(list.id)}
+        onListsChanged={loadData}
       />
 
       {/* ── Dialog Form Modal ─────────────────────────────────────────── */}

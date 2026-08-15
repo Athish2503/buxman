@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
-import { X, Fuel, GaugeCircle, IndianRupee, CalendarDays, Car, Bike, Check, ShieldAlert } from 'lucide-react';
+import { X, Fuel, GaugeCircle, IndianRupee, CalendarDays, Car, Bike, Check, ShieldAlert, Receipt } from 'lucide-react';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { SwipeToAdd } from '@/components/ui/swipe-to-add';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FuelLog, VehicleRate } from '@/types/modules';
 import { fuelService, mileageService } from '@/lib/modules-storage';
+import { storageService } from '@/lib/storage';
+import { Expense } from '@/types/expense';
 import { haptics } from '@/lib/haptics';
 import { cn, formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -18,6 +20,7 @@ interface VehicleLogFormProps {
   trigger?: React.ReactNode;
   editLog?: FuelLog;
   defaultVehicleId?: string;
+  onAddExpense?: (expense: Expense) => void;
 }
 
 const INDIAN_STATIONS = [
@@ -30,7 +33,7 @@ const INDIAN_STATIONS = [
   { id: 'Reliance', name: 'Reliance', short: 'Reliance', color: 'border-indigo-500/30 text-indigo-500 bg-indigo-500/5' },
 ];
 
-export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, open: externalOpen, onOpenChange }: VehicleLogFormProps & { open?: boolean; onOpenChange?: (open: boolean) => void }) {
+export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, onAddExpense, open: externalOpen, onOpenChange }: VehicleLogFormProps & { open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
@@ -52,6 +55,7 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
   const [station, setStation] = useState(editLog?.station || 'IndianOil');
   const [date, setDate] = useState(editLog?.date || format(new Date(), 'yyyy-MM-dd'));
   const [missedPreviousRefill, setMissedPreviousRefill] = useState(editLog?.missedPreviousRefill ?? false);
+  const [addAsExpense, setAddAsExpense] = useState(editLog?.isExpenseAdded ?? true);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -107,6 +111,7 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
       setStation(editLog.station || 'IndianOil');
       setDate(editLog.date);
       setMissedPreviousRefill(editLog.missedPreviousRefill ?? false);
+      setAddAsExpense(editLog.isExpenseAdded ?? true);
     }
   }, [editLog]);
 
@@ -190,8 +195,45 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
       isFullTank,
       station,
       missedPreviousRefill,
+      expenseId: editLog?.expenseId,
+      isExpenseAdded: addAsExpense,
       createdAt: editLog?.createdAt || new Date().toISOString()
     };
+
+    if (addAsExpense) {
+      const activeVehicle = vehicles.find(v => v.id === activeVehId);
+      const vehicleName = activeVehicle?.name || 'Vehicle';
+
+      const expenseObj: Expense = {
+        id: editLog?.expenseId || crypto.randomUUID(),
+        date,
+        vendor: station ? `Fuel (${station})` : `Fuel - ${vehicleName}`,
+        category: 'transportation',
+        amount: Number(totalCost),
+        currency: 'INR',
+        description: `Fuel refill: ${liters}L @ ₹${price}/L (${vehicleName} - Odo: ${odometer} km)`,
+        status: 'approved',
+        isReimbursement: false,
+        tags: ['Fuel', vehicleName, station].filter(Boolean) as string[],
+        createdAt: editLog?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      log.expenseId = expenseObj.id;
+
+      if (editLog?.expenseId) {
+        storageService.updateExpense(expenseObj);
+      } else {
+        storageService.addExpense(expenseObj);
+      }
+
+      if (onAddExpense) {
+        onAddExpense(expenseObj);
+      }
+    } else if (editLog?.expenseId && !addAsExpense) {
+      storageService.deleteExpense(editLog.expenseId);
+      log.expenseId = undefined;
+    }
 
     if (editLog) {
       fuelService.updateLog(log);
@@ -201,7 +243,13 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
 
     setSuccess(true);
     haptics.success();
-    toast.success(editLog ? 'Fuel log updated!' : 'Fuel log saved!');
+    toast.success(
+      editLog 
+        ? 'Fuel log updated!' 
+        : addAsExpense 
+          ? 'Fuel log saved & added to Expenses!' 
+          : 'Fuel log saved!'
+    );
 
     setTimeout(() => {
       setOpen(false);
@@ -498,6 +546,44 @@ export function VehicleLogForm({ onSuccess, trigger, editLog, defaultVehicleId, 
             )}
           >
             {missedPreviousRefill ? 'Yes, Missed' : 'No'}
+          </button>
+        </div>
+
+        {/* Add as Expense Toggle Card */}
+        <div className={cn(
+          "flex items-center justify-between p-3.5 rounded-2xl border transition-all duration-300",
+          addAsExpense 
+            ? "bg-primary/10 border-primary/30 text-foreground" 
+            : "bg-muted/10 border-border/40 text-muted-foreground/80"
+        )}>
+          <div className="space-y-0.5 pr-2">
+            <Label className="text-xs font-bold flex items-center gap-1.5 cursor-pointer" onClick={() => { setAddAsExpense(!addAsExpense); haptics.selection(); }}>
+              <Receipt className="h-3.5 w-3.5 text-primary" />
+              <span>Add as Expense</span>
+              {totalCost && Number(totalCost) > 0 && (
+                <span className="text-[10px] font-mono font-bold text-primary">
+                  ({formatCurrency(Number(totalCost))})
+                </span>
+              )}
+            </Label>
+            <p className="text-[10px] opacity-75">
+              Automatically record this fuel fill-up as a pending expense for easy tracking
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setAddAsExpense(!addAsExpense);
+              haptics.selection();
+            }}
+            className={cn(
+              "h-8 px-3 rounded-xl border text-[10px] font-black uppercase transition-all shrink-0 tracking-wider shadow-sm",
+              addAsExpense 
+                ? "bg-primary text-primary-foreground border-primary" 
+                : "bg-muted/30 border-border/40 text-muted-foreground hover:border-border/80 hover:text-foreground"
+            )}
+          >
+            {addAsExpense ? '✓ Yes' : 'No'}
           </button>
         </div>
 

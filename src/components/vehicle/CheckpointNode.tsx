@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Fuel, MapPin, Gauge, Clock, CloudRain, Sun, Moon, Wind, Info } from 'lucide-react';
+import { Fuel, MapPin, Gauge, Clock, CloudRain, Sun, Moon, Wind, Info, Receipt } from 'lucide-react';
 import { FuelLog } from '@/types/modules';
 import { format } from 'date-fns';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -37,7 +37,7 @@ export const CheckpointNode: React.FC<CheckpointNodeProps> = ({ log, index, onCl
         <div className="group relative">
           {/* Station Logo / Branding */}
           <div className={cn(
-            "flex items-center gap-2 mb-3",
+            "flex items-center gap-2 mb-3 flex-wrap",
             index % 2 === 0 ? "justify-end" : "justify-start"
           )}>
             <div className="h-6 w-6 rounded-md bg-white/5 flex items-center justify-center border border-white/10">
@@ -46,6 +46,11 @@ export const CheckpointNode: React.FC<CheckpointNodeProps> = ({ log, index, onCl
             <span className="text-xs font-black uppercase tracking-widest opacity-60">
               {log.station || 'IndianOil'}
             </span>
+            {log.isExpenseAdded && (
+              <Badge variant="outline" className="h-4.5 px-1.5 text-[8px] border-primary/30 bg-primary/10 text-primary font-bold uppercase tracking-wider flex items-center gap-1">
+                <Receipt className="h-2.5 w-2.5" /> Expense
+              </Badge>
+            )}
             {log.missedPreviousRefill && (
               <Badge variant="outline" className="h-4.5 px-1.5 text-[8px] border-warning/30 bg-warning/5 text-warning font-bold uppercase tracking-wider">
                 Missed Refill

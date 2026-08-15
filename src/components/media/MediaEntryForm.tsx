@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, forwardRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
-import { X, Plus, Film, Tv, Check, Star, User, Clapperboard, Search, Loader2, Pin, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Plus, Film, Tv, Check, Star, User, Clapperboard, Search, Loader2, Pin, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -164,10 +164,30 @@ const FormBody = forwardRef<HTMLDivElement, Omit<MediaEntryFormProps, 'open' | '
     }
   };
 
+  // ── Duplicate Check ──────────────────────────────────────────────────
+  const existingMedia = mediaService.getMedia();
+  const cleanTitle = title.trim().toLowerCase();
+  const cleanImdbId = imdbId?.trim().toLowerCase();
+  const duplicateItem = cleanTitle.length > 0
+    ? existingMedia.find(m => {
+        if (isEdit && initialData && m.id === initialData.id) return false;
+        const titleMatches = m.title.trim().toLowerCase() === cleanTitle;
+        const imdbMatches = cleanImdbId && m.imdbId && m.imdbId.trim().toLowerCase() === cleanImdbId;
+        return titleMatches || imdbMatches;
+      })
+    : undefined;
+  const isDuplicate = !!duplicateItem;
+
   // ── Submit ───────────────────────────────────────────────────────────
   const handleFormSubmit = async () => {
     if (isProcessing) return;
     if (!title.trim()) { toast.error('Title is required'); return; }
+
+    if (isDuplicate) {
+      haptics.medium();
+      toast.error(`"${duplicateItem?.title || title.trim()}" is already in your watchlist!`);
+      return;
+    }
 
     setIsProcessing(true);
     try {
@@ -245,11 +265,24 @@ const FormBody = forwardRef<HTMLDivElement, Omit<MediaEntryFormProps, 'open' | '
               onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
               placeholder={omdbConfigured ? 'Search movie or series title...' : 'e.g. Interstellar, Severance'}
               className={cn(
-                'h-9 text-xs rounded-xl bg-background/50 border-border/40 font-bold text-foreground',
-                omdbConfigured && 'pl-9'
+                'h-9 text-xs rounded-xl bg-background/50 border-border/40 font-bold text-foreground transition-colors',
+                omdbConfigured && 'pl-9',
+                isDuplicate && 'border-amber-500/60 focus:border-amber-500 bg-amber-500/5'
               )}
             />
           </div>
+
+          {/* Inline Duplicate Alert */}
+          {isDuplicate && (
+            <motion.div
+              initial={{ opacity: 0, y: -2 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-1.5 px-3 py-2 mt-1.5 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl"
+            >
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+              <span>"{duplicateItem?.title}" is already in your watchlist!</span>
+            </motion.div>
+          )}
 
           {/* Suggestions dropdown */}
           <AnimatePresence>
@@ -263,49 +296,64 @@ const FormBody = forwardRef<HTMLDivElement, Omit<MediaEntryFormProps, 'open' | '
                 className="absolute top-full left-0 right-0 mt-1.5 z-[9999] glass rounded-2xl border border-border/40 shadow-2xl overflow-hidden"
                 style={{ background: 'hsl(var(--background))', maxHeight: '260px', overflowY: 'auto' }}
               >
-                {suggestions.map((s, i) => (
-                  <button
-                    key={s.imdbId}
-                    type="button"
-                    onClick={() => handlePickSuggestion(s)}
-                    className={cn(
-                      'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/30',
-                      i !== 0 && 'border-t border-border/10'
-                    )}
-                  >
-                    {/* Poster thumb with onError fallback */}
-                    <div className="h-10 w-7 rounded-md overflow-hidden bg-muted/30 shrink-0 flex items-center justify-center">
-                      {s.posterUrl ? (
-                        <img
-                          src={s.posterUrl}
-                          alt={s.title}
-                          referrerPolicy="no-referrer"
-                          className="h-full w-full object-cover"
-                          onError={e => {
-                            (e.currentTarget as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <Film className="h-3.5 w-3.5 text-muted-foreground/50" />
+                {suggestions.map((s, i) => {
+                  const isSugDuplicate = existingMedia.some(m => {
+                    if (isEdit && initialData && m.id === initialData.id) return false;
+                    return m.title.trim().toLowerCase() === s.title.trim().toLowerCase() ||
+                      (s.imdbId && m.imdbId && m.imdbId.trim().toLowerCase() === s.imdbId.trim().toLowerCase());
+                  });
+
+                  return (
+                    <button
+                      key={s.imdbId}
+                      type="button"
+                      onClick={() => handlePickSuggestion(s)}
+                      className={cn(
+                        'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/30',
+                        i !== 0 && 'border-t border-border/10',
+                        isSugDuplicate && 'bg-amber-500/5'
                       )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-foreground truncate">{s.title}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {s.year} · {s.type === 'movie' ? 'Movie' : 'Series'}
-                      </p>
-                    </div>
-                    <span className={cn(
-                      'text-[8px] font-black uppercase px-1.5 py-0.5 rounded border shrink-0',
-                      s.type === 'movie'
-                        ? 'bg-purple-500/10 border-purple-500/20 text-purple-400'
-                        : 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400'
-                    )}>
-                      {s.type === 'movie' ? <Film className="h-2 w-2 inline mr-0.5" /> : <Tv className="h-2 w-2 inline mr-0.5" />}
-                      {s.type}
-                    </span>
-                  </button>
-                ))}
+                    >
+                      {/* Poster thumb with onError fallback */}
+                      <div className="h-10 w-7 rounded-md overflow-hidden bg-muted/30 shrink-0 flex items-center justify-center">
+                        {s.posterUrl ? (
+                          <img
+                            src={s.posterUrl}
+                            alt={s.title}
+                            referrerPolicy="no-referrer"
+                            className="h-full w-full object-cover"
+                            onError={e => {
+                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <Film className="h-3.5 w-3.5 text-muted-foreground/50" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs font-bold text-foreground truncate">{s.title}</p>
+                          {isSugDuplicate && (
+                            <span className="text-[8px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-1.5 py-0.5 rounded shrink-0">
+                              In Watchlist
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          {s.year} · {s.type === 'movie' ? 'Movie' : 'Series'}
+                        </p>
+                      </div>
+                      <span className={cn(
+                        'text-[8px] font-black uppercase px-1.5 py-0.5 rounded border shrink-0',
+                        s.type === 'movie'
+                          ? 'border-indigo-400/30 text-indigo-400 bg-indigo-400/10'
+                          : 'border-purple-400/30 text-purple-400 bg-purple-400/10'
+                      )}>
+                        {s.type}
+                      </span>
+                    </button>
+                  );
+                })}
               </motion.div>
             )}
           </AnimatePresence>
@@ -672,14 +720,24 @@ const FormBody = forwardRef<HTMLDivElement, Omit<MediaEntryFormProps, 'open' | '
       <div className="pt-2">
         <Button
           type="button"
-          disabled={isProcessing}
+          disabled={isProcessing || isDuplicate}
           onClick={handleFormSubmit}
-          className="w-full h-12 rounded-2xl bg-gradient-primary text-white font-bold text-sm shadow-lg shadow-primary/25 flex items-center justify-center gap-2 hover:opacity-95 active:scale-[0.98] transition-all"
+          className={cn(
+            'w-full h-12 rounded-2xl font-bold text-sm shadow-lg flex items-center justify-center gap-2 transition-all',
+            isDuplicate
+              ? 'bg-muted text-muted-foreground border border-amber-500/30 cursor-not-allowed shadow-none'
+              : 'bg-gradient-primary text-white shadow-primary/25 hover:opacity-95 active:scale-[0.98]'
+          )}
         >
           {isProcessing ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin text-white" />
               <span>{isEdit ? 'Updating Watchlist...' : 'Saving Watchlist...'}</span>
+            </>
+          ) : isDuplicate ? (
+            <>
+              <AlertTriangle className="h-4 w-4 text-amber-400" />
+              <span>Already in Watchlist</span>
             </>
           ) : success ? (
             <>

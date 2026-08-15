@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
-import { Fuel, Car, Bike, Plus, Trash2, Eye, ArrowRight, IndianRupee, MapPin, GaugeCircle, TrendingUp, Settings, Pencil, ChevronUp, ChevronDown, Wrench, ShieldAlert, CreditCard, Calendar } from 'lucide-react';
+import { Fuel, Car, Bike, Plus, Trash2, Eye, ArrowRight, IndianRupee, MapPin, GaugeCircle, TrendingUp, Settings, Pencil, ChevronUp, ChevronDown, Wrench, ShieldAlert, CreditCard, Calendar, Receipt } from 'lucide-react';
 import { FuelLog, VehicleRate } from '@/types/modules';
 import { fuelService, mileageService } from '@/lib/modules-storage';
+import { storageService } from '@/lib/storage';
+import { Expense } from '@/types/expense';
 import { haptics } from '@/lib/haptics';
 import { formatCurrency, cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -23,9 +25,10 @@ interface VehicleTrackerProps {
   vehicles: VehicleRate[];
   logs: FuelLog[];
   onRefresh: () => void;
+  onAddExpense?: (expense: Expense) => void;
 }
 
-export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProps) {
+export function VehicleTracker({ vehicles, logs, onRefresh, onAddExpense }: VehicleTrackerProps) {
   const [mode, setMode] = useState<'dashboard' | 'add' | 'vehicles'>('dashboard');
   const [viewMode, setViewMode] = useState<'roadway' | 'garage' | 'simple'>('roadway');
   
@@ -61,6 +64,42 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
   const handleDelete = (id: string) => {
     fuelService.removeLog(id);
     haptics.heavy();
+    reload();
+  };
+
+  const handleConvertFuelToExpense = (log: FuelLog, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const v = vehicles.find(veh => veh.id === log.vehicleId);
+    const vehicleName = v?.name || 'Vehicle';
+
+    const expenseObj: Expense = {
+      id: log.expenseId || crypto.randomUUID(),
+      date: log.date,
+      vendor: log.station ? `Fuel (${log.station})` : `Fuel - ${vehicleName}`,
+      category: 'transportation',
+      amount: log.totalCost,
+      currency: 'INR',
+      description: `Fuel refill: ${log.liters}L @ ₹${log.pricePerLiter}/L (${vehicleName} - Odo: ${log.odometer} km)`,
+      status: 'approved',
+      isReimbursement: false,
+      tags: ['Fuel', vehicleName, log.station || ''].filter(Boolean),
+      createdAt: log.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    storageService.addExpense(expenseObj);
+    if (onAddExpense) {
+      onAddExpense(expenseObj);
+    }
+
+    fuelService.updateLog({
+      ...log,
+      expenseId: expenseObj.id,
+      isExpenseAdded: true,
+    });
+
+    haptics.success();
+    toast.success('Fuel entry added as Expense!');
     reload();
   };
 
@@ -424,6 +463,7 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
           onSuccess={reload}
           editLog={editingLog}
           defaultVehicleId={activeVehId}
+          onAddExpense={onAddExpense}
         />
       </div>
     );
@@ -450,6 +490,7 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
           </button>
           <VehicleLogForm
             onSuccess={reload}
+            onAddExpense={onAddExpense}
             trigger={
               <button className="h-10 px-4 rounded-full bg-gradient-primary text-white text-xs font-bold flex items-center gap-2 shadow-glow active:scale-95 transition-all tracking-tight">
                 <Fuel className="h-4 w-4" /> Log Fuel
@@ -725,6 +766,11 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
                                 {log.station}
                               </span>
                             )}
+                            {log.isExpenseAdded && (
+                              <Badge variant="outline" className="h-4.5 px-1.5 text-[8px] border-primary/30 bg-primary/10 text-primary font-bold uppercase tracking-wider shrink-0 flex items-center gap-1">
+                                <Receipt className="h-2.5 w-2.5" /> Expense Added
+                              </Badge>
+                            )}
                             {log.missedPreviousRefill && (
                               <Badge variant="outline" className="h-4.5 px-1.5 text-[8px] border-warning/30 bg-warning/10 text-warning font-bold uppercase tracking-wider shrink-0">
                                 Missed Refill
@@ -773,6 +819,15 @@ export function VehicleTracker({ vehicles, logs, onRefresh }: VehicleTrackerProp
                           )}
                         </div>
                         <div className="flex items-center gap-2">
+                          {!log.isExpenseAdded && (
+                            <button 
+                              type="button"
+                              onClick={(e) => handleConvertFuelToExpense(log, e)} 
+                              className="h-9 px-3 bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary text-[10px] font-bold flex items-center gap-1.5 rounded-xl transition-all active:scale-95 shadow-sm"
+                            >
+                              <Receipt className="h-3.5 w-3.5" /> + Expense
+                            </button>
+                          )}
                           <button 
                             onClick={(e) => { 
                               e.stopPropagation();

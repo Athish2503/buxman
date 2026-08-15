@@ -24,6 +24,10 @@ export interface FuelLog {
   notes?: string;
   missedPreviousRefill?: boolean;
   
+  // Expense Integration
+  expenseId?: string;
+  isExpenseAdded?: boolean;
+
   // Computed (set during save or calculation)
   distanceSinceLast?: number;
   economy?: number; // km per liter

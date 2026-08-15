@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { 
   X, Star, Film, Tv, Clock, User, Pin, PinOff, Edit2, Trash2, 
-  Play, Check, Award, ShieldAlert, Sparkles, Share2 
+  Play, Check, Award, ShieldAlert, Sparkles, Share2, FolderHeart
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ export interface MediaDetailModalProps {
   onTogglePin: (item: MediaRecommendation) => void;
   onStartWatching: (item: MediaRecommendation) => void;
   onRate: (item: MediaRecommendation) => void;
+  onManageLists?: (item: MediaRecommendation) => void;
   contactName?: string;
 }
 
@@ -33,6 +34,7 @@ export function MediaDetailModal({
   onTogglePin,
   onStartWatching,
   onRate,
+  onManageLists,
   contactName = 'Self',
 }: MediaDetailModalProps) {
   const isMobile = useIsMobile();
@@ -295,17 +297,31 @@ export function MediaDetailModal({
           </div>
         )}
 
-        {/* Footer Controls (Pin, Edit, Delete) */}
+        {/* Footer Controls (Pin, Lists, Edit, Delete) */}
         <div className="pt-2 flex items-center justify-between border-t border-border/20">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onTogglePin(item)}
-            className="h-9 px-3 text-xs font-bold gap-1.5 rounded-xl text-muted-foreground hover:text-foreground"
-          >
-            {item.pinned ? <PinOff className="h-4 w-4 text-amber-400" /> : <Pin className="h-4 w-4" />}
-            <span>{item.pinned ? 'Unpin' : 'Pin'}</span>
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onTogglePin(item)}
+              className="h-9 px-2.5 text-xs font-bold gap-1.5 rounded-xl text-muted-foreground hover:text-foreground"
+            >
+              {item.pinned ? <PinOff className="h-4 w-4 text-amber-400" /> : <Pin className="h-4 w-4" />}
+              <span>{item.pinned ? 'Unpin' : 'Pin'}</span>
+            </Button>
+
+            {onManageLists && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onManageLists(item)}
+                className="h-9 px-2.5 text-xs font-bold gap-1.5 rounded-xl text-muted-foreground hover:text-foreground"
+              >
+                <FolderHeart className="h-4 w-4 text-primary" />
+                <span>Lists</span>
+              </Button>
+            )}
+          </div>
 
           <div className="flex items-center gap-2">
             <Button

@@ -1,12 +1,14 @@
 import { VehicleTracker } from '@/components/fuel-tracker';
+import { Expense } from '@/types/expense';
 
 interface GarageModuleProps {
   vehicles: any[];
   logs: any[];
   onRefresh: () => void;
+  onAddExpense?: (expense: Expense) => void;
 }
 
-export function GarageModule({ vehicles, logs, onRefresh }: GarageModuleProps) {
+export function GarageModule({ vehicles, logs, onRefresh, onAddExpense }: GarageModuleProps) {
   return (
     <div className="animate-in fade-in duration-500 space-y-5">
       <div className="mb-6 px-1">
@@ -17,6 +19,7 @@ export function GarageModule({ vehicles, logs, onRefresh }: GarageModuleProps) {
         vehicles={vehicles}
         logs={logs}
         onRefresh={onRefresh}
+        onAddExpense={onAddExpense}
       />
     </div>
   );

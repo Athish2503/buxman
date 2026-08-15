@@ -708,7 +708,7 @@ export function ExpenseForm({
                   <div className="h-7 w-7 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
                     <Receipt className="h-3.5 w-3.5 text-white" />
                   </div>
-                  <h2 className="text-sm font-bold leading-none">New Expense</h2>
+                  <h2 className="text-sm font-bold leading-none">{isEdit ? 'Edit Expense' : 'New Expense'}</h2>
                 </div>
                 <button
                   onClick={() => setOpen(false)}
@@ -745,8 +745,8 @@ export function ExpenseForm({
                     <Sparkles className="h-4 w-4 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold leading-none">New Expense</h2>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Fill in the details below</p>
+                    <h2 className="text-sm font-bold leading-none">{isEdit ? 'Edit Expense' : 'New Expense'}</h2>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{isEdit ? 'Update expense details' : 'Fill in the details below'}</p>
                   </div>
                 </div>
                 <button

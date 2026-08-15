@@ -246,6 +246,7 @@ const Index = () => {
           <GarageModule
             vehicles={vehicles}
             logs={logs}
+            onAddExpense={handleAddExpense}
             onRefresh={() => {
               setLogs(fuelService.getLogs());
               setVehicles(mileageService.getVehicles());

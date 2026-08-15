@@ -10,6 +10,17 @@ export type MediaPlatform =
   | 'youtube'
   | 'other';
 
+export interface CustomMediaList {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string; // 'purple' | 'cyan' | 'amber' | 'emerald' | 'rose' | 'indigo'
+  emoji?: string; // e.g. "🍿", "🚀", "🔥", "⭐", "🎬"
+  itemIds: string[]; // List of MediaRecommendation IDs in this list
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface MediaRecommendation {
   id: string;
   title: string;
@@ -22,6 +33,7 @@ export interface MediaRecommendation {
   // New fields
   platform?: MediaPlatform;
   pinned?: boolean;
+  listIds?: string[]; // IDs of CustomMediaLists this item belongs to
   // OMDb rich details
   imdbId?: string;
   imdbRating?: string;  // e.g. "8.6/10"
