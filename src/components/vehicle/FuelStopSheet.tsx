@@ -35,10 +35,8 @@ export const FuelStopSheet: React.FC<FuelStopSheetProps> = ({
   onEdit,
   onDelete,
 }) => {
-  if (!log) return null;
-
   // Efficiency tier status
-  const economyVal = log.economy || 0;
+  const economyVal = log?.economy || 0;
   const ecoRating =
     economyVal >= 45
       ? { label: 'Excellent Mileage', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' }
@@ -50,25 +48,26 @@ export const FuelStopSheet: React.FC<FuelStopSheetProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[9995] flex items-end justify-center pointer-events-none">
-        {/* Backdrop overlay */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/65 backdrop-blur-sm pointer-events-auto"
-          onClick={onClose}
-        />
+      {log && (
+        <div className="fixed inset-0 z-[9995] flex items-end justify-center pointer-events-none">
+          {/* Backdrop overlay */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/65 backdrop-blur-sm pointer-events-auto"
+            onClick={onClose}
+          />
 
-        {/* Bottom Sheet Modal Card */}
-        <motion.div
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-          className="relative w-full max-w-lg bg-slate-950 border-t border-slate-800 rounded-t-3xl p-6 shadow-2xl pointer-events-auto backdrop-blur-xl space-y-5 max-h-[90vh] overflow-y-auto"
-        >
-          {/* Top Drag Handle */}
+          {/* Bottom Sheet Modal Card */}
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+            className="relative w-full max-w-lg bg-slate-950 border-t border-slate-800 rounded-t-3xl p-6 shadow-2xl pointer-events-auto backdrop-blur-xl space-y-5 max-h-[90vh] overflow-y-auto z-10"
+          >
+            {/* Top Drag Handle */}
           <div className="flex justify-center -mt-2 mb-1">
             <div className="w-12 h-1.5 rounded-full bg-slate-700/60" />
           </div>
@@ -216,7 +215,7 @@ export const FuelStopSheet: React.FC<FuelStopSheetProps> = ({
             <button
               onClick={() => {
                 haptics.heavy();
-                onDelete(log.id);
+                if (log) onDelete(log.id);
                 onClose();
               }}
               className="h-12 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 font-bold flex items-center justify-center gap-2 active:scale-95 transition-all text-sm shadow-md"
@@ -227,6 +226,7 @@ export const FuelStopSheet: React.FC<FuelStopSheetProps> = ({
           </div>
         </motion.div>
       </div>
+      )}
     </AnimatePresence>
   );
 };
