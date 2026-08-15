@@ -379,6 +379,8 @@ export function VehicleTracker({ vehicles, logs, onRefresh, onAddExpense }: Vehi
         {viewMode === 'roadway' ? (
           <JourneyTimeline 
             vehicle={activeVeh}
+            vehicles={vehicles}
+            onSelectVehicle={setActiveVehId}
             logs={activeLogs}
             onAddLog={() => {
               setEditingLog(undefined);
@@ -388,6 +390,7 @@ export function VehicleTracker({ vehicles, logs, onRefresh, onAddExpense }: Vehi
               setEditingLog(log);
               setShowLogForm(true);
             }}
+            onDeleteLog={handleDelete}
             onManageVehicle={() => {
               setMode('vehicles');
               haptics.selection();
@@ -435,18 +438,43 @@ export function VehicleTracker({ vehicles, logs, onRefresh, onAddExpense }: Vehi
                 </div>
 
                 <div className="space-y-3 px-2">
-                   <h3 className="text-sm font-bold opacity-40 uppercase tracking-widest">Recent Logs</h3>
+                   <h3 className="text-sm font-bold opacity-40 uppercase tracking-widest">Recent Logs Details</h3>
                    {activeLogs.map(log => (
                       <div 
                         key={log.id} 
                         onClick={() => { setEditingLog(log); setShowLogForm(true); haptics.light(); }}
-                        className="p-4 rounded-2xl bg-card/40 border border-white/5 glass flex justify-between items-center cursor-pointer active:scale-[0.98] transition-all hover:bg-white/5"
+                        className="p-4 rounded-2xl bg-card/60 border border-white/10 glass flex flex-col gap-3 cursor-pointer active:scale-[0.98] transition-all hover:bg-white/5 shadow-lg"
                       >
-                         <div>
-                            <p className="font-bold">{log.odometer.toLocaleString()} KM</p>
-                            <p className="text-[10px] opacity-40">{format(new Date(log.date), 'dd MMM yyyy')}</p>
+                         <div className="flex justify-between items-start">
+                            <div>
+                               <div className="flex items-center gap-2">
+                                  <p className="font-black text-lg font-mono tracking-tight">{log.odometer.toLocaleString()} KM</p>
+                                  {log.station && (
+                                     <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-primary/10 text-primary border border-primary/20">
+                                        {log.station}
+                                     </span>
+                                  )}
+                                  {log.isExpenseAdded && (
+                                     <Badge variant="outline" className="h-4.5 px-1.5 text-[8px] border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                                        <Receipt className="h-2.5 w-2.5" /> Expense
+                                     </Badge>
+                                  )}
+                               </div>
+                               <p className="text-[10px] opacity-60 mt-0.5 flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" /> {format(new Date(log.date), 'dd MMM yyyy')} · {log.liters} L @ ₹{log.pricePerLiter}/L
+                               </p>
+                            </div>
+                            <p className="text-primary font-black text-xl font-mono">{formatCurrency(log.totalCost)}</p>
                          </div>
-                         <p className="text-primary font-black">{formatCurrency(log.totalCost)}</p>
+
+                         <div className="flex items-center justify-between pt-2 border-t border-white/5 text-xs">
+                            <span className="text-[10px] text-muted-foreground font-semibold">
+                               Distance: <strong className="text-foreground">+{log.distanceSinceLast || 0} km</strong>
+                            </span>
+                            <span className="text-[10px] font-bold text-emerald-400">
+                               Efficiency: {log.economy ? `${log.economy.toFixed(1)} km/l` : '--'}
+                            </span>
+                         </div>
                       </div>
                    ))}
                 </div>
