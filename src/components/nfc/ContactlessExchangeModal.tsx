@@ -24,7 +24,8 @@ import { Badge } from '@/components/ui/badge';
 import { NfcExchangePayload, NfcMode, NfcSplitDebtPayload, NfcReportPayload, NfcExpensePayload } from '@/types/nfc';
 import { nfcService } from '@/lib/nfc-service';
 import { haptics } from '@/lib/haptics';
-import { useTransactionStore } from '@/lib/useTransactionStore';
+import { storageService } from '@/lib/storage';
+import { Expense } from '@/types/expense';
 import { contactService } from '@/lib/contact-service';
 
 interface ContactlessExchangeModalProps {
@@ -49,17 +50,19 @@ export function ContactlessExchangeModal({
   const [statusText, setStatusText] = useState<string>('Ready for contactless tap');
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
 
-  const addExpense = useTransactionStore((state) => state.addExpense);
-
   useEffect(() => {
     setNfcSupported(nfcService.isSupported());
   }, []);
 
   useEffect(() => {
-    if (initialPayload) {
-      setPayload(initialPayload);
+    if (isOpen) {
+      setReceivedPayload(null);
+      setIsSuccess(false);
+      if (initialPayload) {
+        setPayload(initialPayload);
+      }
     }
-  }, [initialPayload]);
+  }, [isOpen, initialPayload]);
 
   // Generate QR fallback whenever payload is updated
   useEffect(() => {
@@ -94,6 +97,7 @@ export function ContactlessExchangeModal({
     setIsListening(true);
     setStatusText('Hold back of phone near sender device...');
 
+    let cancelled = false;
     let stopFn: (() => void) | null = null;
 
     nfcService.startListening(
@@ -108,10 +112,15 @@ export function ContactlessExchangeModal({
         setStatusText('Waiting for phone tap...');
       }
     ).then(cleanup => {
-      stopFn = cleanup;
+      if (cancelled) {
+        cleanup?.();
+      } else {
+        stopFn = cleanup;
+      }
     });
 
     return () => {
+      cancelled = true;
       if (stopFn) stopFn();
       nfcService.stopListening();
       setIsListening(false);
@@ -152,16 +161,19 @@ export function ContactlessExchangeModal({
     const contacts = contactService.getContacts();
     let contact = contacts.find(c => c.name.toLowerCase() === debt.senderName.toLowerCase());
     if (!contact) {
-      contact = contactService.addContact(debt.senderName, debt.senderUpi);
+      contact = contactService.addContact({ name: debt.senderName, upiId: debt.senderUpi });
     }
 
-    // Add expense to store with split
-    addExpense({
-      vendor: debt.vendor,
-      amount: debt.totalAmount,
-      category: debt.category as any,
+    const newExpense: Expense = {
+      id: crypto.randomUUID(),
       date: debt.date || new Date().toISOString(),
-      notes: `[Contactless Import from ${debt.senderName}] ${debt.notes || ''}`,
+      vendor: debt.vendor || 'Imported Split',
+      category: debt.category || 'General',
+      amount: debt.totalAmount,
+      currency: 'INR',
+      description: `[Contactless Import from ${debt.senderName}] ${debt.notes || ''}`,
+      status: 'pending',
+      isReimbursement: false,
       paidBy: contact.id,
       split: {
         totalAmount: debt.totalAmount,
@@ -174,8 +186,12 @@ export function ContactlessExchangeModal({
             paid: true
           }
         ]
-      }
-    });
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    storageService.addExpense(newExpense);
 
     haptics.success();
     toast.success(`Imported debt from ${debt.senderName}!`, {
@@ -189,13 +205,23 @@ export function ContactlessExchangeModal({
     if (!receivedPayload || receivedPayload.type !== 'EXPENSE_IMPORT') return;
     const exp = (receivedPayload as NfcExpensePayload).expense;
 
-    addExpense({
-      vendor: exp.vendor || 'Beamed Expense',
-      amount: exp.amount || 0,
-      category: exp.category || 'General',
+    const newExpense: Expense = {
+      id: exp.id || crypto.randomUUID(),
       date: exp.date || new Date().toISOString(),
-      notes: `[Beamed Via NFC] ${exp.notes || ''}`
-    });
+      vendor: exp.vendor || 'Beamed Expense',
+      category: exp.category || 'General',
+      amount: exp.amount || 0,
+      currency: exp.currency || 'INR',
+      description: `[Beamed Via NFC] ${(exp as { notes?: string }).notes || exp.description || ''}`,
+      status: exp.status || 'pending',
+      isReimbursement: exp.isReimbursement ?? false,
+      paidBy: exp.paidBy,
+      split: exp.split,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    storageService.addExpense(newExpense);
 
     haptics.success();
     toast.success('Expense imported to workspace!');
@@ -454,7 +480,13 @@ export function ContactlessExchangeModal({
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-4 text-center"
               >
-                {qrDataUrl ? (
+                {!payload ? (
+                  <div className="py-12 flex flex-col items-center justify-center text-center space-y-2">
+                    <AlertCircle className="h-8 w-8 text-amber-400 opacity-60" />
+                    <p className="text-xs font-bold text-foreground">No Payload Selected to Beam</p>
+                    <p className="text-[11px] text-muted-foreground max-w-xs">Select an expense or split debt first to display its contactless QR code.</p>
+                  </div>
+                ) : qrDataUrl ? (
                   <div className="flex flex-col items-center justify-center space-y-3">
                     <div className="p-3 bg-white rounded-3xl shadow-2xl shadow-cyan-500/20 border border-white/20">
                       <img src={qrDataUrl} alt="Peer Beam QR" className="w-56 h-56 rounded-2xl" />

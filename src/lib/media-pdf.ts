@@ -26,7 +26,7 @@ const st  = (pdf: jsPDF, c: [number,number,number]) => pdf.setTextColor(c[0], c[
 const sd  = (pdf: jsPDF, c: [number,number,number]) => pdf.setDrawColor(c[0], c[1], c[2]);
 
 function stars(rating: number): string {
-  return '★'.repeat(rating) + '☆'.repeat(5 - rating);
+  return `Rating: ${rating}/5 Stars`;
 }
 
 /**
@@ -77,7 +77,7 @@ export async function generateWatchlistPDF(
   sf(pdf, P.accent);
   pdf.roundedRect(M, 14, 4, 38, 4, 4, 'F');
 
-  text('🎬 Watchlist', M + 10, 27, 18, P.white, 'bold');
+  text('WATCHLIST REPORT', M + 10, 27, 18, P.white, 'bold');
   text('PIXEL REIMBURSE', M + 10, 34, 7.5, P.muted, 'normal');
   text(`Exported ${format(new Date(), 'dd MMM yyyy, h:mm a')}`, M + 10, 41, 7.5, P.muted, 'normal');
 
@@ -98,7 +98,7 @@ export async function generateWatchlistPDF(
     { label: 'To Watch', value: String(toWatch), color: P.muted },
     { label: 'Watching', value: String(watching), color: P.cyan },
     { label: 'Watched', value: String(watched), color: P.emerald },
-    { label: 'Avg ★', value: avgRating, color: P.amber },
+    { label: 'Avg Rating', value: avgRating, color: P.amber },
   ];
   let sx = statsX;
   [...statsItems].reverse().forEach(stat => {
@@ -142,7 +142,10 @@ export async function generateWatchlistPDF(
     y += 16;
 
     for (const item of items) {
-      const ROW_H = item.notes ? 22 : 16;
+      const hasRating = !!item.rating;
+      const hasNotes = !!item.notes;
+      const ROW_H = (hasRating && hasNotes) ? 26 : (hasNotes || hasRating) ? 22 : 17;
+
       if (y + ROW_H + 4 > H - 12) {
         pdf.addPage();
         sf(pdf, P.bg);
@@ -160,23 +163,20 @@ export async function generateWatchlistPDF(
         pdf.circle(M + 3, y + ROW_H/2, 1.2, 'F');
       }
 
-      // Poster thumbnail (if available)
-      let textStartX = M + 8;
-      // Note: loading external images in jsPDF on web is tricky without CORS proxy,
-      // so we skip poster rendering and just show a placeholder box
+      // Type Badge Box
       sf(pdf, P.surface);
-      pdf.roundedRect(M + 6, y + 2, 9, 12, 1, 1, 'F');
-      text(item.type === 'movie' ? '🎬' : '📺', M + 7, y + 10, 7, P.muted, 'normal');
-      textStartX = M + 18;
+      pdf.roundedRect(M + 6, y + 2.5, 11, 11, 1, 1, 'F');
+      text(item.type === 'movie' ? 'FILM' : 'SERIES', M + 11.5, y + 9.5, 5, P.muted, 'bold', 'center');
+      const textStartX = M + 20;
 
       // Title + year
       const titleText = item.releaseYear ? `${item.title} (${item.releaseYear})` : item.title;
-      const truncTitle = titleText.length > 55 ? titleText.substring(0, 53) + '…' : titleText;
+      const truncTitle = titleText.length > 52 ? titleText.substring(0, 50) + '…' : titleText;
       text(truncTitle, textStartX, y + 7, 8.5, P.white, 'bold');
 
       // Genre chips (text only)
       const genreStr = item.genres.slice(0, 3).join(' · ');
-      if (genreStr) text(genreStr, textStartX, y + 12, 6.5, P.muted, 'normal');
+      if (genreStr) text(genreStr, textStartX, y + 11.5, 6.5, P.muted, 'normal');
 
       // Platform
       const platformLabel = item.platform
@@ -193,15 +193,18 @@ export async function generateWatchlistPDF(
       const rec = item.recommendedBy ? (contactMap[item.recommendedBy] || 'Friend') : 'Self';
       text(`From: ${rec}`, W - M - 2, y + 13, 6, P.muted, 'normal', 'right');
 
+      let currentOffset = y + 15.5;
+
       // Rating stars
       if (item.rating) {
-        text(stars(item.rating), textStartX, y + 17, 7, P.amber, 'normal');
+        text(stars(item.rating), textStartX, currentOffset, 6.5, P.amber, 'bold');
+        currentOffset += 4.5;
       }
 
       // Notes
-      if (item.notes && ROW_H > 16) {
-        const truncNotes = item.notes.length > 80 ? item.notes.substring(0, 78) + '…' : item.notes;
-        text(`"${truncNotes}"`, textStartX, y + 19.5, 6, P.muted, 'normal');
+      if (item.notes) {
+        const truncNotes = item.notes.length > 75 ? item.notes.substring(0, 73) + '…' : item.notes;
+        text(`"${truncNotes}"`, textStartX, currentOffset, 6, P.muted, 'normal');
       }
 
       y += ROW_H + 3;
@@ -229,9 +232,14 @@ export async function generateWatchlistPDF(
   const fileName = `watchlist-${format(new Date(), 'yyyyMMdd-HHmm')}.pdf`;
 
   if (Capacitor.isNativePlatform()) {
-    const data = pdf.output('datauristring').split(',')[1];
-    const res  = await Filesystem.writeFile({ path: fileName, data, directory: Directory.Cache });
-    await Share.share({ title: 'My Watchlist', files: [res.uri] });
+    try {
+      const data = pdf.output('datauristring').split(',')[1];
+      const res  = await Filesystem.writeFile({ path: fileName, data, directory: Directory.Cache });
+      await Share.share({ title: 'My Watchlist', files: [res.uri] });
+    } catch (e) {
+      console.error('Failed native PDF share:', e);
+      pdf.save(fileName);
+    }
   } else {
     pdf.save(fileName);
   }

@@ -82,6 +82,12 @@ export function MediaDashboard() {
   const [selectedDetailItem, setSelectedDetailItem] = useState<MediaRecommendation | null>(null);
   const [isDetailOpen, setIsDetailOpen]             = useState(false);
 
+  // Keep selected detail item synced with live mediaList state
+  const activeDetailItem = useMemo(() => {
+    if (!selectedDetailItem) return null;
+    return mediaList.find(m => m.id === selectedDetailItem.id) || selectedDetailItem;
+  }, [selectedDetailItem, mediaList]);
+
   // Rate modal
   const [isRateOpen, setIsRateOpen]   = useState(false);
   const [ratingItem, setRatingItem]   = useState<MediaRecommendation | null>(null);
@@ -192,7 +198,7 @@ export function MediaDashboard() {
   const handleOpenAdd = () => { setEditingItem(null); setIsFormOpen(true); haptics.selection(); };
   const handleOpenEdit = (item: MediaRecommendation) => { setEditingItem(item); setIsFormOpen(true); haptics.selection(); };
   const handleSaveItem = (payload: Omit<MediaRecommendation, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (editingItem) {
+    if (editingItem && editingItem.id) {
       mediaService.updateMedia({ ...editingItem, ...payload });
     } else {
       mediaService.addMedia(payload);
@@ -797,7 +803,11 @@ export function MediaDashboard() {
                       e.preventDefault();
                       setDragOverColumn(col.id);
                     }}
-                    onDragLeave={() => setDragOverColumn(null)}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                        setDragOverColumn(null);
+                      }
+                    }}
                     onDrop={(e) => {
                       e.preventDefault();
                       setDragOverColumn(null);
@@ -810,7 +820,7 @@ export function MediaDashboard() {
                       }
                     }}
                     className={cn(
-                      "w-[85vw] sm:w-[340px] shrink-0 snap-center md:w-auto md:shrink md:snap-align-none",
+                      "w-full sm:w-[340px] shrink-0 snap-center md:w-auto md:shrink md:snap-align-none",
                       "flex flex-col gap-3 glass rounded-3xl p-3.5 sm:p-4 border transition-all bg-gradient-to-b min-h-[480px]",
                       col.columnBg,
                       isDragOver ? "ring-2 ring-primary border-primary bg-primary/10" : col.accentColor,
@@ -865,7 +875,7 @@ export function MediaDashboard() {
                               key={item.id}
                               layout
                               draggable
-                              onDragStart={(e) => {
+                              onDragStart={(e: any) => {
                                 e.dataTransfer.setData('text/plain', item.id);
                                 setDraggedItemId(item.id);
                               }}
@@ -1313,7 +1323,7 @@ export function MediaDashboard() {
 
       {/* ── Detail Modal ──────────────────────────────────────────────── */}
       <MediaDetailModal
-        item={selectedDetailItem}
+        item={activeDetailItem}
         open={isDetailOpen}
         onOpenChange={setIsDetailOpen}
         onEdit={(item) => handleOpenEdit(item)}
@@ -1322,7 +1332,7 @@ export function MediaDashboard() {
         onStartWatching={(item) => handleStartWatching(item)}
         onRate={(item) => handleOpenRate(item)}
         onManageLists={(item) => handleOpenManageLists(item)}
-        contactName={getFriendName(selectedDetailItem?.recommendedBy)}
+        contactName={getFriendName(activeDetailItem?.recommendedBy)}
       />
 
       {/* ── Manage Custom Lists Modal ────────────────────────────────────── */}
@@ -1341,7 +1351,7 @@ export function MediaDashboard() {
         onOpenChange={setIsFormOpen}
         onSubmit={handleSaveItem}
         initialData={editingItem || undefined}
-        isEdit={!!editingItem}
+        isEdit={!!(editingItem && editingItem.id)}
       />
 
       {/* ── Rate & Review Modal ───────────────────────────────────────── */}

@@ -76,7 +76,7 @@ export const RoadwayView: React.FC<RoadwayViewProps> = ({
   return (
     <div
       className={`min-h-screen bg-slate-950 text-slate-100 transition-all duration-300 relative ${
-        isFullscreen ? 'fixed inset-0 z-[9999] overflow-y-auto p-4 md:p-8 bg-slate-950' : 'pb-28'
+        isFullscreen ? 'fixed inset-0 z-[9999] overflow-y-auto p-4 md:p-8 bg-slate-950' : 'pb-12'
       }`}
     >
       {/* Fleet Vehicle Switcher (if multiple vehicles exist) */}
@@ -247,23 +247,6 @@ export const RoadwayView: React.FC<RoadwayViewProps> = ({
         onEdit={onEditLog}
         onDelete={onDeleteLog}
       />
-
-      {/* Floating Bottom Action Bar (+ Log Fuel Button) */}
-      <div className="fixed bottom-6 left-0 right-0 z-40 flex justify-center px-4 pointer-events-none">
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={() => {
-            haptics.medium();
-            onAddLog();
-          }}
-          className="h-14 px-7 rounded-full bg-gradient-to-r from-sky-500 via-emerald-500 to-teal-500 text-slate-950 font-black text-sm flex items-center gap-3 shadow-2xl shadow-emerald-500/25 pointer-events-auto border border-white/30 tracking-tight"
-        >
-          <div className="h-8 w-8 rounded-full bg-slate-950/20 flex items-center justify-center">
-            <Plus className="h-5 w-5 stroke-[3]" />
-          </div>
-          <span>Log New Fuel Entry</span>
-        </motion.button>
-      </div>
     </div>
   );
 };

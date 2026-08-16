@@ -11,6 +11,7 @@ import { MediaRecommendation } from '@/types/media';
 import { PLATFORM_CONFIG } from './platformConfig';
 import { cn } from '@/lib/utils';
 import { haptics } from '@/lib/haptics';
+import { toast } from 'sonner';
 
 export interface MediaDetailModalProps {
   item: MediaRecommendation | null;
@@ -297,7 +298,7 @@ export function MediaDetailModal({
           </div>
         )}
 
-        {/* Footer Controls (Pin, Lists, Edit, Delete) */}
+        {/* Footer Controls (Pin, Lists, Share, Edit, Delete) */}
         <div className="pt-2 flex items-center justify-between border-t border-border/20">
           <div className="flex items-center gap-1">
             <Button
@@ -321,6 +322,28 @@ export function MediaDetailModal({
                 <span>Lists</span>
               </Button>
             )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                haptics.light();
+                const shareText = `Check out "${item.title}" (${item.type === 'movie' ? 'Movie' : 'Series'})! ${item.imdbRating ? `IMDb: ${item.imdbRating}/10.` : ''} ${item.notes ? `Notes: ${item.notes}` : ''}`;
+                if (navigator.share) {
+                  try {
+                    await navigator.share({ title: item.title, text: shareText });
+                  } catch {}
+                } else {
+                  await navigator.clipboard.writeText(shareText);
+                  toast.success('Recommendation details copied to clipboard!');
+                }
+              }}
+              className="h-9 px-2.5 text-xs font-bold gap-1.5 rounded-xl text-muted-foreground hover:text-foreground"
+              title="Share Recommendation"
+            >
+              <Share2 className="h-4 w-4 text-cyan-400" />
+              <span>Share</span>
+            </Button>
           </div>
 
           <div className="flex items-center gap-2">

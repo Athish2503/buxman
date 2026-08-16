@@ -164,6 +164,13 @@ const FormBody = forwardRef<HTMLDivElement, Omit<MediaEntryFormProps, 'open' | '
     }
   };
 
+  // Clean up search debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (searchDebounce.current) clearTimeout(searchDebounce.current);
+    };
+  }, []);
+
   // ── Duplicate Check ──────────────────────────────────────────────────
   const existingMedia = mediaService.getMedia();
   const cleanTitle = title.trim().toLowerCase();
@@ -172,11 +179,12 @@ const FormBody = forwardRef<HTMLDivElement, Omit<MediaEntryFormProps, 'open' | '
     ? existingMedia.find(m => {
         if (isEdit && initialData && m.id === initialData.id) return false;
         const titleMatches = m.title.trim().toLowerCase() === cleanTitle;
-        const imdbMatches = cleanImdbId && m.imdbId && m.imdbId.trim().toLowerCase() === cleanImdbId;
+        const imdbMatches = !!(cleanImdbId && m.imdbId && m.imdbId.trim().toLowerCase() === cleanImdbId);
         return titleMatches || imdbMatches;
       })
     : undefined;
-  const isDuplicate = !!duplicateItem;
+  const isExactDuplicate = !!(duplicateItem && cleanImdbId && duplicateItem.imdbId?.trim().toLowerCase() === cleanImdbId);
+  const isDuplicate = isExactDuplicate;
 
   // ── Submit ───────────────────────────────────────────────────────────
   const handleFormSubmit = async () => {
@@ -772,6 +780,7 @@ export function MediaEntryForm({
 
   const formContent = (
     <FormBody
+      key={initialData?.id || (open ? 'open' : 'closed')}
       onSubmit={onSubmit}
       initialData={initialData}
       isEdit={isEdit}

@@ -60,10 +60,21 @@ export function ManageListsModal({
     if (open) {
       refreshLists();
       setIsCreating(initialCreate);
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
     }
-  }, [open, initialCreate]);
 
-  if (!open) return null;
+    const handleListsUpdated = () => {
+      setLists(mediaService.getCustomLists());
+    };
+
+    window.addEventListener('media-lists-updated', handleListsUpdated);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('media-lists-updated', handleListsUpdated);
+    };
+  }, [open, initialCreate]);
 
   const handleCreateList = () => {
     if (!newListName.trim()) {
@@ -285,6 +296,7 @@ export function ManageListsModal({
                             key={idx}
                             src={url}
                             alt=""
+                            referrerPolicy="no-referrer"
                             className="h-9 w-6 rounded object-cover border border-background shadow-sm"
                             onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                           />
@@ -339,7 +351,37 @@ export function ManageListsModal({
   if (isMobile) {
     return createPortal(
       <AnimatePresence>
-        <div className="fixed inset-0 z-[9999] flex items-end justify-center">
+        {open && (
+          <div className="fixed inset-0 z-[9999] flex items-end justify-center">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => onOpenChange(false)}
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-lg glass-dark border-t border-border/40 rounded-t-[2.5rem] shadow-2xl overflow-hidden z-10"
+              style={{ background: 'hsl(var(--background))' }}
+            >
+              <div className="w-12 h-1 bg-muted-foreground/30 rounded-full mx-auto mt-3 mb-1" />
+              {modalBody}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>,
+      document.body
+    );
+  }
+
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -348,42 +390,16 @@ export function ManageListsModal({
             className="fixed inset-0 bg-black/70 backdrop-blur-sm"
           />
           <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="relative w-full max-w-lg glass-dark border-t border-border/40 rounded-t-[2.5rem] shadow-2xl overflow-hidden z-10"
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            className="relative w-full max-w-md glass rounded-[2.5rem] border border-border/40 shadow-2xl overflow-hidden z-10"
             style={{ background: 'hsl(var(--background))' }}
           >
-            <div className="w-12 h-1 bg-muted-foreground/30 rounded-full mx-auto mt-3 mb-1" />
             {modalBody}
           </motion.div>
         </div>
-      </AnimatePresence>,
-      document.body
-    );
-  }
-
-  return createPortal(
-    <AnimatePresence>
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={() => onOpenChange(false)}
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm"
-        />
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          className="relative w-full max-w-md glass rounded-[2.5rem] border border-border/40 shadow-2xl overflow-hidden z-10"
-          style={{ background: 'hsl(var(--background))' }}
-        >
-          {modalBody}
-        </motion.div>
-      </div>
+      )}
     </AnimatePresence>,
     document.body
   );

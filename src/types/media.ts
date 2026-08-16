@@ -35,6 +35,8 @@ export interface MediaRecommendation {
   pinned?: boolean;
   listIds?: string[]; // IDs of CustomMediaLists this item belongs to
   // OMDb rich details
+  posterUrl?: string;   // Image poster URL from OMDb or user input
+  releaseYear?: string; // Release year e.g. "2023" or "2010"
   imdbId?: string;
   imdbRating?: string;  // e.g. "8.6/10"
   plot?: string;        // Synopsis from OMDb
