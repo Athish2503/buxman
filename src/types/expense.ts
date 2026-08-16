@@ -49,7 +49,16 @@ export interface BudgetGoal {
   period: 'monthly' | 'quarterly' | 'yearly';
 }
 
+export interface UserProfile {
+  name: string;
+  nickname?: string;
+  avatarEmoji?: string;
+  avatarIcon?: string;
+  roleTagline?: string;
+}
+
 export interface AppSettings {
+  userProfile?: UserProfile;
   billedTo: {
     name: string;
     line2: string;

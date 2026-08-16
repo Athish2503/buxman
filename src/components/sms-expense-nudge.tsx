@@ -25,7 +25,8 @@ export function SMSExpenseNudge({ onAdd }: SMSExpenseNudgeProps) {
       if (typeof body !== 'string') return;
       
       const parsed = smsParser.parse(body);
-      if (parsed) {
+      const isVerification = body.toLowerCase().includes('mandate') || body.toLowerCase().includes('verification') || body.toLowerCase().includes('penny drop');
+      if (parsed && parsed.amount > 1.0 && !isVerification) {
         setDetected(parsed);
         haptics.heavy();
       }

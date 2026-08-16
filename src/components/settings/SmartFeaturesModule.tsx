@@ -337,6 +337,27 @@ export function SmartFeaturesModule({ permissionsStatus, onBack }: SmartFeatures
               variant="outline" 
               className="h-12 rounded-2xl border-white/10 hover:bg-white/5 text-xs font-bold gap-2"
               onClick={async () => {
+                const sampleText = "Rs.500.00 debited from A/c **1234 on 16-Aug-26 via UPI ref no 6228xxxxxxxx to VPA merchant@paytm (Avl Bal: Rs.14,500.00). Call 18002586161 if not done. -HDFC Bank";
+                if (Capacitor.isNativePlatform()) {
+                  await FinancialNotification.simulateSms({
+                    sender: "HD-HDFCBK",
+                    body: sampleText
+                  });
+                  toast.success("Simulated HDFC VPA format");
+                } else {
+                  window.dispatchEvent(new CustomEvent("simulate-sms", { detail: { body: sampleText } }));
+                  toast.success("Simulated HDFC VPA Flow (Web)");
+                }
+              }}
+            >
+              <Phone className="w-3.5 h-3.5 text-emerald-400" />
+              Simulate HDFC VPA
+            </Button>
+
+            <Button 
+              variant="outline" 
+              className="h-12 rounded-2xl border-white/10 hover:bg-white/5 text-xs font-bold gap-2"
+              onClick={async () => {
                 if (Capacitor.isNativePlatform()) {
                   await FinancialNotification.simulateSms({
                     sender: "VM-ICICIB",

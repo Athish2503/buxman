@@ -28,7 +28,7 @@ object TransactionParser {
     private const val THRESHOLD_MIN_CONFIDENCE = 65
 
     // Keywords
-    private val DEBIT_KEYWORDS = listOf("debited", "debit", "deducted", "deduction", "charged", "transferred", "paid", "withdrawn", "spent", "trf to", "sent to", "purchase", "payment made")
+    private val DEBIT_KEYWORDS = listOf("debited", "debit", "deducted", "deduction", "charged", "transferred", "paid", "withdrawn", "spent", "trf to", "sent to", "sent", "sent rs", "sent inr", "sent ₹", "purchase", "payment made", "auto-debited", "auto debited")
     private val CREDIT_KEYWORDS = listOf("credited", "credit", "received", "deposited", "refund received", "salary credited", "cash deposit", "received from", "credited by")
     private val UPI_KEYWORDS = listOf("upi", "vpa", "bhim", "phonepe", "gpay", "paytm")
     private val ACCOUNT_KEYWORDS = listOf("a/c", "account", "acc ", "acct")
@@ -40,10 +40,11 @@ object TransactionParser {
     private val NEGATIVE_PROMO = listOf("promo", "advertisement", "free", "win", "gift voucher", "congratulations")
 
     // Extraction Patterns
-    private val AMOUNT_PATTERN = Pattern.compile("(?:₹|Rs\\.?|INR)\\s*([\\d,]+\\.?\\d*)", Pattern.CASE_INSENSITIVE)
+    private val AMOUNT_PATTERN = Pattern.compile("(?:₹|Rs\\.?|INR|Re\\.?|Rupees?)\\s*([\\d,]+\\.?\\d*)", Pattern.CASE_INSENSITIVE)
+    private val AMOUNT_FALLBACK_PATTERN = Pattern.compile("([\\d,]+\\.?\\d*)\\s*(?:₹|Rs\\.?|INR|Re\\.?|Rupees?|debited|spent|paid|withdrawn|deducted)", Pattern.CASE_INSENSITIVE)
     private val MASKED_ACC_PATTERN = Pattern.compile("(?:X+|\\*+)(\\d{3,6})", Pattern.CASE_INSENSITIVE)
     private val DATE_PATTERN = Pattern.compile("(\\d{1,2}[-/](?:\\d{1,2}|[a-zA-Z]{3})[-/]\\d{2,4})", Pattern.CASE_INSENSITIVE)
-    private val REF_ID_PATTERN = Pattern.compile("(?:ref|txn|id)[:\\s]*([A-Z0-9]{8,20})", Pattern.CASE_INSENSITIVE)
+    private val REF_ID_PATTERN = Pattern.compile("(?:ref|txn|id)[:\\s]*([A-Z0-9xX]{6,20})", Pattern.CASE_INSENSITIVE)
 
     fun parseTransaction(text: String, packageName: String? = null, title: String? = null, extractionSource: String = "Unknown"): ParsedTransactionInfo {
         Log.d(TAG, "--- STARTING PARSE PIPELINE ---")
@@ -91,6 +92,7 @@ object TransactionParser {
                 lowerText.contains("deduction") || 
                 lowerText.contains("spent") || 
                 lowerText.contains("paid") || 
+                lowerText.contains("sent") ||
                 lowerText.contains("withdrawn") || 
                 lowerText.contains("charged")) {
                 type = "debit"
@@ -202,10 +204,21 @@ object TransactionParser {
     }
 
     private fun extractAmount(text: String): Double {
-        val matcher = AMOUNT_PATTERN.matcher(text)
+        // Strip out available balance clauses to avoid balance numbers being extracted as transaction amount
+        val cleanText = text.replace(Regex("(?i)\\(?\\s*(?:avl|avail|available|net|total|clear|updated)?\\s*bal(?:ance)?:?\\s*(?:₹|Rs\\.?|INR|Re\\.?|Rupees?)?\\s*[\\d,]+\\.?\\d*\\)?"), "")
+        
+        val matcher = AMOUNT_PATTERN.matcher(cleanText)
         if (matcher.find()) {
-            return matcher.group(1)?.replace(",", "")?.toDoubleOrNull() ?: 0.0
+            val amt = matcher.group(1)?.replace(",", "")?.toDoubleOrNull()
+            if (amt != null && amt > 0) return amt
         }
+
+        val fallbackMatcher = AMOUNT_FALLBACK_PATTERN.matcher(cleanText)
+        if (fallbackMatcher.find()) {
+            val amt = fallbackMatcher.group(1)?.replace(",", "")?.toDoubleOrNull()
+            if (amt != null && amt > 0) return amt
+        }
+
         return 0.0
     }
 
@@ -230,7 +243,7 @@ object TransactionParser {
     private fun extractMerchant(text: String, type: String): String {
         val lowerText = text.lowercase()
         val markers = if (type == "debit") {
-            listOf("trf to", "transfer to", "sent to", "paid to", "towards ", "at ", "to ", "for ")
+            listOf("to vpa ", "to upi id ", "to upi ", "trf to ", "transfer to ", "sent to ", "paid to ", "towards ", "at ", "to ", "for ")
         } else {
             listOf("received from", "credited by", "refunded by", "cashback from", "from ")
         }
@@ -241,15 +254,29 @@ object TransactionParser {
                 val start = idx + marker.length
                 var end = text.length
                 
-                val endMarkers = listOf(" ref", " txn", " on ", " via", " using", " upi:", " a/c", " from", " to", " for")
+                val endMarkers = listOf(
+                    " (avl", " avl", " (bal", " bal:", " call ", " -", ". call", 
+                    " ref", " txn", " on ", " via", " using", " upi:", " a/c", 
+                    " from", " to ", " for ", " if not"
+                )
                 for (endM in endMarkers) {
                     val endIdx = lowerText.indexOf(endM, start)
                     if (endIdx != -1 && endIdx < end) end = endIdx
                 }
                 
-                val result = text.substring(start, end).trim()
-                val lowerResult = result.lowercase()
-                if (result.length in 3..40 && 
+                var result = text.substring(start, end).trim()
+                var lowerResult = result.lowercase()
+
+                // Clean leading VPA / UPI ID prefixes
+                if (lowerResult.startsWith("vpa ")) {
+                    result = result.substring(4).trim()
+                    lowerResult = result.lowercase()
+                } else if (lowerResult.startsWith("upi id ")) {
+                    result = result.substring(7).trim()
+                    lowerResult = result.lowercase()
+                }
+
+                if (result.length in 2..50 && 
                     !lowerResult.contains("account") && 
                     !lowerResult.contains("a/c") && 
                     !lowerResult.contains("acct")) {

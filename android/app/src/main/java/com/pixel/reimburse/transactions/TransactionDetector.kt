@@ -25,17 +25,26 @@ object TransactionDetector {
             return
         }
 
-        // Overlay is accepted if confidence is >= 50 or if we have a valid amount, confidence >= 40, and not promotional
+        val lowerRaw = text.lowercase()
+        val isMicroOrVerification = parsedInfo.amount <= 1.0 || 
+                lowerRaw.contains("mandate") || 
+                lowerRaw.contains("verification") || 
+                lowerRaw.contains("penny drop") || 
+                lowerRaw.contains("auth")
+
+        // Overlay is accepted if not promotional, not micro/verification, confidence is >= 40, and valid amount
         val accepted = !parsedInfo.isPromotional &&
+                !isMicroOrVerification &&
                 parsedInfo.confidenceScore >= 40 &&
                 (parsedInfo.confidenceScore >= 50 || parsedInfo.amount > 0)
 
         // Log to diagnostics regardless of score
         FinancialNotificationPlugin.logTransactionAttempt(context, parsedInfo, accepted)
 
-        if (parsedInfo.isPromotional) {
-            Log.d(TAG, "[$source] REJECTED: Promotional content detected (Score: ${parsedInfo.confidenceScore})")
-            FinancialNotificationPlugin.logRejection(context, text, source, "Promotional content detected", parsedInfo.matchedKeywords)
+        if (parsedInfo.isPromotional || isMicroOrVerification) {
+            val reason = if (parsedInfo.isPromotional) "Promotional content detected" else "Micro-transaction or verification message suppressed from popup"
+            Log.d(TAG, "[$source] REJECTED: $reason (Score: ${parsedInfo.confidenceScore})")
+            FinancialNotificationPlugin.logRejection(context, text, source, reason, parsedInfo.matchedKeywords)
             return
         }
 

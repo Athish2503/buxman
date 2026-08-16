@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { createPortal } from 'react-dom';
 
 // Import sub-modules
+import { ProfileModule } from './settings/ProfileModule';
 import { OverviewModule } from './settings/OverviewModule';
 import { OrganizationModule } from './settings/OrganizationModule';
 import { SmartFeaturesModule } from './settings/SmartFeaturesModule';
@@ -29,7 +30,7 @@ import { DataManagementModule } from './settings/DataManagementModule';
 import { NavigationSettingsModule } from './settings/NavigationSettingsModule';
 import { Field } from './settings/Common';
 
-type SettingsTab = 'overview' | 'organization' | 'smart' | 'security' | 'categories' | 'budgets' | 'data' | 'navigation';
+type SettingsTab = 'overview' | 'profile' | 'organization' | 'smart' | 'security' | 'categories' | 'budgets' | 'data' | 'navigation';
 
 interface SettingsPageProps {
   theme: 'dark' | 'light';
@@ -158,6 +159,8 @@ export function SettingsPage({ theme, onThemeToggle }: SettingsPageProps) {
     switch (activeTab) {
       case 'overview':
         return <OverviewModule onNavigate={setActiveTab} />;
+      case 'profile':
+        return <ProfileModule settings={settings} updateSettings={updateSettings} onBack={() => setActiveTab('overview')} />;
       case 'organization':
         return <OrganizationModule settings={settings} updateSettings={updateSettings} onBack={() => setActiveTab('overview')} />;
       case 'smart':

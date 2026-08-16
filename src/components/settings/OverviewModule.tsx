@@ -1,17 +1,23 @@
-import { Building, Zap, LayoutGrid, Target, Lock, Database, AppWindow } from 'lucide-react';
+import { User, Building, Zap, LayoutGrid, Target, Lock, Database, AppWindow } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChevronRight } from 'lucide-react';
+import { settingsService } from '@/lib/settings';
+import { UserAvatarIcon, getAvatarOption } from '@/lib/avatar-icons.tsx';
 
-const ModuleCard = ({ icon: Icon, title, description, onClick, color = 'bg-primary' }: { 
-  icon: React.ElementType; title: string; description: string; onClick: () => void; color?: string;
+const ModuleCard = ({ icon: Icon, title, description, onClick, color = 'bg-primary', iconId }: { 
+  icon?: React.ElementType; title: string; description: string; onClick: () => void; color?: string; iconId?: string;
 }) => (
   <button 
     onClick={onClick}
     className="w-full flex items-center gap-4 p-4 rounded-3xl border border-border/40 bg-card/40 dark:bg-card/40 backdrop-blur-md hover:border-primary/40 hover:bg-muted/10 transition-all text-left group shadow-sm dark:shadow-none"
   >
-    <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform", color)}>
-      <Icon className="h-6 w-6 text-white" />
-    </div>
+    {iconId ? (
+      <UserAvatarIcon iconId={iconId} className="h-12 w-12 rounded-2xl group-hover:scale-110 transition-transform" iconClassName="h-6 w-6" />
+    ) : (
+      <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform text-xl", color)}>
+        {Icon ? <Icon className="h-6 w-6 text-white" /> : null}
+      </div>
+    )}
     <div className="flex-1 min-w-0">
       <h4 className="font-bold text-sm">{title}</h4>
       <p className="text-xs text-muted-foreground truncate">{description}</p>
@@ -25,8 +31,18 @@ interface OverviewModuleProps {
 }
 
 export function OverviewModule({ onNavigate }: OverviewModuleProps) {
+  const settings = settingsService.get();
+  const profile = settings.userProfile;
+  const displayName = profile?.nickname || profile?.name || 'Set up profile';
+  const avatarIcon = profile?.avatarIcon || 'Zap';
+  const iconOption = getAvatarOption(avatarIcon);
+
   return (
     <div className="grid grid-cols-1 gap-3 px-1">
+      <ModuleCard 
+        iconId={avatarIcon} title="Personal Profile" description={`${displayName} • ${iconOption.label} Avatar, name & persona`} 
+        onClick={() => onNavigate('profile')}
+      />
       <ModuleCard 
         icon={Building} title="Organization" description="Company & personal billing details" 
         onClick={() => onNavigate('organization')} color="bg-blue-500"

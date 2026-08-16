@@ -4,6 +4,13 @@ import { storageEngine } from '@/lib/storage-engine';
 const SETTINGS_KEY = 'reimburse_settings_v2';
 
 const defaultSettings: AppSettings = {
+  userProfile: {
+    name: '',
+    nickname: '',
+    avatarEmoji: '⚡',
+    avatarIcon: 'Zap',
+    roleTagline: 'Personal Account',
+  },
   billedTo: {
     name: 'Company Name',
     line2: 'Accounts Payable Dept.',
@@ -48,9 +55,23 @@ export const settingsService = {
       const stored = localStorage.getItem(SETTINGS_KEY);
       if (!stored) return defaultSettings;
       const parsed = JSON.parse(stored);
+      const userProfile = {
+        ...defaultSettings.userProfile,
+        ...(parsed.userProfile || {}),
+      };
+      
+      // Auto-fallback profile name from billedFrom if userProfile name is empty
+      if (!userProfile.name && parsed.billedFrom?.name && parsed.billedFrom.name !== 'Employee Name') {
+        userProfile.name = parsed.billedFrom.name;
+        if (!userProfile.nickname) {
+          userProfile.nickname = parsed.billedFrom.name.split(' ')[0];
+        }
+      }
+
       return {
         ...defaultSettings,
         ...parsed,
+        userProfile,
         billedTo: { ...defaultSettings.billedTo, ...parsed.billedTo },
         billedFrom: { ...defaultSettings.billedFrom, ...parsed.billedFrom },
         budgets: parsed.budgets || [],

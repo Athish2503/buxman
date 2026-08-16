@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Camera, Bell, Mic, Fingerprint, CheckCircle2, ArrowRight, ShieldCheck, 
-  Lock, Sparkles, Coins, Info, Smartphone, Eye, Volume2, Landmark, Check
+  Lock, Sparkles, Coins, Info, Smartphone, Eye, Volume2, Landmark, Check, User
 } from 'lucide-react';
 import { permissions } from '@/lib/permissions';
 import { settingsService } from '@/lib/settings';
@@ -15,6 +15,7 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import confetti from 'canvas-confetti';
+import { AVATAR_ICON_OPTIONS, UserAvatarIcon } from '@/lib/avatar-icons.tsx';
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -22,6 +23,7 @@ interface OnboardingProps {
 
 const STEPS = [
   { id: 'welcome', label: 'Welcome' },
+  { id: 'profile', label: 'Profile' },
   { id: 'core_perms', label: 'System Access' },
   { id: 'auto_perms', label: 'Autopilot' },
   { id: 'voice_perm', label: 'Smart Dictation' },
@@ -37,6 +39,8 @@ const CURRENCIES = [
   { code: 'CAD', symbol: '$', label: 'Canadian Dollar' },
   { code: 'AUD', symbol: '$', label: 'Australian Dollar' },
 ];
+
+const ONBOARDING_EMOJIS = ['⚡', '🚀', '👑', '🦊', '🎯', '💎', '🦁', '🌟', '🎨', '🔥', '☕', '🕶️'];
 
 export function Onboarding({ onComplete }: OnboardingProps) {
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
@@ -69,10 +73,13 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     microphone: false
   });
 
-  // Settings State
+  // Settings & Profile State
   const [selectedCurrency, setSelectedCurrency] = useState('INR');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [userNickname, setUserNickname] = useState('');
+  const [userAvatarIcon, setUserAvatarIcon] = useState('Zap');
 
   // Load initial settings and check permissions
   const queryAllPermissions = async () => {
@@ -306,12 +313,25 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     setLoading(true);
     playSuccess();
     
-    // Save currency to settings
+    // Save settings and user profile
     const currentSettings = settingsService.get();
+    const trimmedName = userName.trim();
+    const trimmedNick = userNickname.trim() || trimmedName.split(' ')[0] || 'User';
+
     settingsService.save({
       ...currentSettings,
       currency: selectedCurrency,
-      biometricLock: biometricEnabled
+      biometricLock: biometricEnabled,
+      userProfile: {
+        name: trimmedName,
+        nickname: trimmedNick,
+        avatarIcon: userAvatarIcon,
+        roleTagline: 'Personal Account',
+      },
+      billedFrom: {
+        ...currentSettings.billedFrom,
+        name: trimmedName || currentSettings.billedFrom.name,
+      }
     });
 
     // Mark onboarded
@@ -445,6 +465,73 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                         <h3 className="text-sm font-bold text-foreground">Smart Speech Input</h3>
                         <p className="text-xs text-muted-foreground">Dictate transactions directly with natural voice recognition support.</p>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Render step Profile Personalization */}
+              {currentStep.id === 'profile' && (
+                <div className="space-y-6">
+                  <div className="space-y-2 text-center">
+                    <UserAvatarIcon 
+                      iconId={userAvatarIcon} 
+                      className="h-16 w-16 rounded-2xl mx-auto border-2 text-3xl shadow-glow" 
+                      iconClassName="h-8 w-8"
+                    />
+                    <h2 className="text-2xl font-display font-black">Personalize Workspace</h2>
+                    <p className="text-sm text-muted-foreground leading-relaxed px-4">
+                      Let Buxman know who you are to customize greetings, badges, and reports.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4 text-left">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Select Avatar Icon</label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {AVATAR_ICON_OPTIONS.slice(0, 8).map((opt) => {
+                          const isSelected = userAvatarIcon === opt.id;
+                          const IconComp = opt.icon;
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => { playTick(); setUserAvatarIcon(opt.id); }}
+                              className={cn(
+                                "p-2.5 rounded-2xl border flex flex-col items-center justify-center gap-1 transition-all active:scale-95",
+                                isSelected
+                                  ? cn("border-primary ring-2 ring-primary/40 shadow-sm scale-105", opt.bgGradient, opt.textColor)
+                                  : "border-white/5 bg-card/40 hover:border-white/20 text-muted-foreground"
+                              )}
+                            >
+                              <IconComp className={cn("h-5 w-5", isSelected ? opt.textColor : "text-muted-foreground")} />
+                              <span className="text-[9px] font-bold truncate max-w-full">{opt.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Full Name</label>
+                      <input
+                        type="text"
+                        value={userName}
+                        onChange={(e) => setUserName(e.target.value)}
+                        placeholder="e.g. Alex Morgan"
+                        className="w-full h-11 px-4 rounded-2xl bg-card/60 border border-white/10 text-foreground placeholder:text-muted-foreground/50 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Preferred Greeting Name</label>
+                      <input
+                        type="text"
+                        value={userNickname}
+                        onChange={(e) => setUserNickname(e.target.value)}
+                        placeholder="e.g. Alex"
+                        className="w-full h-11 px-4 rounded-2xl bg-card/60 border border-white/10 text-foreground placeholder:text-muted-foreground/50 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                      />
                     </div>
                   </div>
                 </div>

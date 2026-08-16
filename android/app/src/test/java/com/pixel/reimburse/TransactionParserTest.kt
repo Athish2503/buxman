@@ -80,4 +80,27 @@ class TransactionParserTest {
         assertEquals(100.0, result2.amount, 0.0)
         assertEquals("debit", result2.type) // Should resolve to debit
     }
+
+    @Test
+    fun testUserHdfcVpaFormat() {
+        val text = "Rs.500.00 debited from A/c **1234 on 16-Aug-26 via UPI ref no 6228xxxxxxxx to VPA merchant@paytm (Avl Bal: Rs.14,500.00). Call 18002586161 if not done. -HDFC Bank"
+        val result = TransactionParser.parseTransaction(text, "com.android.messaging", "SMS")
+        assertNotNull(result)
+        assertEquals(500.0, result.amount, 0.0)
+        assertEquals("MERCHANT@PAYTM", result.merchant)
+        assertEquals("debit", result.type)
+        assertEquals("**1234", result.account)
+        assertTrue(result.confidenceScore >= 50)
+    }
+
+    @Test
+    fun testSentMessageFormat() {
+        val text = "Sent Rs. 500.00 to merchant@paytm via UPI"
+        val result = TransactionParser.parseTransaction(text, "com.android.messaging", "SMS")
+        assertNotNull(result)
+        assertEquals(500.0, result.amount, 0.0)
+        assertEquals("MERCHANT@PAYTM", result.merchant)
+        assertEquals("debit", result.type)
+        assertTrue(result.confidenceScore >= 40)
+    }
 }

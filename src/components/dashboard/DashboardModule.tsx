@@ -16,6 +16,7 @@ import { ExpenseList } from '@/components/expense-list';
 import { settingsService } from '@/lib/settings';
 import { haptics } from '@/lib/haptics';
 import { mediaService } from '@/lib/media-service';
+import { UserAvatarIcon } from '@/lib/avatar-icons.tsx';
 
 interface DashboardModuleProps {
   expenses: Expense[];
@@ -90,6 +91,10 @@ function BalanceHeroCard({
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const userProfile = settingsService.get().userProfile;
+  const displayName = userProfile?.nickname || userProfile?.name;
+  const avatarIcon = userProfile?.avatarIcon || 'Zap';
+  const greetingText = displayName ? `${greeting}, ${displayName}` : greeting;
 
   return (
     <motion.div
@@ -102,10 +107,14 @@ function BalanceHeroCard({
         <div>
           {/* Top Header Row */}
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shadow-sm">
-                <Sparkles className="h-4.5 w-4.5" />
-              </div>
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={() => onNavigate('settings')}
+                title="View & edit profile"
+                className="hover:scale-105 active:scale-95 transition-all"
+              >
+                <UserAvatarIcon iconId={avatarIcon} className="h-9 w-9 rounded-xl border shadow-sm" iconClassName="h-4.5 w-4.5" />
+              </button>
               <div 
                 className="select-none active:scale-95 transition-transform" 
                 onClick={() => {
@@ -124,7 +133,7 @@ function BalanceHeroCard({
                   }
                 }}
               >
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none">{greeting}</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none">{greetingText}</p>
                 <h2 className="text-xs font-bold text-foreground tracking-tight mt-0.5">
                   Financial Hub
                 </h2>
